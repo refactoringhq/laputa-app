@@ -506,6 +506,12 @@ function updateSelectedBlocksToType(
   }
 }
 
+function useRequiredComponentsContext() {
+  const components = useComponentsContext()
+  if (!components) throw new Error('BlockNote components context is unavailable')
+  return components
+}
+
 function TolariaBasicTextStyleButton({
   basicTextStyle,
   locale = 'en',
@@ -513,7 +519,7 @@ function TolariaBasicTextStyleButton({
   basicTextStyle: TolariaBasicTextStyle
   locale?: AppLocale
 }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const editor = useBlockNoteEditor<
     BlockSchema,
     InlineContentSchema,
@@ -633,7 +639,7 @@ function TolariaBlockTypeSelect() {
 }
 
 function TolariaFileDownloadButton({ vaultPath }: { vaultPath?: string }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const dict = useDictionary()
   const editor = useBlockNoteEditor<
     BlockSchema,

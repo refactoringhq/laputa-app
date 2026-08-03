@@ -1,25 +1,9 @@
 import { ArrowUpRight, Check, Copy, Handshake, Megaphone } from '@phosphor-icons/react'
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   BUG_REPORT_PATH,
   CONTRIBUTION_ANALYTICS_EVENT,
@@ -32,10 +16,7 @@ import {
   type ContributionIcon,
   type ContributionTone,
 } from '../constants/feedback'
-import {
-  buildSanitizedDiagnosticBundle,
-  startFeedbackDiagnosticsCapture,
-} from '../lib/feedbackDiagnostics'
+import { buildSanitizedDiagnosticBundle, startFeedbackDiagnosticsCapture } from '../lib/feedbackDiagnostics'
 import { trackEvent } from '../lib/telemetry'
 import { cn } from '../lib/utils'
 import { takeFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
@@ -142,18 +123,19 @@ function ContributionLinkButton({
   )
 }
 
-function ContributionCard({
-  title,
-  description,
-  ctaLabel,
-  icon: Icon,
-  tone,
-  onAction,
-  autoFocus = false,
-  className,
-  inlineAction = false,
-  secondaryAction,
-}: ContributionCardProps) {
+function ContributionCard(options: ContributionCardProps) {
+  const {
+    title,
+    description,
+    ctaLabel,
+    icon: Icon,
+    tone,
+    onAction,
+    autoFocus = false,
+    className,
+    inlineAction = false,
+    secondaryAction,
+  } = options
   const compactActionClassName = secondaryAction ? 'min-w-0 px-3 text-sm' : undefined
   const primaryAction = (
     <ContributionLinkButton
@@ -168,10 +150,12 @@ function ContributionCard({
   return (
     <Card className={cn('gap-4 border-border/70 py-4 shadow-none', className)}>
       <CardHeader className="gap-3 px-4">
-        <div className={cn(
+        <div
+          className={cn(
           'flex gap-3',
           inlineAction ? 'flex-col sm:flex-row sm:items-center sm:justify-between' : 'items-center',
-        )}>
+          )}
+        >
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <span className={cn('rounded-md p-2', Reflect.get(CONTRIBUTION_TONE_CLASSES, tone))}>
               <Icon size={16} />
@@ -221,19 +205,14 @@ function SponsorLogoCard({
                     type="button"
                     variant="ghost"
                     className="h-11 bg-transparent px-1.5 shadow-none hover:bg-transparent hover:opacity-80 lg:w-32"
-                    aria-label={t('feedback.sponsors.logoLinkLabel', { sponsor: sponsor.name })}
-                    onClick={() => openTrackedContributionLink(
-                      sponsor.analyticsAction,
-                      sponsor.name,
-                      sponsor.url,
-                      onOpenLink,
-                    )}
+                    aria-label={t('feedback.sponsors.logoLinkLabel', {
+                      sponsor: sponsor.name,
+                    })}
+                    onClick={() =>
+                      openTrackedContributionLink(sponsor.analyticsAction, sponsor.name, sponsor.url, onOpenLink)
+                    }
                   >
-                    <img
-                      className="max-h-6 max-w-[7.25rem] object-contain dark:hidden"
-                      src={sponsor.darkLogo}
-                      alt=""
-                    />
+                    <img className="max-h-6 max-w-[7.25rem] object-contain dark:hidden" src={sponsor.darkLogo} alt="" />
                     <img
                       className="hidden max-h-6 max-w-[7.25rem] object-contain dark:block"
                       src={sponsor.lightLogo}
@@ -248,18 +227,19 @@ function SponsorLogoCard({
           </div>
         </div>
         <CardDescription className="text-sm leading-6 text-muted-foreground">
-          {t('feedback.sponsors.description')}{' '}
-          {t('feedback.sponsors.developmentSentencePrefix')}{' '}
+          {t('feedback.sponsors.description')} {t('feedback.sponsors.developmentSentencePrefix')}{' '}
           <Button
             type="button"
             variant="link"
             className="h-auto p-0 align-baseline text-sm leading-6 text-[var(--accent-blue)]"
-            onClick={() => openTrackedContributionLink(
+            onClick={() =>
+              openTrackedContributionLink(
               SPONSOR_DEVELOPMENT_ARTICLE_LINK.analyticsAction,
               t(SPONSOR_DEVELOPMENT_ARTICLE_LINK.labelKey),
               SPONSOR_DEVELOPMENT_ARTICLE_LINK.url,
               onOpenLink,
-            )}
+              )
+            }
           >
             {t(SPONSOR_DEVELOPMENT_ARTICLE_LINK.textKey)}
           </Button>
@@ -329,9 +309,7 @@ function BugReportActions({
         <p className="text-xs font-medium text-foreground">{t('feedback.diagnosticsCopiedSentence')}</p>
       ) : null}
       {copyState === 'failed' ? (
-        <p className="text-xs font-medium text-[var(--feedback-warning-text)]">
-          {t('feedback.clipboardUnavailable')}
-        </p>
+        <p className="text-xs font-medium text-[var(--feedback-warning-text)]">{t('feedback.clipboardUnavailable')}</p>
       ) : null}
     </div>
   )
@@ -353,9 +331,11 @@ function useDialogReturnFocus(open: boolean, onClose: () => void) {
     onClose()
     window.setTimeout(() => {
       if (reopenCommandPalette) {
-        window.dispatchEvent(new CustomEvent(APP_COMMAND_EVENT_NAME, {
+        window.dispatchEvent(
+          new CustomEvent(APP_COMMAND_EVENT_NAME, {
           detail: APP_COMMAND_IDS.viewCommandPalette,
-        }))
+          }),
+        )
         return
       }
 
@@ -387,7 +367,8 @@ function useFeedbackDialogActions(diagnosticsBundle: string) {
       return
     }
 
-    void navigator.clipboard.writeText(diagnosticsBundle)
+    void navigator.clipboard
+      .writeText(diagnosticsBundle)
       .then(() => {
         setCopyState('copied')
       })
@@ -435,12 +416,14 @@ function ContributionGrid({
         tone={NEWSLETTER_PATH.tone}
         autoFocus={true}
         inlineAction={true}
-        onAction={() => openTrackedContributionLink(
+        onAction={() =>
+          openTrackedContributionLink(
           NEWSLETTER_PATH.analyticsAction,
           t(NEWSLETTER_PATH.labelKey),
           NEWSLETTER_PATH.url,
           onOpenLink,
-        )}
+          )
+        }
       />
       <SponsorLogoCard className="sm:col-span-2" onOpenLink={onOpenLink} t={t} />
       {CONTRIBUTION_PATHS.map((path) => {
@@ -454,26 +437,25 @@ function ContributionGrid({
             ctaLabel={t(path.ctaLabelKey)}
             icon={path.icon}
             tone={path.tone}
-            onAction={() => openTrackedContributionLink(
-              path.analyticsAction,
-              t(path.labelKey),
-              path.url,
-              onOpenLink,
-            )}
-            secondaryAction={secondaryLink ? (
+            onAction={() => openTrackedContributionLink(path.analyticsAction, t(path.labelKey), path.url, onOpenLink)}
+            secondaryAction={
+              secondaryLink ? (
               <ContributionLinkButton
                 label={t(secondaryLink.ctaLabelKey)}
                 tone={path.tone}
                 accented={false}
                 className="min-w-0 px-3 text-sm"
-                onAction={() => openTrackedContributionLink(
+                  onAction={() =>
+                    openTrackedContributionLink(
                   secondaryLink.analyticsAction,
                   t(secondaryLink.labelKey),
                   secondaryLink.url,
                   onOpenLink,
-                )}
+                    )
+                  }
               />
-            ) : undefined}
+              ) : undefined
+            }
           />
         )
       })}
@@ -483,13 +465,15 @@ function ContributionGrid({
         ctaLabel={t(BUG_REPORT_PATH.ctaLabelKey)}
         icon={BUG_REPORT_PATH.icon}
         tone={BUG_REPORT_PATH.tone}
-        onAction={() => openTrackedContributionLink(
+        onAction={() =>
+          openTrackedContributionLink(
           BUG_REPORT_PATH.analyticsAction,
           t(BUG_REPORT_PATH.labelKey),
           BUG_REPORT_PATH.url,
           onOpenLink,
-        )}
-        secondaryAction={(
+          )
+        }
+        secondaryAction={
           <BugReportActions
             buttonClassName="min-w-0 px-3 text-sm"
             copyState={copyState}
@@ -497,35 +481,27 @@ function ContributionGrid({
             onCopyDiagnostics={onCopyDiagnostics}
             t={t}
           />
-        )}
+        }
       />
     </div>
   )
 }
 
-export function FeedbackDialog({
-  open,
-  onClose,
-  buildNumber,
-  locale = 'en',
-  releaseChannel,
-}: FeedbackDialogProps) {
+export function FeedbackDialog({ open, onClose, buildNumber, locale = 'en', releaseChannel }: FeedbackDialogProps) {
   const t = createTranslator(locale)
   const detectedBuildNumber = useBuildNumber()
   const resolvedBuildNumber = buildNumber ?? detectedBuildNumber
   const diagnosticsBundle = useMemo(
-    () => buildSanitizedDiagnosticBundle({ buildNumber: resolvedBuildNumber, releaseChannel }),
+    () =>
+      buildSanitizedDiagnosticBundle({
+        buildNumber: resolvedBuildNumber,
+        releaseChannel,
+      }),
     [releaseChannel, resolvedBuildNumber],
   )
   const handleRequestClose = useDialogReturnFocus(open, onClose)
-  const {
-    linkFallback,
-    copyState,
-    canCopyDiagnostics,
-    handleOpenLink,
-    handleCopyDiagnostics,
-    reset,
-  } = useFeedbackDialogActions(diagnosticsBundle)
+  const { linkFallback, copyState, canCopyDiagnostics, handleOpenLink, handleCopyDiagnostics, reset } =
+    useFeedbackDialogActions(diagnosticsBundle)
 
   useEffect(() => startFeedbackDiagnosticsCapture(), [])
 
@@ -535,16 +511,19 @@ export function FeedbackDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) handleClose() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) handleClose()
+      }}
+    >
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[820px]" data-testid="feedback-dialog">
         <DialogHeader className="space-y-2">
           <DialogTitle className="flex items-center gap-2">
             <Megaphone size={18} weight="duotone" />
             {t('feedback.title')}
           </DialogTitle>
-          <DialogDescription>
-            {t('feedback.description')}
-          </DialogDescription>
+          <DialogDescription>{t('feedback.description')}</DialogDescription>
         </DialogHeader>
 
         <LinkFallbackBanner linkFallback={linkFallback} t={t} />

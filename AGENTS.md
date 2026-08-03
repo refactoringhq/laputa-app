@@ -4,7 +4,7 @@
 
 ### Start working on a task
 
-**Before writing a single line of code:** inspect the configured CodeScene project's current Hotspot and Average Code Health and compare them with `.codescene-thresholds`. Then capture the file-level Code Health score for every existing code file you intend to edit. If the project is already below the threshold, **stop and refactor first** — find the worst files with the MCP, improve them, commit, then start the task. Never start feature work on a codebase that is already below the gate.
+**Before writing a single line of code:** inspect the configured CodeScene project's current Hotspot and Average Code Health and compare them with `.codescene-thresholds`. Then capture the file-level Code Health score for every existing code file you intend to edit. If the project is already below the threshold, **stop and refactor first** — find the worst files with the MCP, improve them, commit, then start the task. If the gate cannot be restored, stop and obtain explicit repository-owner direction before starting feature work.
 
 - Read task description and all comments fully
 - For To Rework: the ❌ QA failed comment tells you exactly what to fix
@@ -19,7 +19,7 @@
 - Commit every 20–30 min: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Pre-commit is a lightweight lint gate only. Pre-push runs the full check suite (build + tests + coverage + core Playwright smoke + CodeScene), preferably on three Chunk sidecar lanes for automatic test/coverage work: frontend lint/build/coverage, Rust coverage, and Playwright smoke. The goal is lower wall-clock time than local hooks while keeping each heavy gate isolated; keep local Playwright mainly for authoring, focused reproduction, or sidecar outages.
 - CircleCI is the authoritative outer-loop CI/CD system. `.circleci/config.yml` owns validation, native cross-platform release builds, GitHub Release publication, and Pages publication.
-- **A task is NOT done until `git push origin main` succeeds.** If the hook blocks: read the error, fix it (clippy, tests, CodeScene, build), commit the fix, push again. **⛔ NEVER use --no-verify**
+- **A task is NOT done until `git push origin main` succeeds.** If the hook blocks: read the error, fix it (clippy, tests, CodeScene, build), commit the fix, push again. If a verified push is impossible, stop and obtain explicit repository-owner direction; do not use `--no-verify` without that recorded approval.
 
 ### TDD (mandatory)
 
@@ -29,7 +29,7 @@ Red → Green → Refactor → Commit. One cycle per commit. For bugs: write fai
 
 ### Localization (mandatory for UI copy)
 
-All user-facing UI labels/copy must live in `src/lib/locales/en.json` and be translated into every target listed in `lara.yaml`. When adding or changing interface copy:
+All user-facing UI labels/copy must live in `src/lib/locales/en.json` and be translated into every target listed in `lara.yaml`. If the localization tooling cannot satisfy this rule, stop and obtain explicit repository-owner direction. When adding or changing interface copy:
 
 ```bash
 pnpm l10n:translate
@@ -39,40 +39,47 @@ Use `pnpm l10n:translate:force` only when intentionally regenerating existing tr
 
 ### Product analytics (mandatory for meaningful features)
 
-New features should almost always emit a PostHog event so we can see whether users actually discover and use them. Skip instrumentation only for very small changes where a dedicated event would create noise. Use clear, stable event names, avoid PII or note content, and include only safe metadata that helps evaluate adoption and failures.
+New features should emit a PostHog event so we can see whether users actually discover and use them. Skip instrumentation when the change has no meaningful user action or when a dedicated event would create noise; record that reason in the completion comment. If the correct instrumentation remains unclear, obtain repository-owner direction before release. Use clear, stable event names, avoid PII or note content, and include only safe metadata that helps evaluate adoption and failures.
 
 When adding or changing a meaningful user-facing feature, include the event name(s) in the Todoist completion comment alongside QA, docs, and code health. If intentionally not instrumenting a feature, explain why in the completion comment.
 
 ### Code health (mandatory)
 
-Pre-push enforces **Hotspot Code Health** and **Average Code Health** ≥ thresholds in `.codescene-thresholds`. Pre-commit is lint-only; CodeScene remains mandatory through the file-level review rules below and the pre-push ratchet gate. Thresholds are a **ratchet** — only go up. When pre-push sees improved remote scores, it updates `.codescene-thresholds`, stages it, and stops so you can commit the new floor with normal verified hooks before pushing again. Never add `// eslint-disable`, `#[allow(...)]`, or `as any`.
+Pre-push enforces **Hotspot Code Health** and **Average Code Health** ≥ thresholds in `.codescene-thresholds`. Pre-commit is lint-only; CodeScene remains mandatory through the file-level review rules below and the pre-push ratchet gate. Thresholds are a **ratchet** — only go up. When pre-push sees improved remote scores, it updates `.codescene-thresholds`, stages it, and stops so you can commit the new floor with normal verified hooks before pushing again. If an exception such as `// eslint-disable`, `#[allow(...)]`, or `as any` appears necessary, stop and obtain explicit repository-owner approval before adding it.
 
-**Release rule:** CodeScene is a before/after gate, not just a final score. Every task must record the starting CodeScene state before edits and the final state after edits. If touched code gets worse, refactor before committing.
+**Release rule:** CodeScene is a before/after gate, not just a final score. Record the starting CodeScene state before edits and the final state after edits. If touched code gets worse, refactor before committing; if the comparison cannot be produced, stop and obtain explicit repository-owner direction.
 
-**⛔ NEVER edit `.codescene-thresholds` to lower the values.** If the gate blocks you, improve the code — do not lower the bar.
+Do not edit `.codescene-thresholds` to lower the values. If the gate blocks you, improve the code; any proposed exception requires explicit repository-owner approval recorded before the edit.
 
 **CodeScene access order:** use CodeScene MCP tools if available. If MCP is unavailable, use the installed `cs` CLI for file-level review/delta work, and use the CodeScene API (`CODESCENE_PAT` + `CODESCENE_PROJECT_ID`) for project-wide Hotspot/Average threshold checks from `.codescene-thresholds`.
 
-**Before editing any existing code file:** capture its current file-level CodeScene score. After your edits, re-run the same file-level review and verify the score is higher. If the file already starts at `10.0`, it must remain `10.0`.
+**Before editing any existing code file:** capture its current file-level CodeScene score. After your edits, re-run the same file-level review and verify the score is higher. If the file already starts at `10.0`, it must remain `10.0`; if the score cannot be obtained or preserved, stop and obtain explicit repository-owner direction.
 
-**New files:** every new **scorable code file** must reach CodeScene score `10.0` before commit. If CodeScene reports `null` / "no scorable code" for a new file, it must still have zero CodeScene findings/warnings.
+**New files:** every new **scorable code file** must reach CodeScene score `10.0` before commit. If CodeScene reports `null` / "no scorable code" for a new file, it must still have zero CodeScene findings/warnings. If either requirement cannot be met, stop and obtain explicit repository-owner direction.
 
-**Before every commit:** run CodeScene file-level review on every touched or newly created code file and verify the rule above. Then run `mcp__codescene__pre_commit_code_health_safeguard` for the repository and do not commit unless its quality gates pass. **Boy Scout Rule:** every file you touch must leave with a higher score, unless it was already `10.0`, in which case it must stay `10.0`.
+**Before every commit:** run CodeScene file-level review on every touched or newly created code file and verify the rule above. Then run `mcp__codescene__pre_commit_code_health_safeguard` for the repository and do not commit unless its quality gates pass. **Boy Scout Rule:** every file you touch must leave with a higher score, unless it was already `10.0`, in which case it must stay `10.0`. If an analyzer or gate is unavailable, stop and obtain explicit repository-owner approval for a documented exception.
 
-**Before the final direct-to-main push:** run `mcp__codescene__analyze_change_set` with `base_ref=origin/main`. This is Tolaria's PR-preflight equivalent: every affected file must be improved or stable, and the overall quality gate must pass. Refactor and repeat if any file is degraded.
+**Before the final direct-to-main push:** run `mcp__codescene__analyze_change_set` with `base_ref=origin/main`. This is Tolaria's PR-preflight equivalent: every affected file must be improved or stable, and the overall quality gate must pass. Refactor and repeat if any file is degraded; if the analysis cannot complete, stop and obtain explicit repository-owner direction.
 
-**If CodeScene gate blocks your push:** use `mcp__codescene__code_health_score` to find the worst file, refactor it, commit, push again. Do NOT stop or wait for laputa-refactor — that is a background loop, not a substitute for fixing your own regressions.
+**If CodeScene gate blocks your push:** use `mcp__codescene__code_health_score` to find the worst file, refactor it, commit, push again. Do not wait for laputa-refactor because it is a background loop rather than a substitute for fixing your own regressions; if no in-scope refactor can restore the gate, stop and obtain explicit repository-owner direction.
 
 ### Security scan with Codacy (mandatory)
 
 Use Codacy as a security and static-analysis gate before a task is considered releasable.
 
-- **Before editing:** record Codacy findings for every touched code file using the MCP; if unavailable, use `.codacy/cli.sh analyze <path> --format sarif` with every relevant configured tool.
-- **Zero-new-findings rule:** added or modified code must introduce no Codacy finding at any severity, including findings reported on unchanged lines or at file level because of the change.
-- **Boy Scout Rule:** after editing, every touched file must have fewer findings; a zero-finding file must stay at zero. Fix every existing Critical/High finding in a touched file.
-- **New files:** every new code file must have zero Codacy findings at every severity.
-- **Before every commit:** re-scan every touched/new code file and compare with its recorded baseline. Do not rely on added-line filtering alone.
-- **Escalation:** if a scanner is unavailable or a finding is demonstrably false, stop and obtain explicit repository-owner approval recorded in the completion comment; never suppress a rule merely to pass.
+- **Two required checks:** Codacy's local CLI/MCP analyzes the uncommitted working tree, while the Codacy dashboard also runs server-side tools after a commit is pushed. These are complementary gates. Report each count with its source; if either check is unavailable, stop and obtain explicit repository-owner approval instead of substituting one for the other.
+- **What counts as new code:** both a newly created code, test, script, or executable configuration file and any added code in an existing file. Scan the entire containing file, not only the added lines, because Codacy tools can report findings on unchanged lines or at file level after a change.
+- **Build the scan manifest:** before each Codacy check, enumerate added and modified tracked paths with `git diff --name-only --diff-filter=ACMR "$(git merge-base HEAD origin/main)" --` and untracked paths with `git ls-files --others --exclude-standard`. Classify every code, test, script, and executable configuration path as new or existing, record the manifest in the task evidence, and scan every path individually. Rebuild the manifest immediately before commit so no late-created file is omitted.
+- **Before editing existing code:** run a local file scan and record every finding for each code file you intend to touch. Also record that file's findings on Codacy's currently analyzed `main` commit using `codacy_list_files` to resolve the file and `codacy_get_file_issues` to enumerate all paginated results.
+- **Local file scan:** use `mcp__codacy__codacy_cli_analyze` with the repository's absolute `rootPath` and an explicit `file`, one touched/new file at a time. If the MCP is unavailable or fails, run `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 .codacy/cli.sh analyze <path> --format sarif --output /tmp/codacy-<slug>.sarif`. Omit `--tool` so every locally configured analyzer runs. Explicitly inspect every `runs[].results[]` entry in the SARIF output.
+- **Fail closed on partial scans:** a zero process exit code is not enough. Confirm the expected relevant tools produced SARIF runs and inspect scan logs for crashes, encoding failures, skipped target files, partial analysis, or missing tool output. If any relevant analyzer did not complete, the scan did not pass.
+- **Zero-new-findings rule:** added or modified code must introduce no Codacy finding at any severity, including Info/Minor, Warning/Medium, High/Error/Critical, unclassified findings, and findings reported on unchanged lines or at file level because of the change. If this cannot be achieved, stop and obtain explicit repository-owner approval for a documented exception.
+- **New code — absolute zero rule:** every new code file and every file containing newly added code must be scanned explicitly after creation or modification and must have exactly zero findings attributable to the new code at every severity. A newly created file must have exactly zero findings in the whole file. For added code in an existing file, any finding on an added line, caused by an added symbol or dependency, or newly appearing at file level fails the gate. `0 Critical + 0 High + 0 Medium + 0 Minor + 0 Info + 0 unclassified` is the only passing result. If a scanner cannot prove this, stop and obtain explicit repository-owner approval before proceeding.
+- **Boy Scout Rule for existing files:** after editing, every touched file must have fewer local findings than its recorded baseline; a zero-finding file must stay at zero. Fix every existing Critical/High finding in a touched file; if this cannot be achieved, stop and obtain explicit repository-owner approval for the documented exception.
+- **Before every commit:** re-scan every touched/new code file individually and compare the complete SARIF results with its recorded baseline. Do not rely on added-line filtering, repository totals, or `pnpm codacy:gate` alone; if an individual scan cannot complete, stop and obtain explicit repository-owner approval.
+- **Post-push dashboard verification:** after `git push origin main`, wait until `codacy_get_repository_with_analysis` reports the exact pushed SHA as `lastAnalysedCommit`. Then query all paginated dashboard findings for every touched/new file. Every new code file must have zero dashboard findings at every severity; every existing touched file must have no new finding and must have fewer findings than its pre-edit dashboard baseline (or remain at zero). If the dashboard reports a finding or has not analyzed the pushed SHA, fix it, commit, push, wait for that SHA's analysis, and verify again; if verification cannot complete, stop and obtain explicit repository-owner direction.
+- **Repository-wide dashboard counts:** use `codacy_get_repository_with_analysis` for the total and `codacy_list_repository_issues` with full pagination for severity/tool breakdowns. Derive the provider/organization/repository from the Git remote without printing credential-bearing remote URLs; for this repository use `gh` / `refactoringhq` / `tolaria` and branch `main`.
+- **Escalation:** if a scanner is unavailable or a finding is demonstrably false, stop and obtain explicit repository-owner approval recorded in the completion comment. Rule suppression requires that same explicit approval and documentation.
 - `pnpm codacy:gate` is a required fail-closed added-line safety net in pre-push and CI; it does not replace the touched-file before/after check.
 
 ### Check suite (runs on every push)
@@ -82,8 +89,8 @@ cargo test && cargo llvm-cov --manifest-path src-tauri/Cargo.toml --no-clean --f
 ```
 
 Coverage is a release gate, not a vanity metric:
-- Frontend coverage must stay ≥70%.
-- Rust line coverage must stay ≥85%.
+- Frontend coverage must stay ≥70%; if the gate cannot be restored, stop and obtain explicit repository-owner direction.
+- Rust line coverage must stay ≥85%; if the gate cannot be restored, stop and obtain explicit repository-owner direction.
 - For bug fixes, add a regression test when practical.
 - For new behavior, add targeted coverage close to the changed code; do not rely only on broad E2E coverage.
 
@@ -91,7 +98,7 @@ Coverage is a release gate, not a vanity metric:
 
 **Phase 1 — Playwright (only for core user flows):**
 
-Write Playwright test in `tests/smoke/<slug>.spec.ts` only if feature touches: vault open, note create/save/delete, search, wikilink navigation, git commit/push, conflict resolution. Tag a test with `@smoke` only if it protects a core pre-push workflow. Do NOT tag cosmetic or mock-heavy checks — keep those in the full regression lane. Prefer `.chunk/run-playwright-smoke.sh` on a Chunk sidecar for the curated smoke lane because local Playwright is expensive; keep `pnpm playwright:smoke` available for focused local reproduction. The curated smoke suite must stay under **5 minutes** when sharded on sidecars; use `pnpm playwright:regression` for the full Playwright pass.
+Write Playwright test in `tests/smoke/<slug>.spec.ts` when the feature touches vault open, note create/save/delete, search, wikilink navigation, git commit/push, or conflict resolution. Tag a test with `@smoke` when it protects one of those core pre-push workflows; keep cosmetic or mock-heavy checks in the full regression lane. Prefer `.chunk/run-playwright-smoke.sh` on a Chunk sidecar for the curated smoke lane because local Playwright is expensive; keep `pnpm playwright:smoke` available for focused local reproduction. The curated smoke suite must stay under **5 minutes** when sharded on sidecars; if that limit cannot be restored, stop and obtain explicit repository-owner direction before changing the lane.
 
 ```bash
 pnpm dev --port 5201 &
@@ -108,20 +115,20 @@ bash ~/.openclaw/skills/tolaria-qa/scripts/focus-app.sh laputa
 bash ~/.openclaw/skills/tolaria-qa/scripts/screenshot.sh /tmp/qa-native.png
 ```
 
-Use computer-use/browser-control style interaction for native UI QA when available: click, hover, drag, select, scroll, and type the way a real user would with the mouse and trackpad. For every UI feature, test the primary mouse-driven path first, then verify any relevant keyboard shortcut or keyboard-first workflow still works. Tolaria is still a keyboard-first app, but QA must not assume users only interact by keyboard.
+Use computer-use/browser-control interaction for native UI QA when either tool is present in the current environment: click, hover, drag, select, scroll, and type the way a real user would with the mouse and trackpad. For every UI feature, test the primary mouse-driven path first, then verify each keyboard shortcut or keyboard-first workflow implemented or modified by the task. If neither interaction tool is present, run the scripted focus, screenshot, and shortcut checks and document that limitation.
 
-Use `osascript` for app focus, keyboard shortcuts, and keyboard-specific checks. **⚠️ WKWebView:** `osascript keystroke` can be blocked inside editor content — use computer use for native editor interaction when possible, and rely on Playwright for deterministic text-input coverage. Write result as Todoist comment (✅ or ❌).
+Use `osascript` for app focus, keyboard shortcuts, and keyboard-specific checks. **⚠️ WKWebView:** if an `osascript keystroke` fails to enter editor text, use computer use for the native editor interaction and rely on Playwright for deterministic text-input coverage. Write the result as a Todoist comment (✅ or ❌), or in the final handoff when no Todoist task exists.
 
 ### Release-readiness checklist
 
-Before pushing or moving a task to In Review, verify the release gates and add a **completion comment** to the Todoist task. The comment must include:
+Before pushing or moving a task to In Review, verify the release gates and add a **completion comment** to the Todoist task. If no Todoist task exists, include the same evidence in the final handoff. The record must include:
 
 - What was implemented (a few lines covering logic and UX/UI).
 - QA: what was tested and how (Playwright / native screenshot / osascript).
 - Tests/coverage: commands run and final coverage result.
-- CodeScene: before/after touched-file checks, the pre-commit safeguard verdict, the final `origin/main` change-set verdict, plus final Hotspot and Average scores after push; every gate must pass `.codescene-thresholds`.
+- CodeScene: before/after touched-file checks, the pre-commit safeguard verdict, the final `origin/main` change-set verdict, plus final Hotspot and Average scores after push; every gate must pass `.codescene-thresholds`, or the record must include explicit repository-owner approval for a documented exception.
 - Coverage commands passed (`pnpm test:coverage` and `cargo llvm-cov ... --fail-under-lines 85`) or the change is docs-only.
-- Codacy: before/after findings for every touched file; confirm fewer findings (or zero stayed zero), zero findings in new files, and no new findings at any severity.
+- Codacy: the final scan manifest; local before/after findings for every touched file; confirmation that every relevant local analyzer completed; and post-push dashboard findings after Codacy analyzed the exact pushed SHA. Confirm fewer findings in existing files (or zero stayed zero), exactly zero local and dashboard findings in every new code file, and zero findings attributable to added code in existing files at every severity.
 - Localization: any user-facing copy lives in `src/lib/locales/en.json`, `pnpm l10n:translate` was run, and `pnpm l10n:validate` passes. If no copy changed, say “Localization: no UI copy changes”.
 - PostHog: meaningful new user actions/events are instrumented with safe metadata; noisy/minor changes explicitly say “PostHog: no event needed because …”.
 - Refactoring: any files refactored to meet the CodeScene gate, or "none needed".
@@ -131,7 +138,7 @@ Before pushing or moving a task to In Review, verify the release gates and add a
 
 ### ADRs & docs
 
-ADRs live in `docs/adr/`. Create in the same commit as the code. Never edit existing — create a new one that supersedes. Use `/create-adr`. **When:** new dependency, storage strategy, platform target, core abstraction, cross-cutting pattern. **Not for:** bug fixes, styling, refactors.
+ADRs live in `docs/adr/`. Create one in the same commit as the code. Preserve existing ADRs by creating a new one that supersedes them; editing an existing ADR requires an explicit repository-owner request. Use `/create-adr`. **When:** new dependency, storage strategy, platform target, core abstraction, cross-cutting pattern. **Not for:** bug fixes, styling, refactors.
 
 After any Tauri command, new component/hook, data model change, or new integration: update `docs/ARCHITECTURE.md`, `docs/ABSTRACTIONS.md`, and/or `docs/GETTING-STARTED.md` in the same commit.
 
@@ -152,13 +159,13 @@ Default to `demo-vault-v2/` for testing.
 ### User vault (`~/Laputa/`)
 
 Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
-- **Never commit or push** any test notes to the remote vault
+- Do not commit or push test notes to the remote vault unless the repository owner explicitly identifies that content as an intended deliverable.
 - **Delete all test notes from disk** when done — do not leave untitled or temporary notes on the filesystem. Run `cd ~/Laputa && git checkout -- . && git clean -fd` to restore the vault to its last committed state.
-- **Rationale:** test notes pollute the local vault over time, making it a collection of nonsensical untitled files. The vault must stay clean on disk, not just on the remote.
+- **Rationale:** test notes pollute the local vault over time, making it a collection of nonsensical untitled files. Keep the vault clean on disk as well as on the remote; any intended fixture exception requires explicit repository-owner approval.
 
 ### UI components — mandatory rules
 
-**Always use shadcn/ui components.** Never use raw HTML form elements (`<input>`, `<select>`, `<button>`, native `<input type="date">`, etc.) for user-facing UI. Every interactive element must use the shadcn/ui equivalent:
+Use shadcn/ui components for user-facing interactive elements instead of raw HTML form elements (`<input>`, `<select>`, `<button>`, native `<input type="date">`, etc.). If no suitable shadcn or existing app component exists, stop and obtain explicit repository-owner design approval before introducing a raw control.
 
 | Need | Use |
 |---|---|
@@ -173,7 +180,7 @@ Default to `demo-vault-v2/`. If you must use `~/Laputa/` for testing:
 | Toggle/switch | `Switch` or `ToggleGroup` from shadcn/ui |
 | Dialog/modal | `Dialog` from shadcn/ui |
 
-**When in doubt:** search `src/components/` for an existing component before building new. **Visual language:** all new UI must feel native to Tolaria — if it looks like a browser default, it's wrong.
+**When in doubt:** search `src/components/` for an existing component before building new. **Visual language:** new UI must follow Tolaria's existing components and design tokens; if a deliberate exception is needed, obtain explicit repository-owner design approval.
 
 ---
 

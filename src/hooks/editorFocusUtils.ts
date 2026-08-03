@@ -19,7 +19,7 @@ interface TiptapChain {
 }
 
 export interface TiptapEditor {
-  state: { doc: { descendants: (cb: (node: { type: { name: string }; nodeSize: number }, pos: number) => boolean | void) => void } }
+  state: { doc: { descendants: (cb: (node: { type: { name: string }; nodeSize: number }, pos: number) => boolean | undefined) => void } }
   chain: () => TiptapChain
 }
 

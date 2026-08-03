@@ -160,7 +160,7 @@ function markdownVaultRelativePath(request: {
   filePath: string | null
   vaultPath: string
 }): string | null {
-  if (!request.filePath || !request.filePath.endsWith('.md')) return null
+  if (!request.filePath?.endsWith('.md')) return null
   return toVaultRelative({
     filePath: request.filePath,
     vaultPath: request.vaultPath,

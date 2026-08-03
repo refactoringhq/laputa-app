@@ -150,17 +150,7 @@ function usePendingExternalFormulaRetry({
   }, [refreshWorkbook, scheduleSelectionChromePatch, scheduleSerialize, workbookRef, writeCellInputAt])
 }
 
-function useTolariaClipboardPaste({
-  cancelPendingPaste,
-  pasteIdleRef,
-  pasteJobRef,
-  refreshWorkbook,
-  retryPendingExternalFormulaCells,
-  scheduleSelectionChromePatch,
-  scheduleSerialize,
-  workbookRef,
-  writeCellInputAt,
-}: UseSheetClipboardActionsOptions & {
+function useTolariaClipboardPaste(options: UseSheetClipboardActionsOptions & {
   cancelPendingPaste: () => void
   pasteIdleRef: MutableRefObject<IdleHandle | null>
   pasteJobRef: MutableRefObject<number>
@@ -170,6 +160,17 @@ function useTolariaClipboardPaste({
     currentJobId: () => number,
   ) => void
 }) {
+  const {
+    cancelPendingPaste,
+    pasteIdleRef,
+    pasteJobRef,
+    refreshWorkbook,
+    retryPendingExternalFormulaCells,
+    scheduleSelectionChromePatch,
+    scheduleSerialize,
+    workbookRef,
+    writeCellInputAt,
+} = options
   return useCallback((payload: TolariaSheetClipboardPayload) => {
     const current = workbookRef.current
     if (!current) return false
@@ -349,16 +350,17 @@ function useClipboardEventHandlers(options: Pick<UseSheetClipboardActionsOptions
   return { handleCopyCapture, handleCutCapture, handlePasteCapture }
 }
 
-export function useSheetClipboardActions({
-  refreshWorkbook,
-  scheduleSelectionChromePatch,
-  scheduleSerialize,
-  setFormulaAutocomplete,
-  setSheetContextMenu,
-  setWikilinkAutocomplete,
-  workbookRef,
-  writeCellInputAt,
-}: UseSheetClipboardActionsOptions) {
+export function useSheetClipboardActions(options: UseSheetClipboardActionsOptions) {
+  const {
+    refreshWorkbook,
+    scheduleSelectionChromePatch,
+    scheduleSerialize,
+    setFormulaAutocomplete,
+    setSheetContextMenu,
+    setWikilinkAutocomplete,
+    workbookRef,
+    writeCellInputAt,
+} = options
   const pasteJobRef = useRef(0)
   const pasteIdleRef = useRef<IdleHandle | null>(null)
 

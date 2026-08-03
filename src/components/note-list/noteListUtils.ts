@@ -146,7 +146,7 @@ export function isDeletedNoteEntry(entry: VaultEntry): entry is DeletedNoteEntry
 }
 
 function matchesModifiedFile(entry: VaultEntry, file: ModifiedFile): boolean {
-  return entry.path === file.path || entry.path.endsWith('/' + file.relativePath)
+  return entry.path === file.path || entry.path.endsWith(`/${file.relativePath}`)
 }
 
 function applyChangeStats<T extends VaultEntry>(entry: T, file: ModifiedFile): T {

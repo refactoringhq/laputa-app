@@ -33,7 +33,10 @@ export function makeMockEditor(docRef: { current: unknown[] }) {
   const editor = {
     document: docRef.current,
     get prosemirrorView() { return {} },
-    onMount: (cb: () => void) => { cb(); return () => {} },
+    onMount: (cb: () => void) => {
+      cb()
+      return () => { /* The mock has no external listener to remove. */ }
+    },
     replaceBlocks: vi.fn((_old, newBlocks) => { docRef.current = newBlocks }),
     insertBlocks: vi.fn(),
     blocksToMarkdownLossy: vi.fn(() => ''),

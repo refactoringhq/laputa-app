@@ -37,12 +37,15 @@ type CollapsedHeadingRenderingController = {
   frame: number | null
   ownerWindow: Window | undefined
 }
-
 const COLLAPSIBLE_LIST_ITEM_TYPES = new Set(['bulletListItem', 'numberedListItem', 'checkListItem'])
 const headingCollapseStores = new WeakMap<TolariaBlockNoteEditor, CollapsedHeadingStore>()
-const headingCollapseRenderers = new WeakMap<HTMLElement, () => void>()
-const collapsedSectionStyleElements = new WeakMap<HTMLElement, HTMLStyleElement>()
+const headingCollapseRenderers = createWeakKeyMap<HTMLElement, () => void>()
+const collapsedSectionStyleElements = createWeakKeyMap<HTMLElement, HTMLStyleElement>()
 let collapsedSectionScopeSequence = 0
+
+function createWeakKeyMap<Key extends object, Value>(): WeakMap<Key, Value> {
+  return new WeakMap<Key, Value>()
+}
 
 function createCollapsedHeadingStore(): CollapsedHeadingStore {
   const store: CollapsedHeadingStore = {
@@ -637,11 +640,11 @@ function ensureCollapsedHeadingRenderer(
   if (!ownerWindow) return
 
   let frame: number | null = null
-  const apply = () => applyCollapsedSectionRenderingFromHeadingIds(
+  const apply = () => { applyCollapsedSectionRenderingFromHeadingIds(
     editorElement,
     store.collapsedHeadingIds,
     editor.document as readonly CollapsibleBlock[],
-  )
+  ); }
   const scheduleApply = () => {
     if (frame !== null) return
     frame = ownerWindow.requestAnimationFrame(() => {
@@ -677,7 +680,7 @@ function ensureCollapsedHeadingRenderer(
   const handleCollapsedHeadingMouseMove = (event: MouseEvent) => {
     setHoveredDotsHit(collapsedHeadingDotsHitFromEvent(editorElement, store, event))
   }
-  const handleCollapsedHeadingMouseLeave = () => setHoveredDotsHit()
+  const handleCollapsedHeadingMouseLeave = () => { setHoveredDotsHit(); }
   const handleCollapsedHeadingMouseDown = (event: MouseEvent) => {
     if (!collapsedHeadingIdFromDotsEvent(editorElement, store, event)) return
 

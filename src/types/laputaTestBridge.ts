@@ -20,5 +20,3 @@ declare global {
     __laputaTest?: LaputaTestBridge
   }
 }
-
-export {}

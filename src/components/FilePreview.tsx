@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { ArrowSquareOut, ClipboardText, FileDashed, FilePdf, FolderOpen, ImageSquare, Link, SpeakerHigh, Video, WarningCircle } from '@phosphor-icons/react'
+import {
+  ArrowSquareOut,
+  ClipboardText,
+  FileDashed,
+  FilePdf,
+  FolderOpen,
+  ImageSquare,
+  Link,
+  SpeakerHigh,
+  Video,
+  WarningCircle,
+} from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import { translate, type AppLocale } from '../lib/i18n'
 import { trackFilePreviewAction, trackFilePreviewFailed, trackFilePreviewOpened } from '../lib/productAnalytics'
@@ -68,7 +79,11 @@ function filePreviewState(entry: VaultEntry): FilePreviewState {
   }
 }
 
-function filePreviewAssetSrc(previewKind: FilePreviewKind | null, previewPath: string | null, pdfPreviewLoadKey: string): string | null {
+function filePreviewAssetSrc(
+  previewKind: FilePreviewKind | null,
+  previewPath: string | null,
+  pdfPreviewLoadKey: string,
+): string | null {
   if (!previewKind || previewPath === null) return null
 
   let src: string
@@ -87,7 +102,9 @@ function usePdfPreviewLoadKey(): string {
   return loadKey
 }
 
-function fallbackContentForPreviewKind(previewKind: FilePreviewKind | null): Omit<FilePreviewFallbackProps, 'onOpenExternal'> {
+function fallbackContentForPreviewKind(
+  previewKind: FilePreviewKind | null,
+): Omit<FilePreviewFallbackProps, 'onOpenExternal'> {
   if (previewKind === 'image') {
     return {
       icon: 'warning',
@@ -131,7 +148,13 @@ function FilePreviewHeaderIcon({ previewKind }: { previewKind: FilePreviewKind |
   return <FileDashed size={17} className="shrink-0 text-muted-foreground" aria-hidden="true" />
 }
 
-function FilePreviewFallback({ icon, title, description, canOpenExternal = true, onOpenExternal }: FilePreviewFallbackProps) {
+function FilePreviewFallback({
+  icon,
+  title,
+  description,
+  canOpenExternal = true,
+  onOpenExternal,
+}: FilePreviewFallbackProps) {
   const Icon = icon === 'warning' ? WarningCircle : FileDashed
 
   return (
@@ -152,17 +175,7 @@ function FilePreviewFallback({ icon, title, description, canOpenExternal = true,
   )
 }
 
-function FilePreviewHeader({
-  entry,
-  previewKind,
-  canUseFileActions,
-  fileTypeLabel,
-  locale = 'en',
-  onOpenExternal,
-  onRevealFile,
-  onCopyFilePath,
-  onCopyDeepLink,
-}: {
+function FilePreviewHeader(options: {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
   canUseFileActions: boolean
@@ -173,6 +186,17 @@ function FilePreviewHeader({
   onCopyFilePath?: () => void
   onCopyDeepLink?: () => void
 }) {
+  const {
+    entry,
+    previewKind,
+    canUseFileActions,
+    fileTypeLabel,
+    locale = 'en',
+    onOpenExternal,
+    onRevealFile,
+    onCopyFilePath,
+    onCopyDeepLink,
+  } = options
   return (
     <div
       className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-4"
@@ -265,15 +289,11 @@ function FilePreviewImage({
   )
 }
 
-function FilePreviewMediaFrame({
-  children,
-  video = false,
-}: {
-  children: ReactNode
-  video?: boolean
-}) {
+function FilePreviewMediaFrame({ children, video = false }: { children: ReactNode; video?: boolean }) {
   return (
-    <div className={`flex h-full items-center justify-center ${video ? 'min-h-[320px] bg-black p-4' : 'min-h-[260px] p-6'}`}>
+    <div
+      className={`flex h-full items-center justify-center ${video ? 'min-h-[320px] bg-black p-4' : 'min-h-[260px] p-6'}`}
+    >
       {children}
     </div>
   )
@@ -328,17 +348,7 @@ function shouldRenderImagePreview(isImage: boolean, imageSrc: string | null, ima
   return isImage && imageSrc !== null && !imageFailed
 }
 
-function FilePreviewBody({
-  entry,
-  previewKind,
-  assetSrc,
-  imageFailed,
-  canOpenExternal,
-  onImageError,
-  onAudioError,
-  onVideoError,
-  onOpenExternal,
-}: {
+function FilePreviewBody(options: {
   entry: VaultEntry
   previewKind: FilePreviewKind | null
   assetSrc: string | null
@@ -349,6 +359,17 @@ function FilePreviewBody({
   onVideoError: () => void
   onOpenExternal: () => void
 }) {
+  const {
+    entry,
+    previewKind,
+    assetSrc,
+    imageFailed,
+    canOpenExternal,
+    onImageError,
+    onAudioError,
+    onVideoError,
+    onOpenExternal,
+  } = options
   if (shouldRenderImagePreview(previewKind === 'image', assetSrc, imageFailed)) {
     return <FilePreviewImage entry={entry} imageSrc={assetSrc} onImageError={onImageError} />
   }
@@ -448,7 +469,12 @@ function useFilePreviewActions({
     onCopyDeepLink?.(entry)
   }, [entry, onCopyDeepLink, previewKind])
 
-  return { handleOpenExternal, handleRevealFile, handleCopyFilePath, handleCopyDeepLink }
+  return {
+    handleOpenExternal,
+    handleRevealFile,
+    handleCopyFilePath,
+    handleCopyDeepLink,
+  }
 }
 
 function isMediaPreviewKind(previewKind: FilePreviewKind | null): boolean {

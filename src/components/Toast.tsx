@@ -10,7 +10,7 @@ export function Toast({ message, onDismiss }: ToastProps) {
   useEffect(() => {
     if (!message) return
     const timer = setTimeout(onDismiss, 2000)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); }
   }, [message, onDismiss])
 
   if (!message) return null

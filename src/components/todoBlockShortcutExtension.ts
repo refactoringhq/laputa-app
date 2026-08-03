@@ -1,15 +1,16 @@
 import { createExtension } from '@blocknote/core'
-import type { useCreateBlockNote } from '@blocknote/react'
+import type { EditorView } from '@tiptap/pm/view'
 import { isMac } from '../utils/platform'
 import {
   toggleCurrentBlockTodoType,
   type RichEditorBlockTypeCommandEditor,
 } from './richEditorBlockTypeCommands'
 
-type EditorLike = ReturnType<typeof useCreateBlockNote>
-type EditorViewLike = NonNullable<EditorLike['prosemirrorView']>
-type ShortcutEditor = EditorLike & {
+type EditorViewLike = EditorView
+type ShortcutEditor = RichEditorBlockTypeCommandEditor & {
+  _tiptapEditor?: { view: EditorViewLike }
   isEditable?: boolean
+  prosemirrorView?: EditorViewLike
 }
 type ShortcutEvent = Pick<
   KeyboardEvent,

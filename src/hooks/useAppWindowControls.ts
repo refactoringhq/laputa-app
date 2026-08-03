@@ -50,11 +50,11 @@ interface AppWindowControls {
 
 function useAppWindowActionRefs(): AppWindowActionRefs {
   return {
-    diffToggleRef: useRef<() => void>(() => {}),
+    diffToggleRef: useRef<() => void>(() => { /* Initialized before the action is exposed. */ }),
     findInNoteRef: useRef<FindInNoteHandler | null>(null),
     pdfExportRef: useRef<PdfExportHandler | null>(null),
-    rawToggleRef: useRef<() => void>(() => {}),
-    tableOfContentsToggleRef: useRef<() => void>(() => {}),
+    rawToggleRef: useRef<() => void>(() => { /* Initialized before the action is exposed. */ }),
+    tableOfContentsToggleRef: useRef<() => void>(() => { /* Initialized before the action is exposed. */ }),
   }
 }
 
@@ -79,7 +79,7 @@ function useMainWindowConstraintUpdater(
     })
 
     void applyMainWindowSizeConstraints(minWidth, { growToFit: !isWindows() })
-      .catch((err) => console.warn('[window] Size constraints failed:', err))
+      .catch((err: unknown) => { console.warn('[window] Size constraints failed:', err); })
   }, [
     layout.inspectorCollapsed,
     layout.inspectorWidth,

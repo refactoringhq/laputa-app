@@ -58,7 +58,7 @@ export function useSettingsPanelAutofocus(panelRef: RefObject<HTMLDivElement | n
       const focusTarget = panelRef.current?.querySelector<HTMLElement>('[data-settings-autofocus="true"]')
       focusTarget?.focus()
     }, 50)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); }
   }, [panelRef])
 }
 
@@ -69,6 +69,6 @@ export function useSettingsPanelFocusTrap(panelRef: RefObject<HTMLDivElement | n
     }
 
     document.addEventListener('keydown', handleDocumentKeyDown, true)
-    return () => document.removeEventListener('keydown', handleDocumentKeyDown, true)
+    return () => { document.removeEventListener('keydown', handleDocumentKeyDown, true); }
   }, [panelRef])
 }

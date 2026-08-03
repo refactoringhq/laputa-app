@@ -10,15 +10,8 @@ import {
 } from '../lib/aiAgentPermissionMode'
 import { useCliAiAgent, type AgentFileCallbacks } from '../hooks/useCliAiAgent'
 import type { VaultEntry } from '../types'
-import {
-  getVaultConfig,
-  subscribeVaultConfig,
-  updateVaultConfigField,
-} from '../utils/vaultConfigStore'
-import {
-  type NoteListItem,
-  type NoteReference,
-} from '../utils/ai-context'
+import { getVaultConfig, subscribeVaultConfig, updateVaultConfigField } from '../utils/vaultConfigStore'
+import type { NoteListItem, NoteReference } from '../utils/ai-context'
 import { useAiPanelContextSnapshot } from './useAiPanelContextSnapshot'
 
 interface UseAiPanelControllerArgs {
@@ -58,10 +51,7 @@ export interface AiPanelController {
   handleNewChat: () => void
 }
 
-function resolveAgentReady(
-  readiness: AiAgentReadiness | undefined,
-  ready: boolean,
-): boolean {
+function resolveAgentReady(readiness: AiAgentReadiness | undefined, ready: boolean): boolean {
   return (readiness ?? (ready ? 'ready' : 'missing')) === 'ready'
 }
 
@@ -74,15 +64,15 @@ function useAgentFileCallbacks({
   onFileCreated,
   onFileModified,
   onVaultChanged,
-}: Pick<
-  UseAiPanelControllerArgs,
-  'onFileCreated' | 'onFileModified' | 'onVaultChanged'
->): AgentFileCallbacks {
-  return useMemo<AgentFileCallbacks>(() => ({
+}: Pick<UseAiPanelControllerArgs, 'onFileCreated' | 'onFileModified' | 'onVaultChanged'>): AgentFileCallbacks {
+  return useMemo<AgentFileCallbacks>(
+    () => ({
     onFileCreated,
     onFileModified,
     onVaultChanged,
-  }), [onFileCreated, onFileModified, onVaultChanged])
+    }),
+    [onFileCreated, onFileModified, onVaultChanged],
+  )
 }
 
 function useAiPermissionModeHandler({
@@ -98,31 +88,21 @@ function useAiPermissionModeHandler({
   locale: AppLocale
   permissionMode: AiAgentPermissionMode
 }) {
-  return useCallback((mode: AiAgentPermissionMode) => {
+  return useCallback(
+    (mode: AiAgentPermissionMode) => {
     const nextMode = normalizeAiAgentPermissionMode(mode)
     if (isActive || nextMode === permissionMode) return
 
     updateVaultConfigField('ai_agent_permission_mode', nextMode)
     trackAiAgentPermissionModeChanged(defaultAiAgent, nextMode)
     agent.addLocalMarker(aiAgentPermissionModeMarker(nextMode, locale))
-  }, [agent, defaultAiAgent, isActive, locale, permissionMode])
+    },
+    [agent, defaultAiAgent, isActive, locale, permissionMode],
+  )
 }
 
-function usePanelAgent({
-  vaultPath,
-  vaultPaths,
-  contextPrompt,
-  defaultAiAgent,
-  defaultAiTarget,
-  defaultAiAgentReady,
-  defaultAiAgentReadiness,
-  locale,
-  model,
-  onFileCreated,
-  onFileModified,
-  onVaultChanged,
-  sessionId,
-}: Pick<
+function usePanelAgent(
+  options: Pick<
   UseAiPanelControllerArgs,
   | 'vaultPath'
   | 'vaultPaths'
@@ -136,8 +116,14 @@ function usePanelAgent({
   | 'onFileModified'
   | 'onVaultChanged'
   | 'sessionId'
-> & { contextPrompt?: string }) {
-  const fileCallbacks = useAgentFileCallbacks({ onFileCreated, onFileModified, onVaultChanged })
+  > & { contextPrompt?: string },
+) {
+  const { vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, locale, model, onFileCreated, onFileModified, onVaultChanged, sessionId } = options
+  const fileCallbacks = useAgentFileCallbacks({
+    onFileCreated,
+    onFileModified,
+    onVaultChanged,
+  })
   const permissionMode = useVaultAiAgentPermissionMode()
   const agent = useCliAiAgent(vaultPath, vaultPaths, contextPrompt, fileCallbacks, {
     agent: defaultAiAgent,
@@ -151,27 +137,38 @@ function usePanelAgent({
   return { agent, permissionMode }
 }
 
-export function useAiPanelController({
-  vaultPath,
-  vaultPaths,
-  defaultAiAgent,
-  defaultAiTarget,
-  defaultAiAgentReady,
-  defaultAiAgentReadiness,
-  activeEntry,
-  activeNoteContent,
-  entries,
-  openTabs,
-  noteList,
-  noteListFilter,
-  locale = 'en',
-  model,
+function useAiPanelActions({
+  agent,
+  isActive,
   onOpenNote,
-  onFileCreated,
-  onFileModified,
-  onVaultChanged,
-  sessionId,
-}: UseAiPanelControllerArgs): AiPanelController {
+  setInput,
+}: {
+  agent: ReturnType<typeof usePanelAgent>['agent']
+  isActive: boolean
+  onOpenNote: UseAiPanelControllerArgs['onOpenNote']
+  setInput: (value: string) => void
+}) {
+  const handleSend = useCallback(
+    (text: string, references: NoteReference[]) => {
+      if (!text.trim() || isActive) return
+      agent.sendMessage(text, references)
+      setInput('')
+    },
+    [agent, isActive, setInput],
+  )
+  const handleStop = useCallback(() => {
+    if (isActive) agent.stopMessage()
+  }, [agent, isActive])
+  const handleNavigateWikilink = useCallback((target: string) => onOpenNote?.(target), [onOpenNote])
+  const handleNewChat = useCallback(() => {
+    agent.clearConversation()
+    setInput('')
+  }, [agent, setInput])
+  return { handleSend, handleStop, handleNavigateWikilink, handleNewChat }
+}
+
+export function useAiPanelController(options: UseAiPanelControllerArgs): AiPanelController {
+  const { vaultPath, vaultPaths, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, activeEntry, activeNoteContent, entries, openTabs, noteList, noteListFilter, locale = 'en', model, onOpenNote, onFileCreated, onFileModified, onVaultChanged, sessionId } = options
   const [input, setInput] = useState('')
   const { linkedEntries, contextPrompt } = useAiPanelContextSnapshot({
     activeEntry,
@@ -183,30 +180,36 @@ export function useAiPanelController({
     noteListFilter,
   })
 
-  const { agent, permissionMode } = usePanelAgent({ vaultPath, vaultPaths, contextPrompt, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, locale, model, onFileCreated, onFileModified, onVaultChanged, sessionId })
+  const { agent, permissionMode } = usePanelAgent({
+    vaultPath,
+    vaultPaths,
+    contextPrompt,
+    defaultAiAgent,
+    defaultAiTarget,
+    defaultAiAgentReady,
+    defaultAiAgentReadiness,
+    locale,
+    model,
+    onFileCreated,
+    onFileModified,
+    onVaultChanged,
+    sessionId,
+  })
   const isActive = agent.status === 'thinking' || agent.status === 'tool-executing'
+  const { handleSend, handleStop, handleNavigateWikilink, handleNewChat } = useAiPanelActions({
+    agent,
+    isActive,
+    onOpenNote,
+    setInput,
+  })
 
-  const handleSend = useCallback((text: string, references: NoteReference[]) => {
-    if (!text.trim() || isActive) return
-    agent.sendMessage(text, references)
-    setInput('')
-  }, [agent, isActive])
-
-  const handleStop = useCallback(() => {
-    if (!isActive) return
-    agent.stopMessage()
-  }, [agent, isActive])
-
-  const handleNavigateWikilink = useCallback((target: string) => {
-    onOpenNote?.(target)
-  }, [onOpenNote])
-
-  const handlePermissionModeChange = useAiPermissionModeHandler({ agent, defaultAiAgent, isActive, locale, permissionMode })
-
-  const handleNewChat = useCallback(() => {
-    agent.clearConversation()
-    setInput('')
-  }, [agent])
+  const handlePermissionModeChange = useAiPermissionModeHandler({
+    agent,
+    defaultAiAgent,
+    isActive,
+    locale,
+    permissionMode,
+  })
 
   return {
     agent,

@@ -80,11 +80,11 @@ export function useLastActiveNote({
       restoreAttemptedRef.current = true
       restoreLastActiveNote(
         { activeTabPath, entries, openNote },
-        () => setRestorationComplete(true),
+        () => { setRestorationComplete(true); },
       )
     }, 0)
 
-    return () => window.clearTimeout(timer)
+    return () => { window.clearTimeout(timer); }
   }, [activeTabPath, enabled, entries, isVaultLoading, openNote])
 
   useEffect(() => {

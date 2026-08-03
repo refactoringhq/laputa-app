@@ -1,12 +1,12 @@
 import { createExtension } from '@blocknote/core'
-import type { useCreateBlockNote } from '@blocknote/react'
+import type { EditorView } from '@tiptap/pm/view'
 import {
   isRecoverableEditorTransformError,
   reportRecoveredEditorTransformError,
   richEditorTransformRecoveryErrorReason,
 } from './richEditorTransformErrorRecoveryExtension'
 
-export type RichEditorInputView = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
+export type RichEditorInputView = EditorView
 export type RichEditorInputTransaction = Parameters<RichEditorInputView['dispatch']>[0]
 
 export interface RichEditorInputTransformContext {
@@ -51,7 +51,8 @@ function resetInputTransforms(transforms: RichEditorInputTransform[]): void {
 
 function isLiveEditorView(view: RichEditorInputView): boolean {
   if (view.isDestroyed) return false
-  if (view.dom?.isConnected === false) return false
+  const dom = Reflect.get(view, 'dom') as unknown
+  if (typeof dom === 'object' && dom !== null && Reflect.get(dom, 'isConnected') === false) return false
 
   return true
 }
@@ -176,7 +177,7 @@ export function createRichEditorInputTransformExtension({
   key,
 }: RichEditorInputTransformExtensionOptions) {
   return createExtension(({ editor }) => {
-    const readView = () => editor._tiptapEditor?.view ?? editor.prosemirrorView
+    const readView = (): RichEditorInputView => editor._tiptapEditor.view
     const transforms = createTransforms()
 
     return {

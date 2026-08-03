@@ -14,8 +14,8 @@ export interface ActionHistoryController {
   undoLabel: string | null
   redoLabel: string | null
   isReplaying: () => boolean
-  record: (entry: ActionHistoryEntry) => (() => void) | void
-  recordAction: (entry: ActionHistoryEntry) => (() => void) | void
+  record: (entry: ActionHistoryEntry) => (() => void) | undefined
+  recordAction: (entry: ActionHistoryEntry) => (() => void) | undefined
   undo: () => Promise<boolean>
   redo: () => Promise<boolean>
   withoutRecording: <T>(run: () => T | Promise<T>) => Promise<T>

@@ -1,5 +1,5 @@
 import { createExtension } from '@blocknote/core'
-import type { useCreateBlockNote } from '@blocknote/react'
+import type { EditorView } from '@tiptap/pm/view'
 import { trackEvent } from '../lib/telemetry'
 import { isMac } from '../utils/platform'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
@@ -9,8 +9,7 @@ const CODE_BLOCK_TYPE = 'codeBlock'
 const PARAGRAPH_TYPE = 'paragraph'
 const FENCE_PATTERN = /^```([^\s`]*)$/
 
-type EditorLike = ReturnType<typeof useCreateBlockNote>
-type EditorViewLike = NonNullable<EditorLike['prosemirrorView']>
+type EditorViewLike = EditorView
 type CodeBlockShortcutPlatform = 'mac' | 'non-mac'
 type ShortcutEvent = Pick<
   KeyboardEvent,
@@ -21,8 +20,12 @@ type RichEditorBlock = {
   id: string
   type: string
 }
-type ShortcutEditor = EditorLike & {
+type ShortcutEditor = {
+  _tiptapEditor?: { view: EditorViewLike }
+  focus: () => void
+  getTextCursorPosition: () => { block?: RichEditorBlock }
   isEditable?: boolean
+  prosemirrorView?: EditorViewLike
   updateBlock: (id: string, update: never) => unknown
 }
 type CodeBlockCreationSource = 'keyboard_shortcut' | 'markdown_fence'
@@ -198,7 +201,7 @@ function handleCodeBlockKeyDown(event: KeyboardEvent, editor: ShortcutEditor, vi
 export const createRichEditorCodeBlockShortcutExtension = createExtension(({ editor }) => {
   const richEditor = editor as ShortcutEditor
   const readView = () => richEditor._tiptapEditor?.view ?? richEditor.prosemirrorView
-  const handleKeyDown = (event: KeyboardEvent) => handleCodeBlockKeyDown(event, richEditor, readView())
+  const handleKeyDown = (event: KeyboardEvent) => { handleCodeBlockKeyDown(event, richEditor, readView()); }
 
   return {
     key: 'richEditorCodeBlockShortcuts',

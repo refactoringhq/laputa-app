@@ -86,7 +86,7 @@ export function useStatusBarAddRemote({
     }
 
     window.addEventListener(REQUEST_ADD_REMOTE_EVENT, handleRequest)
-    return () => window.removeEventListener(REQUEST_ADD_REMOTE_EVENT, handleRequest)
+    return () => { window.removeEventListener(REQUEST_ADD_REMOTE_EVENT, handleRequest); }
   }, [openAddRemote])
 
   const visibleRemoteStatus = useMemo(

@@ -21,9 +21,7 @@ declare const __DEMO_VAULT_PATH__: string | undefined
  *  undefined and the real path is resolved at runtime via get_default_vault_path. */
 const STATIC_DEFAULT_PATH = typeof __DEMO_VAULT_PATH__ !== 'undefined' ? __DEMO_VAULT_PATH__ : ''
 
-export const DEFAULT_VAULTS: VaultOption[] = [
-  { label: GETTING_STARTED_LABEL, path: STATIC_DEFAULT_PATH },
-]
+export const DEFAULT_VAULTS: VaultOption[] = [{ label: GETTING_STARTED_LABEL, path: STATIC_DEFAULT_PATH }]
 
 interface UseVaultSwitcherOptions {
   onSwitch: () => void
@@ -214,16 +212,17 @@ async function checkVaultAvailability(path: string): Promise<boolean> {
 }
 
 async function loadInitialVaultState() {
-  const [vaultListResult, defaultPathResult] = await Promise.allSettled([
-    loadVaultList(),
-    resolveDefaultPath(),
-  ])
-  const { vaults, activeVault, defaultWorkspacePath, hiddenDefaults } = vaultListResult.status === 'fulfilled'
+  const [vaultListResult, defaultPathResult] = await Promise.allSettled([loadVaultList(), resolveDefaultPath()])
+  const { vaults, activeVault, defaultWorkspacePath, hiddenDefaults } =
+    vaultListResult.status === 'fulfilled'
     ? vaultListResult.value
-    : { vaults: [], activeVault: null, defaultWorkspacePath: null, hiddenDefaults: [] }
-  const resolvedDefaultPath = defaultPathResult.status === 'fulfilled'
-    ? defaultPathResult.value
-    : ''
+      : {
+          vaults: [],
+          activeVault: null,
+          defaultWorkspacePath: null,
+          hiddenDefaults: [],
+        }
+  const resolvedDefaultPath = defaultPathResult.status === 'fulfilled' ? defaultPathResult.value : ''
   const defaultAvailable = await checkVaultAvailability(resolvedDefaultPath)
 
   if (vaultListResult.status === 'rejected') {
@@ -267,12 +266,16 @@ function sanitizeCanonicalGettingStartedState({
   vaults: VaultOption[]
 }) {
   if (!resolvedDefaultPath) {
-    return { activeVault, defaultAvailable, hiddenDefaults, resolvedDefaultPath, vaults }
+    return {
+      activeVault,
+      defaultAvailable,
+      hiddenDefaults,
+      resolvedDefaultPath,
+      vaults,
+    }
   }
 
-  const filteredVaults = vaults.filter(
-    (vault) => !shouldDropPersistedGettingStartedVault(vault, resolvedDefaultPath),
-  )
+  const filteredVaults = vaults.filter((vault) => !shouldDropPersistedGettingStartedVault(vault, resolvedDefaultPath))
   const removedStarterPaths = new Set(
     vaults
       .filter((vault) => shouldDropPersistedGettingStartedVault(vault, resolvedDefaultPath))
@@ -340,7 +343,7 @@ function buildVisibleDefaultVaults({
   defaultVaults: VaultOption[]
   hiddenDefaults: string[]
 }): VaultOption[] {
-  return defaultVaults.filter(vault => !hiddenDefaults.includes(vault.path))
+  return defaultVaults.filter((vault) => !hiddenDefaults.includes(vault.path))
 }
 
 function applyResolvedDefaultPath({
@@ -414,11 +417,20 @@ function useVaultCollections(
     [defaultAvailable, defaultPath],
   )
   const visibleDefaults = useMemo(
-    () => buildVisibleDefaultVaults({ defaultVaults, hiddenDefaults: hiddenDefaultPaths }),
+    () =>
+      buildVisibleDefaultVaults({
+        defaultVaults,
+        hiddenDefaults: hiddenDefaultPaths,
+      }),
     [defaultVaults, hiddenDefaultPaths],
   )
   const allVaults = useMemo(
-    () => buildAllVaults({ visibleDefaults, extraVaults, hiddenDefaults: hiddenDefaultPaths }),
+    () =>
+      buildAllVaults({
+        visibleDefaults,
+        extraVaults,
+        hiddenDefaults: hiddenDefaultPaths,
+      }),
     [extraVaults, hiddenDefaultPaths, visibleDefaults],
   )
   const isGettingStartedHidden = useMemo(
@@ -429,291 +441,285 @@ function useVaultCollections(
   return { allVaults, defaultVaults, isGettingStartedHidden }
 }
 
-function useLoadPersistedVaultState(
-  store: PersistedVaultStore,
-  onSwitchRef: MutableRefObject<() => void>,
-) {
+function useLoadPersistedVaultState(store: PersistedVaultStore, onSwitchRef: MutableRefObject<() => void>) {
   const {
-    lastPersistedSnapshotRef,
-    setDefaultAvailable,
-    setDefaultPath,
-    setDefaultWorkspacePath,
-    setExtraVaults,
-    setHiddenDefaults,
-    setLoaded,
-    setSelectedVaultPath,
-    setVaultPath,
-  } = store
+        lastPersistedSnapshotRef,
+        setDefaultAvailable,
+        setDefaultPath,
+        setDefaultWorkspacePath,
+        setExtraVaults,
+        setHiddenDefaults,
+        setLoaded,
+        setSelectedVaultPath,
+        setVaultPath,
+      } = store
 
-  useEffect(() => {
-    let cancelled = false
+      useEffect(() => {
+        let cancelled = false
 
-    loadInitialVaultState()
-      .then(({ activeVault, defaultAvailable, defaultWorkspacePath, hiddenDefaults: hidden, persistedSnapshot, resolvedDefaultPath, vaults }) => {
-        if (cancelled) return
+        loadInitialVaultState()
+          .then(
+            ({
+              activeVault,
+              defaultAvailable,
+              defaultWorkspacePath,
+              hiddenDefaults: hidden,
+              persistedSnapshot,
+              resolvedDefaultPath,
+              vaults,
+            }) => {
+            if (cancelled) return
 
-        lastPersistedSnapshotRef.current = persistedSnapshot
-        setExtraVaults(vaults)
-        setHiddenDefaults(hidden)
-        setDefaultWorkspacePath(defaultWorkspacePath ?? activeVault ?? null)
-        applyResolvedDefaultPath({
-          defaultAvailable,
-          resolvedDefaultPath,
-          setDefaultAvailable,
-          setDefaultPath,
-        })
-        applyInitialVaultTarget({
-          activeVault: normalizeInitialSelectedVaultPath(activeVault, resolvedDefaultPath, vaults),
-          resolvedDefaultPath,
-          setSelectedVaultPath,
-          setVaultPath,
-          onSwitchRef,
-        })
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoaded(true)
+            lastPersistedSnapshotRef.current = persistedSnapshot
+            setExtraVaults(vaults)
+            setHiddenDefaults(hidden)
+            setDefaultWorkspacePath(defaultWorkspacePath ?? activeVault ?? null)
+            applyResolvedDefaultPath({
+              defaultAvailable,
+              resolvedDefaultPath,
+              setDefaultAvailable,
+              setDefaultPath,
+            })
+            applyInitialVaultTarget({
+              activeVault: normalizeInitialSelectedVaultPath(activeVault, resolvedDefaultPath, vaults),
+              resolvedDefaultPath,
+              setSelectedVaultPath,
+              setVaultPath,
+              onSwitchRef,
+            })
+            },
+          )
+          .finally(() => {
+            if (!cancelled) {
+              setLoaded(true)
+            }
+          })
+
+        return () => {
+          cancelled = true
         }
-      })
-
-    return () => { cancelled = true }
-  }, [lastPersistedSnapshotRef, onSwitchRef, setDefaultAvailable, setDefaultPath, setDefaultWorkspacePath, setExtraVaults, setHiddenDefaults, setLoaded, setSelectedVaultPath, setVaultPath])
-}
-
-function usePersistedVaultStorage(store: PersistedVaultStore) {
-  const { defaultWorkspacePath, extraVaults, hiddenDefaults, lastPersistedSnapshotRef, loaded, selectedVaultPath } = store
-
-  useEffect(() => {
-    if (!loaded) return
-
-    const snapshot = serializePersistedVaultSnapshot(extraVaults, selectedVaultPath, hiddenDefaults, defaultWorkspacePath)
-
-    if (lastPersistedSnapshotRef.current === snapshot) {
-      return
+      }, [
+        lastPersistedSnapshotRef,
+        onSwitchRef,
+        setDefaultAvailable,
+        setDefaultPath,
+        setDefaultWorkspacePath,
+        setExtraVaults,
+        setHiddenDefaults,
+        setLoaded,
+        setSelectedVaultPath,
+        setVaultPath,
+      ])
     }
 
-    saveVaultList(extraVaults, selectedVaultPath, hiddenDefaults, defaultWorkspacePath)
-      .then(() => {
-        lastPersistedSnapshotRef.current = snapshot
+    function usePersistedVaultStorage(store: PersistedVaultStore) {
+      const { defaultWorkspacePath, extraVaults, hiddenDefaults, lastPersistedSnapshotRef, loaded, selectedVaultPath } =
+        store
+
+      useEffect(() => {
+        if (!loaded) return
+
+        const snapshot = serializePersistedVaultSnapshot(
+          extraVaults,
+          selectedVaultPath,
+          hiddenDefaults,
+          defaultWorkspacePath,
+        )
+
+        if (lastPersistedSnapshotRef.current === snapshot) {
+          return
+        }
+
+        saveVaultList(extraVaults, selectedVaultPath, hiddenDefaults, defaultWorkspacePath)
+          .then(() => {
+            lastPersistedSnapshotRef.current = snapshot
+          })
+          .catch((err) => {
+            console.warn('Failed to persist vault list:', err)
+          })
+      }, [defaultWorkspacePath, extraVaults, hiddenDefaults, lastPersistedSnapshotRef, loaded, selectedVaultPath])
+    }
+
+    function usePersistedVaultState(onSwitchRef: MutableRefObject<() => void>): PersistedVaultState {
+      const [vaultPath, setVaultPath] = useState(STATIC_DEFAULT_PATH)
+      const [selectedVaultPath, setSelectedVaultPath] = useState<string | null>(null)
+      const [defaultWorkspacePath, setDefaultWorkspacePath] = useState<string | null>(null)
+      const [extraVaults, setExtraVaults] = useState<VaultOption[]>([])
+      const [hiddenDefaults, setHiddenDefaults] = useState<string[]>([])
+      const [defaultAvailable, setDefaultAvailable] = useState(false)
+      const lastPersistedSnapshotRef = useRef<string | null>(null)
+      const [loaded, setLoaded] = useState(false)
+      const [defaultPath, setDefaultPath] = useState(STATIC_DEFAULT_PATH)
+
+      const store: PersistedVaultStore = {
+        defaultAvailable,
+        defaultPath,
+        defaultWorkspacePath,
+        extraVaults,
+        hiddenDefaults,
+        lastPersistedSnapshotRef,
+        loaded,
+        selectedVaultPath,
+        setDefaultAvailable,
+        setDefaultPath,
+        setDefaultWorkspacePath,
+        setExtraVaults,
+        setHiddenDefaults,
+        setLoaded,
+        setSelectedVaultPath,
+        setVaultPath,
+        vaultPath,
+      }
+
+      useLoadPersistedVaultState(store, onSwitchRef)
+      usePersistedVaultStorage(store)
+
+      return {
+        defaultAvailable,
+        defaultPath,
+        defaultWorkspacePath,
+        extraVaults,
+        hiddenDefaults,
+        lastPersistedSnapshotRef,
+        loaded,
+        selectedVaultPath,
+        setDefaultWorkspacePath,
+        setDefaultAvailable,
+        setExtraVaults,
+        setHiddenDefaults,
+        setSelectedVaultPath,
+        setVaultPath,
+        vaultPath,
+      }
+    }
+
+    function useMcpBridgeVaultSync(loaded: boolean, selectedVaultPath: string | null) {
+      useEffect(() => {
+        if (!loaded) return
+
+        tauriCall<string>('sync_mcp_bridge_vault', {
+          vaultPath: selectedBridgeVaultPath(selectedVaultPath),
+        }).catch((err) => {
+          console.warn('Failed to sync MCP bridge vault:', err)
+        })
+      }, [loaded, selectedVaultPath])
+    }
+
+    function formatGettingStartedRestoreError(err: unknown): string {
+      const message = typeof err === 'string' ? err : err instanceof Error ? err.message : `${err}`
+
+      const networkErrors = ['unable to access', 'Could not resolve host', 'network', 'timed out']
+
+      if (networkErrors.some((fragment) => message.includes(fragment))) {
+        return 'Getting Started requires internet. Clone it later.'
+      }
+
+      return `Could not prepare Getting Started vault: ${message}`
+    }
+
+    function formatCreateEmptyVaultError(err: unknown): string {
+      const message = typeof err === 'string' ? err : err instanceof Error ? err.message : `${err}`
+
+      if (message.includes('Choose an empty folder')) {
+        return message
+      }
+
+      return `Could not create empty vault: ${message}`
+    }
+
+    async function ensureGettingStartedVaultReady(path: string): Promise<void> {
+      const exists = await tauriCall<boolean>('check_vault_exists', { path })
+      if (!exists) {
+        await tauriCall<string>('create_getting_started_vault', {
+          targetPath: path,
+        })
+      }
+    }
+
+    function addVaultToList({
+      setExtraVaults,
+      path,
+      label,
+    }: {
+      setExtraVaults: Dispatch<SetStateAction<VaultOption[]>>
+      path: string
+      label: string
+    }) {
+      setExtraVaults((previousVaults) => {
+        const exists = previousVaults.some((vault) => vault.path === path)
+        return exists ? previousVaults : [...previousVaults, { label, path, available: true, mounted: true }]
       })
-      .catch(err => {
-        console.warn('Failed to persist vault list:', err)
-      })
-  }, [defaultWorkspacePath, extraVaults, hiddenDefaults, lastPersistedSnapshotRef, loaded, selectedVaultPath])
-}
+    }
 
-function usePersistedVaultState(onSwitchRef: MutableRefObject<() => void>): PersistedVaultState {
-  const [vaultPath, setVaultPath] = useState(STATIC_DEFAULT_PATH)
-  const [selectedVaultPath, setSelectedVaultPath] = useState<string | null>(null)
-  const [defaultWorkspacePath, setDefaultWorkspacePath] = useState<string | null>(null)
-  const [extraVaults, setExtraVaults] = useState<VaultOption[]>([])
-  const [hiddenDefaults, setHiddenDefaults] = useState<string[]>([])
-  const [defaultAvailable, setDefaultAvailable] = useState(false)
-  const lastPersistedSnapshotRef = useRef<string | null>(null)
-  const [loaded, setLoaded] = useState(false)
-  const [defaultPath, setDefaultPath] = useState(STATIC_DEFAULT_PATH)
+    function upsertAvailableVaultOption(extraVaults: VaultOption[], path: string, label: string): VaultOption[] {
+      const existingVault = extraVaults.find((vault) => vault.path === path)
+      if (!existingVault) {
+        return [...extraVaults, { label, path, available: true, mounted: true }]
+      }
 
-  const store: PersistedVaultStore = {
-    defaultAvailable,
-    defaultPath,
-    defaultWorkspacePath,
-    extraVaults,
-    hiddenDefaults,
-    lastPersistedSnapshotRef,
-    loaded,
-    selectedVaultPath,
-    setDefaultAvailable,
-    setDefaultPath,
-    setDefaultWorkspacePath,
-    setExtraVaults,
-    setHiddenDefaults,
-    setLoaded,
-    setSelectedVaultPath,
-    setVaultPath,
-    vaultPath,
-  }
+      return extraVaults.map((vault) =>
+        vault.path === path ? { ...vault, label: vault.label || label, available: true } : vault,
+      )
+    }
 
-  useLoadPersistedVaultState(store, onSwitchRef)
-  usePersistedVaultStorage(store)
+    function buildRegisteredVaultSelection({
+      defaultAvailable,
+      defaultPath,
+      extraVaults,
+      hiddenDefaults,
+      label,
+      path,
+    }: {
+      defaultAvailable: boolean
+      defaultPath: string
+      extraVaults: VaultOption[]
+      hiddenDefaults: string[]
+      label: string
+      path: string
+    }): RegisteredVaultSelection {
+      const isCanonicalDefaultVault = path === defaultPath && defaultPath.length > 0
 
-  return {
-    defaultAvailable,
-    defaultPath,
-    defaultWorkspacePath,
-    extraVaults,
-    hiddenDefaults,
-    lastPersistedSnapshotRef,
-    loaded,
-    selectedVaultPath,
-    setDefaultWorkspacePath,
-    setDefaultAvailable,
-    setExtraVaults,
-    setHiddenDefaults,
-    setSelectedVaultPath,
-    setVaultPath,
-    vaultPath,
-  }
-}
+      return {
+        nextDefaultAvailable: isCanonicalDefaultVault ? true : defaultAvailable,
+        nextExtraVaults: isCanonicalDefaultVault
+          ? extraVaults.filter((vault) => vault.path !== path)
+          : upsertAvailableVaultOption(extraVaults, path, label),
+        nextHiddenDefaults: isCanonicalDefaultVault
+          ? hiddenDefaults.filter((hiddenPath) => hiddenPath !== path)
+          : hiddenDefaults,
+        nextSelectedVaultPath: path,
+      }
+    }
 
-function useMcpBridgeVaultSync(loaded: boolean, selectedVaultPath: string | null) {
-  useEffect(() => {
-    if (!loaded) return
+    async function persistRegisteredVaultSelection({
+      defaultWorkspacePath,
+      hiddenDefaults,
+      lastPersistedSnapshotRef,
+      selectedVaultPath,
+      vaults,
+    }: {
+      defaultWorkspacePath: string | null
+      hiddenDefaults: string[]
+      lastPersistedSnapshotRef: MutableRefObject<string | null>
+      selectedVaultPath: string
+      vaults: VaultOption[]
+    }): Promise<void> {
+      const nextSnapshot = serializePersistedVaultSnapshot(vaults, selectedVaultPath, hiddenDefaults, defaultWorkspacePath)
+      await saveVaultList(vaults, selectedVaultPath, hiddenDefaults, defaultWorkspacePath)
+      lastPersistedSnapshotRef.current = nextSnapshot
+    }
 
-    tauriCall<string>('sync_mcp_bridge_vault', {
-      vaultPath: selectedBridgeVaultPath(selectedVaultPath),
-    }).catch(err => {
-      console.warn('Failed to sync MCP bridge vault:', err)
-    })
-  }, [loaded, selectedVaultPath])
-}
-
-function formatGettingStartedRestoreError(err: unknown): string {
-  const message =
-    typeof err === 'string'
-      ? err
-      : err instanceof Error
-        ? err.message
-        : `${err}`
-
-  const networkErrors = [
-    'unable to access',
-    'Could not resolve host',
-    'network',
-    'timed out',
-  ]
-
-  if (networkErrors.some(fragment => message.includes(fragment))) {
-    return 'Getting Started requires internet. Clone it later.'
-  }
-
-  return `Could not prepare Getting Started vault: ${message}`
-}
-
-function formatCreateEmptyVaultError(err: unknown): string {
-  const message =
-    typeof err === 'string'
-      ? err
-      : err instanceof Error
-        ? err.message
-        : `${err}`
-
-  if (message.includes('Choose an empty folder')) {
-    return message
-  }
-
-  return `Could not create empty vault: ${message}`
-}
-
-async function ensureGettingStartedVaultReady(path: string): Promise<void> {
-  const exists = await tauriCall<boolean>('check_vault_exists', { path })
-  if (!exists) {
-    await tauriCall<string>('create_getting_started_vault', { targetPath: path })
-  }
-}
-
-function addVaultToList({
-  setExtraVaults,
-  path,
-  label,
-}: {
-  setExtraVaults: Dispatch<SetStateAction<VaultOption[]>>
-  path: string
-  label: string
-}) {
-  setExtraVaults(previousVaults => {
-    const exists = previousVaults.some(vault => vault.path === path)
-    return exists ? previousVaults : [...previousVaults, { label, path, available: true, mounted: true }]
-  })
-}
-
-function upsertAvailableVaultOption(
-  extraVaults: VaultOption[],
-  path: string,
-  label: string,
-): VaultOption[] {
-  const existingVault = extraVaults.find((vault) => vault.path === path)
-  if (!existingVault) {
-    return [...extraVaults, { label, path, available: true, mounted: true }]
-  }
-
-  return extraVaults.map((vault) => (
-    vault.path === path
-      ? { ...vault, label: vault.label || label, available: true }
-      : vault
-  ))
-}
-
-function buildRegisteredVaultSelection({
-  defaultAvailable,
-  defaultPath,
-  extraVaults,
-  hiddenDefaults,
-  label,
-  path,
-}: {
-  defaultAvailable: boolean
-  defaultPath: string
-  extraVaults: VaultOption[]
-  hiddenDefaults: string[]
-  label: string
-  path: string
-}): RegisteredVaultSelection {
-  const isCanonicalDefaultVault = path === defaultPath && defaultPath.length > 0
-
-  return {
-    nextDefaultAvailable: isCanonicalDefaultVault ? true : defaultAvailable,
-    nextExtraVaults: isCanonicalDefaultVault
-      ? extraVaults.filter((vault) => vault.path !== path)
-      : upsertAvailableVaultOption(extraVaults, path, label),
-    nextHiddenDefaults: isCanonicalDefaultVault
-      ? hiddenDefaults.filter((hiddenPath) => hiddenPath !== path)
-      : hiddenDefaults,
-    nextSelectedVaultPath: path,
-  }
-}
-
-async function persistRegisteredVaultSelection({
-  defaultWorkspacePath,
-  hiddenDefaults,
-  lastPersistedSnapshotRef,
-  selectedVaultPath,
-  vaults,
-}: {
-  defaultWorkspacePath: string | null
-  hiddenDefaults: string[]
-  lastPersistedSnapshotRef: MutableRefObject<string | null>
-  selectedVaultPath: string
-  vaults: VaultOption[]
-}): Promise<void> {
-  const nextSnapshot = serializePersistedVaultSnapshot(
-    vaults,
-    selectedVaultPath,
-    hiddenDefaults,
-    defaultWorkspacePath,
-  )
-  await saveVaultList(vaults, selectedVaultPath, hiddenDefaults, defaultWorkspacePath)
-  lastPersistedSnapshotRef.current = nextSnapshot
-}
-
-function applyRegisteredVaultSelection({
-  nextDefaultAvailable,
-  nextExtraVaults,
-  nextHiddenDefaults,
-  nextSelectedVaultPath,
-  onSwitchRef,
-  setDefaultAvailable,
-  setExtraVaults,
-  setHiddenDefaults,
-  setSelectedVaultPath,
-  setVaultPath,
-}: RegisteredVaultSelection & {
-  onSwitchRef: MutableRefObject<() => void>
-  setDefaultAvailable: Dispatch<SetStateAction<boolean>>
-  setExtraVaults: Dispatch<SetStateAction<VaultOption[]>>
-  setHiddenDefaults: Dispatch<SetStateAction<string[]>>
-  setSelectedVaultPath: Dispatch<SetStateAction<string | null>>
-  setVaultPath: Dispatch<SetStateAction<string>>
-}) {
+    function applyRegisteredVaultSelection(
+      options: RegisteredVaultSelection & {
+        onSwitchRef: MutableRefObject<() => void>
+        setDefaultAvailable: Dispatch<SetStateAction<boolean>>
+        setExtraVaults: Dispatch<SetStateAction<VaultOption[]>>
+        setHiddenDefaults: Dispatch<SetStateAction<string[]>>
+        setSelectedVaultPath: Dispatch<SetStateAction<string | null>>
+        setVaultPath: Dispatch<SetStateAction<string>>
+      },
+    ) {
+      const { nextDefaultAvailable, nextExtraVaults, nextHiddenDefaults, nextSelectedVaultPath, onSwitchRef, setDefaultAvailable, setExtraVaults, setHiddenDefaults, setSelectedVaultPath, setVaultPath } = options
   setDefaultAvailable(nextDefaultAvailable)
   setExtraVaults(nextExtraVaults)
   setHiddenDefaults(nextHiddenDefaults)
@@ -770,35 +776,22 @@ function listRemainingVaults({
   isDefault,
   removedPath,
 }: RemainingVaultOptions) {
-  const visibleDefaults = defaultVaults.filter(vault => (
-    vault.path !== removedPath
-    && (!isDefault || !hiddenDefaults.includes(vault.path))
-  ))
+  const visibleDefaults = defaultVaults.filter(
+    (vault) => vault.path !== removedPath && (!isDefault || !hiddenDefaults.includes(vault.path)),
+  )
 
-  return [...visibleDefaults, ...extraVaults.filter(vault => vault.path !== removedPath)]
+  return [...visibleDefaults, ...extraVaults.filter((vault) => vault.path !== removedPath)]
 }
 
-function removeVaultFromState({
-  defaultWorkspacePath,
-  defaultVaults,
-  extraVaults,
-  hiddenDefaults,
-  isDefault,
-  onSwitchRef,
-  removedPath,
-  setExtraVaults,
-  setDefaultWorkspacePath,
-  setHiddenDefaults,
-  setSelectedVaultPath,
-  setVaultPath,
-  selectedVaultPath,
-  vaultPath,
-}: RemoveVaultStateOptions) {
+function removeVaultFromState(options: RemoveVaultStateOptions) {
+  const { defaultWorkspacePath, defaultVaults, extraVaults, hiddenDefaults, isDefault, onSwitchRef, removedPath, setExtraVaults, setDefaultWorkspacePath, setHiddenDefaults, setSelectedVaultPath, setVaultPath, selectedVaultPath, vaultPath } = options
   if (isDefault) {
-    setHiddenDefaults(previousHidden => previousHidden.includes(removedPath) ? previousHidden : [...previousHidden, removedPath])
-    setExtraVaults(previousVaults => previousVaults.filter(vault => vault.path !== removedPath))
+    setHiddenDefaults((previousHidden) =>
+      previousHidden.includes(removedPath) ? previousHidden : [...previousHidden, removedPath],
+    )
+    setExtraVaults((previousVaults) => previousVaults.filter((vault) => vault.path !== removedPath))
   } else {
-    setExtraVaults(previousVaults => previousVaults.filter(vault => vault.path !== removedPath))
+    setExtraVaults((previousVaults) => previousVaults.filter((vault) => vault.path !== removedPath))
   }
 
   if (vaultPath !== removedPath) {
@@ -842,7 +835,7 @@ function getRemovedVaultLabel({
   defaultVaults: VaultOption[]
   extraVaults: VaultOption[]
 }): string {
-  const removedVault = [...defaultVaults, ...extraVaults].find(vault => vault.path === path)
+  const removedVault = [...defaultVaults, ...extraVaults].find((vault) => vault.path === path)
   return removedVault?.label ?? labelFromPath({ path })
 }
 
@@ -851,37 +844,50 @@ function useSwitchVaultAction(
   setSelectedVaultPath: Dispatch<SetStateAction<string | null>>,
   setVaultPath: Dispatch<SetStateAction<string>>,
 ) {
-  return useCallback((path: string) => {
-    switchVaultPath({ setSelectedVaultPath, setVaultPath, onSwitchRef, path })
-  }, [onSwitchRef, setSelectedVaultPath, setVaultPath])
+  return useCallback(
+    (path: string) => {
+      switchVaultPath({
+        setSelectedVaultPath,
+        setVaultPath,
+        onSwitchRef,
+        path,
+      })
+    },
+    [onSwitchRef, setSelectedVaultPath, setVaultPath],
+  )
 }
 
 function useVaultClonedAction(
   addAndSwitch: (path: string, label: string) => void,
   onToastRef: MutableRefObject<(msg: string) => void>,
 ) {
-  return useCallback((path: string, label: string) => {
+  return useCallback(
+    (path: string, label: string) => {
     addAndSwitch(path, label)
     onToastRef.current(`Vault "${label}" cloned and opened`)
-  }, [addAndSwitch, onToastRef])
+    },
+    [addAndSwitch, onToastRef],
+  )
 }
 
-function useRegisterVaultSelectionAction({
-  defaultAvailable,
-  defaultPath,
-  defaultWorkspacePath,
-  extraVaults,
-  hiddenDefaults,
-  lastPersistedSnapshotRef,
-  onSwitchRef,
-  setDefaultAvailable,
-  setDefaultWorkspacePath,
-  setExtraVaults,
-  setHiddenDefaults,
-  setSelectedVaultPath,
-  setVaultPath,
-}: RegisterVaultSelectionActionDeps) {
-  return useCallback(async (path: string, label: string, options: RegisterVaultSelectionOptions = {}) => {
+function useRegisterVaultSelectionAction(functionOptions: RegisterVaultSelectionActionDeps) {
+  const {
+    defaultAvailable,
+    defaultPath,
+    defaultWorkspacePath,
+    extraVaults,
+    hiddenDefaults,
+    lastPersistedSnapshotRef,
+    onSwitchRef,
+    setDefaultAvailable,
+    setDefaultWorkspacePath,
+    setExtraVaults,
+    setHiddenDefaults,
+    setSelectedVaultPath,
+    setVaultPath,
+  } = functionOptions
+  return useCallback(
+    async (path: string, label: string, options: RegisterVaultSelectionOptions = {}) => {
     if (options.verifyAvailability !== false) {
       await ensureVaultCanBeRegistered(path)
     }
@@ -911,7 +917,8 @@ function useRegisterVaultSelectionAction({
       setSelectedVaultPath,
       setVaultPath,
     })
-  }, [
+    },
+    [
     defaultAvailable,
     defaultPath,
     defaultWorkspacePath,
@@ -925,21 +932,11 @@ function useRegisterVaultSelectionAction({
     setHiddenDefaults,
     setSelectedVaultPath,
     setVaultPath,
-  ])
+    ],
+  )
 }
 
-function useSyncVaultSelectionAction({
-  defaultAvailable,
-  defaultPath,
-  extraVaults,
-  hiddenDefaults,
-  onSwitchRef,
-  setDefaultAvailable,
-  setExtraVaults,
-  setHiddenDefaults,
-  setSelectedVaultPath,
-  setVaultPath,
-}: {
+function useSyncVaultSelectionAction(options: {
   defaultAvailable: boolean
   defaultPath: string
   extraVaults: VaultOption[]
@@ -951,7 +948,9 @@ function useSyncVaultSelectionAction({
   setSelectedVaultPath: Dispatch<SetStateAction<string | null>>
   setVaultPath: Dispatch<SetStateAction<string>>
 }) {
-  return useCallback((path: string, label: string) => {
+  const { defaultAvailable, defaultPath, extraVaults, hiddenDefaults, onSwitchRef, setDefaultAvailable, setExtraVaults, setHiddenDefaults, setSelectedVaultPath, setVaultPath } = options
+  return useCallback(
+    (path: string, label: string) => {
     const nextSelection = buildRegisteredVaultSelection({
       defaultAvailable,
       defaultPath,
@@ -969,7 +968,8 @@ function useSyncVaultSelectionAction({
       setSelectedVaultPath,
       setVaultPath,
     })
-  }, [
+    },
+    [
     defaultAvailable,
     defaultPath,
     extraVaults,
@@ -980,7 +980,8 @@ function useSyncVaultSelectionAction({
     setHiddenDefaults,
     setSelectedVaultPath,
     setVaultPath,
-  ])
+    ],
+  )
 }
 
 function useOpenLocalFolderAction(
@@ -1019,7 +1020,9 @@ function useCreateEmptyVaultAction(
 
     try {
       if (!targetPath) return
-      const vaultPath = await tauriCall<string>('create_empty_vault', { targetPath })
+      const vaultPath = await tauriCall<string>('create_empty_vault', {
+        targetPath,
+      })
       const label = labelFromPath({ path: vaultPath })
       addAndSwitch(vaultPath, label)
       onToastRef.current(`Vault "${label}" created and opened`)
@@ -1029,23 +1032,11 @@ function useCreateEmptyVaultAction(
   }, [addAndSwitch, onToastRef])
 }
 
-function useRemoveVaultAction({
-  defaultWorkspacePath,
-  defaultVaults,
-  extraVaults,
-  hiddenDefaults,
-  onSwitchRef,
-  onToastRef,
-  setExtraVaults,
-  setDefaultWorkspacePath,
-  setHiddenDefaults,
-  setSelectedVaultPath,
-  setVaultPath,
-  selectedVaultPath,
-  vaultPath,
-}: RemoveVaultActionOptions) {
-  return useCallback((path: string) => {
-    const isDefault = defaultVaults.some(vault => vault.path === path)
+function useRemoveVaultAction(options: RemoveVaultActionOptions) {
+  const { defaultWorkspacePath, defaultVaults, extraVaults, hiddenDefaults, onSwitchRef, onToastRef, setExtraVaults, setDefaultWorkspacePath, setHiddenDefaults, setSelectedVaultPath, setVaultPath, selectedVaultPath, vaultPath } = options
+  return useCallback(
+    (path: string) => {
+      const isDefault = defaultVaults.some((vault) => vault.path === path)
 
     removeVaultFromState({
       defaultWorkspacePath,
@@ -1064,7 +1055,8 @@ function useRemoveVaultAction({
       vaultPath,
     })
     onToastRef.current(`Vault "${getRemovedVaultLabel({ path, defaultVaults, extraVaults })}" removed from list`)
-  }, [
+    },
+    [
     defaultWorkspacePath,
     defaultVaults,
     extraVaults,
@@ -1078,7 +1070,8 @@ function useRemoveVaultAction({
     setVaultPath,
     selectedVaultPath,
     vaultPath,
-  ])
+    ],
+  )
 }
 
 function useRestoreGettingStartedAction(options: RestoreGettingStartedOptions) {
@@ -1095,32 +1088,20 @@ function useRestoreGettingStartedAction(options: RestoreGettingStartedOptions) {
   }, [defaultPath, onToastRef, setDefaultAvailable, setHiddenDefaults, switchVault])
 }
 
-function useVaultActions({
-  allVaults,
-  defaultAvailable,
-  defaultPath,
-  defaultWorkspacePath,
-  defaultVaults,
-  extraVaults,
-  hiddenDefaults,
-  lastPersistedSnapshotRef,
-  onSwitchRef,
-  onToastRef,
-  setDefaultAvailable,
-  setDefaultWorkspacePath,
-  setExtraVaults,
-  setHiddenDefaults,
-  selectedVaultPath,
-  setSelectedVaultPath,
-  setVaultPath,
-  vaultPath,
-}: VaultActionOptions) {
-  const addVault = useCallback((path: string, label: string) => {
+function useVaultActions(options: VaultActionOptions) {
+  const { allVaults, defaultAvailable, defaultPath, defaultWorkspacePath, defaultVaults, extraVaults, hiddenDefaults, lastPersistedSnapshotRef, onSwitchRef, onToastRef, setDefaultAvailable, setDefaultWorkspacePath, setExtraVaults, setHiddenDefaults, selectedVaultPath, setSelectedVaultPath, setVaultPath, vaultPath } = options
+  const addVault = useCallback(
+    (path: string, label: string) => {
     addVaultToList({ setExtraVaults, path, label })
-  }, [setExtraVaults])
+    },
+    [setExtraVaults],
+  )
 
   const switchVault = useSwitchVaultAction(onSwitchRef, setSelectedVaultPath, setVaultPath)
-  const workspaceIdentityActions = useWorkspaceIdentityActions({ setDefaultWorkspacePath, setExtraVaults })
+  const workspaceIdentityActions = useWorkspaceIdentityActions({
+    setDefaultWorkspacePath,
+    setExtraVaults,
+  })
   const reorderVaults = useVaultReorderAction({ allVaults, setExtraVaults })
   const registerVaultSelection = useRegisterVaultSelectionAction({
     defaultAvailable,
@@ -1149,10 +1130,13 @@ function useVaultActions({
     setSelectedVaultPath,
     setVaultPath,
   })
-  const addAndSwitch = useCallback((path: string, label: string) => {
+  const addAndSwitch = useCallback(
+    (path: string, label: string) => {
     addVault(path, label)
     switchVault(path)
-  }, [addVault, switchVault])
+    },
+    [addVault, switchVault],
+  )
 
   return {
     handleCreateEmptyVault: useCreateEmptyVaultAction(addAndSwitch, onToastRef),
@@ -1204,7 +1188,7 @@ async function restoreGettingStartedVault({
   try {
     await ensureGettingStartedVaultReady(defaultPath)
     setDefaultAvailable(true)
-    setHiddenDefaults(previousHidden => previousHidden.filter(path => path !== defaultPath))
+    setHiddenDefaults((previousHidden) => previousHidden.filter((path) => path !== defaultPath))
     switchVault(defaultPath)
     onToastRef.current('Getting Started vault ready')
   } catch (err) {
@@ -1217,7 +1201,10 @@ async function restoreGettingStartedVault({
 export function useVaultSwitcher({ onSwitch, onToast }: UseVaultSwitcherOptions) {
   const onSwitchRef = useRef(onSwitch)
   const onToastRef = useRef(onToast)
-  useEffect(() => { onSwitchRef.current = onSwitch; onToastRef.current = onToast })
+  useEffect(() => {
+    onSwitchRef.current = onSwitch
+    onToastRef.current = onToast
+  })
 
   const persistedState = usePersistedVaultState(onSwitchRef)
   const {

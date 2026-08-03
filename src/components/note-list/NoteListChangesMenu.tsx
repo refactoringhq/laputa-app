@@ -38,7 +38,7 @@ function resolveChangeActionTarget(
   modifiedFiles?: ModifiedFile[],
 ): ChangeActionTarget | null {
   const file = modifiedFiles?.find(
-    (modified) => modified.path === entry.path || entry.path.endsWith('/' + modified.relativePath),
+    (modified) => modified.path === entry.path || entry.path.endsWith(`/${modified.relativePath}`),
   )
   if (!file) return null
   return {

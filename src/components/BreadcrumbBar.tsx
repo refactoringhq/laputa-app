@@ -255,16 +255,17 @@ interface TranslatedToggleIconActionProps extends Omit<ToggleIconActionProps, 'a
   locale?: AppLocale
 }
 
-function ToggleIconAction({
-  active,
-  activeClassName,
-  activeLabel,
-  children,
-  inactiveClassName = 'hover:text-foreground',
-  inactiveLabel,
-  onClick,
-  shortcut,
-}: ToggleIconActionProps) {
+function ToggleIconAction(options: ToggleIconActionProps) {
+  const {
+    active,
+    activeClassName,
+    activeLabel,
+    children,
+    inactiveClassName = 'hover:text-foreground',
+    inactiveLabel,
+    onClick,
+    shortcut,
+} = options
   return (
     <IconActionButton
       copy={{
@@ -910,37 +911,38 @@ function BreadcrumbTitleSkeleton() {
   )
 }
 
-function BreadcrumbActions({
-  entry,
-  showDiffToggle,
-  onToggleDiff,
-  rawMode,
-  onToggleRaw,
-  forceRawMode,
-  noteWidth,
-  onToggleNoteWidth,
-  showTableOfContents,
-  onToggleTableOfContents,
-  inspectorCollapsed,
-  onToggleInspector,
-  onToggleFavorite,
-  onToggleOrganized,
-  onRevealFile,
-  onCopyFilePath,
-  onCopyDeepLink,
-  onCopyGitUrl,
-  onExportPdf,
-  onDelete,
-  onArchive,
-  onUnarchive,
-  onEnterNeighborhood,
-  actionsRef,
-  overflowCollapsed,
-  locale = 'en',
-}: Omit<BreadcrumbBarProps, 'wordCount' | 'barRef' | 'onRenameFilename'> & {
+function BreadcrumbActions(options: Omit<BreadcrumbBarProps, 'wordCount' | 'barRef' | 'onRenameFilename'> & {
   actionsRef: React.RefObject<HTMLDivElement | null>
   overflowCollapsed: boolean
 }) {
+  const {
+    entry,
+    showDiffToggle,
+    onToggleDiff,
+    rawMode,
+    onToggleRaw,
+    forceRawMode,
+    noteWidth,
+    onToggleNoteWidth,
+    showTableOfContents,
+    onToggleTableOfContents,
+    inspectorCollapsed,
+    onToggleInspector,
+    onToggleFavorite,
+    onToggleOrganized,
+    onRevealFile,
+    onCopyFilePath,
+    onCopyDeepLink,
+    onCopyGitUrl,
+    onExportPdf,
+    onDelete,
+    onArchive,
+    onUnarchive,
+    onEnterNeighborhood,
+    actionsRef,
+    overflowCollapsed,
+    locale = 'en',
+} = options
   let favoriteAction = onToggleFavorite, organizedAction = onToggleOrganized, neighborhoodAction = onEnterNeighborhood,
     noteWidthAction = onToggleNoteWidth, tableOfContentsAction = onToggleTableOfContents
   if (isHtmlFileEntry(entry)) favoriteAction = organizedAction = neighborhoodAction = noteWidthAction = tableOfContentsAction = undefined
@@ -996,26 +998,7 @@ function BreadcrumbActions({
   )
 }
 
-function BreadcrumbOverflowMenu({
-  entry,
-  showDiffToggle,
-  onToggleDiff,
-  noteWidth,
-  onToggleNoteWidth,
-  showTableOfContents,
-  onToggleTableOfContents,
-  onRevealFile,
-  onCopyFilePath,
-  onCopyDeepLink,
-  onCopyGitUrl,
-  onExportPdf,
-  onArchive,
-  onUnarchive,
-  onDelete,
-  onEnterNeighborhood,
-  showResponsiveActions,
-  locale = 'en',
-}: Pick<
+function BreadcrumbOverflowMenu(options: Pick<
   BreadcrumbBarProps,
   | 'entry'
   | 'showDiffToggle'
@@ -1037,6 +1020,26 @@ function BreadcrumbOverflowMenu({
 > & {
   showResponsiveActions: boolean
 }) {
+  const {
+    entry,
+    showDiffToggle,
+    onToggleDiff,
+    noteWidth,
+    onToggleNoteWidth,
+    showTableOfContents,
+    onToggleTableOfContents,
+    onRevealFile,
+    onCopyFilePath,
+    onCopyDeepLink,
+    onCopyGitUrl,
+    onExportPdf,
+    onArchive,
+    onUnarchive,
+    onDelete,
+    onEnterNeighborhood,
+    showResponsiveActions,
+    locale = 'en',
+} = options
   let showMarkdownActions = true
   if (isHtmlFileEntry(entry)) showMarkdownActions = false
   const runDiffAction = availableDiffAction(showDiffToggle, onToggleDiff)
@@ -1182,10 +1185,7 @@ export const BreadcrumbBar = memo(function BreadcrumbBar({
   onRenameFilename,
   ...actionProps
 }: BreadcrumbBarProps) {
-  type DragRegionResult = ReturnType<typeof useDragRegion<HTMLDivElement>> & {
-    dragRegionRef?: React.RefObject<HTMLDivElement | null>
-  }
-  const { dragRegionRef, onMouseDown } = useDragRegion<HTMLDivElement>() as DragRegionResult
+  const { dragRegionRef, onMouseDown } = useDragRegion<HTMLDivElement>()
   const fallbackDragRegionRef = useRef<HTMLDivElement>(null)
   const breadcrumbDragRegionRef = dragRegionRef ?? fallbackDragRegionRef
   const actionsRef = useRef<HTMLDivElement | null>(null)

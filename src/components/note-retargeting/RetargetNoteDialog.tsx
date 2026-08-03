@@ -1,13 +1,7 @@
 import { Check, StackSimple } from '@phosphor-icons/react'
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -34,9 +28,7 @@ interface RetargetNoteDialogProps {
 function matchesQuery(option: RetargetOption, query: string): boolean {
   const normalized = query.trim().toLowerCase()
   if (!normalized) return true
-  return option.label.toLowerCase().includes(normalized)
-    || option.detail?.toLowerCase().includes(normalized)
-    || false
+  return option.label.toLowerCase().includes(normalized) || option.detail?.toLowerCase().includes(normalized) || false
 }
 
 function initialHighlightIndex(options: RetargetOption[]): number {
@@ -48,31 +40,19 @@ function initialHighlightIndex(options: RetargetOption[]): number {
 function nextHighlightIndex(current: number, total: number, direction: 'next' | 'previous'): number {
   if (total === 0) return -1
   if (current < 0) return direction === 'next' ? 0 : total - 1
-  return direction === 'next'
-    ? (current + 1) % total
-    : (current - 1 + total) % total
+  return direction === 'next' ? (current + 1) % total : (current - 1 + total) % total
 }
 
-export function RetargetNoteDialog({
-  open,
-  title,
-  description,
-  searchPlaceholder,
-  emptyMessage,
-  options,
-  onClose,
-  onSelect,
-  testIdPrefix,
-}: RetargetNoteDialogProps) {
+export function RetargetNoteDialog(functionOptions: RetargetNoteDialogProps) {
+  const { open, title, description, searchPlaceholder, emptyMessage, options, onClose, onSelect, testIdPrefix } =
+    functionOptions
   const [query, setQuery] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
 
-  const filteredOptions = useMemo(
-    () => options.filter((option) => matchesQuery(option, query)),
-    [options, query],
-  )
+  const filteredOptions = useMemo(() => options.filter((option) => matchesQuery(option, query)), [options, query])
 
-  const effectiveHighlightedIndex = highlightedIndex >= 0 && highlightedIndex < filteredOptions.length
+  const effectiveHighlightedIndex =
+    highlightedIndex >= 0 && highlightedIndex < filteredOptions.length
     ? highlightedIndex
     : initialHighlightIndex(filteredOptions)
 
@@ -146,7 +126,9 @@ export function RetargetNoteDialog({
                   )}
                   data-testid={`${testIdPrefix}-option:${option.id}`}
                   onMouseMove={() => setHighlightedIndex(index)}
-                  onClick={() => { void submitSelection(option.id) }}
+                  onClick={() => {
+                    void submitSelection(option.id)
+                  }}
                 >
                   <div className="flex min-w-0 flex-1 items-start gap-2">
                     <span className="mt-0.5 shrink-0 text-muted-foreground">
@@ -154,15 +136,11 @@ export function RetargetNoteDialog({
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-medium text-foreground">{option.label}</span>
-                      {option.detail && (
-                        <span className="truncate text-xs text-muted-foreground">{option.detail}</span>
-                      )}
+                      {option.detail && <span className="truncate text-xs text-muted-foreground">{option.detail}</span>}
                     </span>
                   </div>
                   {option.current && (
-                    <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                      Current
-                    </span>
+                    <span className="shrink-0 text-xs font-medium text-muted-foreground">Current</span>
                   )}
                 </Button>
               ))}

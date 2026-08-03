@@ -1,16 +1,10 @@
 import { useCallback } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { trackEvent } from '../../lib/telemetry'
-import {
-  extractWikilinkQuery,
-  replaceActiveWikilinkQuery,
-} from '../../utils/rawEditorUtils'
+import { extractWikilinkQuery, replaceActiveWikilinkQuery } from '../../utils/rawEditorUtils'
 import { isExternalFormulaInput } from '../../utils/sheetExternalReferences'
 import { selectedRangeArea } from '../../utils/sheetSelection'
-import {
-  applySheetWikilinkStyle,
-  sheetWikilinkCanvasColor,
-} from '../../utils/sheetWikilinkModelBridge'
+import { applySheetWikilinkStyle, sheetWikilinkCanvasColor } from '../../utils/sheetWikilinkModelBridge'
 import {
   dispatchSheetInput,
   formulaAutocompletePosition,
@@ -22,25 +16,23 @@ import {
   sheetWikilinkAutocompleteItems,
   visibleSheetTextInput,
 } from './sheetEditorHelpers'
-import {
-  autocompleteKeyAction,
-  moveAutocompleteSelection,
-  stopAutocompleteKey,
-} from './sheetAutocompleteKeyActions'
+import { autocompleteKeyAction, moveAutocompleteSelection, stopAutocompleteKey } from './sheetAutocompleteKeyActions'
 import type { UseSheetInlineAutocompletesOptions } from './sheetInlineAutocompleteTypes'
 
-function useWikilinkTarget({
-  commitSelectedCellInput,
-  entries,
-  refreshWorkbook,
-  scheduleSerialize,
-  setFormulaAutocomplete,
-  setWikilinkAutocomplete,
-  sourceEntry,
-  wikilinkInputRef,
-  workbookRef,
-}: UseSheetInlineAutocompletesOptions) {
-  return useCallback((target: string) => {
+function useWikilinkTarget(options: UseSheetInlineAutocompletesOptions) {
+  const {
+    commitSelectedCellInput,
+    entries,
+    refreshWorkbook,
+    scheduleSerialize,
+    setFormulaAutocomplete,
+    setWikilinkAutocomplete,
+    sourceEntry,
+    wikilinkInputRef,
+    workbookRef,
+  } = options
+  return useCallback(
+    (target: string) => {
     const input = wikilinkInputRef.current
     if (!input) return
 
@@ -60,13 +52,20 @@ function useWikilinkTarget({
     const current = workbookRef.current
     if (current && !isFormulaInput) {
       commitSelectedCellInput(replacement.text)
-      applySheetWikilinkStyle(current.model, selectedRangeArea(current.model), sheetWikilinkCanvasColor(replacement.text, entries, sourceEntry))
+        applySheetWikilinkStyle(
+          current.model,
+          selectedRangeArea(current.model),
+          sheetWikilinkCanvasColor(replacement.text, entries, sourceEntry),
+        )
       refreshWorkbook()
     } else if (current && isExternalFormulaInput(replacement.text)) {
-      commitSelectedCellInput(replacement.text, { allowPendingExternal: true })
+        commitSelectedCellInput(replacement.text, {
+          allowPendingExternal: true,
+        })
     }
     scheduleSerialize({ bodyRows: 'none' })
-  }, [
+    },
+    [
     commitSelectedCellInput,
     entries,
     refreshWorkbook,
@@ -76,7 +75,8 @@ function useWikilinkTarget({
     sourceEntry,
     wikilinkInputRef,
     workbookRef,
-  ])
+    ],
+  )
 }
 
 function useWikilinkUpdater(
@@ -94,7 +94,8 @@ function useWikilinkUpdater(
     wikilinkInputRef,
   } = options
 
-  return useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
+  return useCallback(
+    (input: HTMLInputElement | HTMLTextAreaElement | null) => {
     const container = sheetElementRef.current
     if (!input || !container) {
       wikilinkInputRef.current = null
@@ -103,7 +104,10 @@ function useWikilinkUpdater(
     }
 
     const cursor = input.selectionStart ?? input.value.length
-    if (isInsideFormulaStringLiteral(input.value, cursor) || isActiveWikilinkQueryInsideFormulaString(input.value, cursor)) {
+      if (
+        isInsideFormulaStringLiteral(input.value, cursor) ||
+        isActiveWikilinkQueryInsideFormulaString(input.value, cursor)
+      ) {
       wikilinkInputRef.current = null
       setWikilinkAutocomplete(null)
       return false
@@ -118,7 +122,8 @@ function useWikilinkUpdater(
 
     wikilinkInputRef.current = input
     setFormulaAutocomplete(null)
-    setWikilinkAutocomplete((current) => nextWikilinkAutocompleteState(current, {
+      setWikilinkAutocomplete((current) =>
+        nextWikilinkAutocompleteState(current, {
       items: sheetWikilinkAutocompleteItems({
         baseItems: wikilinkBaseItems,
         insertWikilink: applyWikilinkAutocompleteTarget,
@@ -129,9 +134,11 @@ function useWikilinkUpdater(
       }),
       selectedIndex: 0,
       ...formulaAutocompletePosition(input, container, cursor),
-    }))
+        }),
+      )
     return true
-  }, [
+    },
+    [
     applyWikilinkAutocompleteTarget,
     setFormulaAutocomplete,
     setWikilinkAutocomplete,
@@ -141,7 +148,8 @@ function useWikilinkUpdater(
     vaultPath,
     wikilinkBaseItems,
     wikilinkInputRef,
-  ])
+    ],
+  )
 }
 
 function useWikilinkKeys({
@@ -150,7 +158,8 @@ function useWikilinkKeys({
   wikilinkAutocomplete,
   wikilinkInputRef,
 }: UseSheetInlineAutocompletesOptions) {
-  return useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+  return useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!wikilinkAutocomplete) return
 
     const input = formulaInputFromTarget(event.target) ?? visibleSheetTextInput(sheetElementRef.current)
@@ -167,7 +176,9 @@ function useWikilinkKeys({
     } else {
       setWikilinkAutocomplete(null)
     }
-  }, [setWikilinkAutocomplete, sheetElementRef, wikilinkAutocomplete, wikilinkInputRef])
+    },
+    [setWikilinkAutocomplete, sheetElementRef, wikilinkAutocomplete, wikilinkInputRef],
+  )
 }
 
 export function useSheetWikilinkAutocomplete(options: UseSheetInlineAutocompletesOptions) {

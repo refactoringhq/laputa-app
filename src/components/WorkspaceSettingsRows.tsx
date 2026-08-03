@@ -30,15 +30,7 @@ function sanitizeWorkspaceShortLabel(value: string): string {
   return value.trim().toUpperCase().slice(0, 3)
 }
 
-function WorkspaceFieldLabel({
-  htmlFor,
-  label,
-  tooltip,
-}: {
-  htmlFor: string
-  label: string
-  tooltip: string
-}) {
+function WorkspaceFieldLabel({ htmlFor, label, tooltip }: { htmlFor: string; label: string; tooltip: string }) {
   return (
     <div className="flex min-w-0 items-center gap-1">
       <label className="truncate text-[11px] font-medium text-muted-foreground" htmlFor={htmlFor}>
@@ -56,7 +48,9 @@ function WorkspaceFieldLabel({
             <Info size={12} />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="top" align="start">{tooltip}</TooltipContent>
+        <TooltipContent side="top" align="start">
+          {tooltip}
+        </TooltipContent>
       </Tooltip>
     </div>
   )
@@ -89,7 +83,9 @@ function WorkspaceIdentityInputs({
   const commitShortLabelDraft = () => {
     const normalizedShortLabel = sanitizeWorkspaceShortLabel(shortLabelDraft)
     if (!canEdit || normalizedShortLabel === savedShortLabelDraft) return
-    onUpdateWorkspaceIdentity?.(vault.path, { shortLabel: normalizedShortLabel })
+    onUpdateWorkspaceIdentity?.(vault.path, {
+      shortLabel: normalizedShortLabel,
+    })
   }
 
   const blurOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -99,20 +95,30 @@ function WorkspaceIdentityInputs({
   return (
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(80px,0.28fr)_minmax(140px,0.55fr)]">
       <div className="grid gap-1.5">
-        <WorkspaceFieldLabel htmlFor={nameId} label={t('settings.workspaces.name')} tooltip={t('settings.workspaces.nameTooltip')} />
+        <WorkspaceFieldLabel
+          htmlFor={nameId}
+          label={t('settings.workspaces.name')}
+          tooltip={t('settings.workspaces.nameTooltip')}
+        />
         <Input
           id={nameId}
           value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}
           onBlur={commitNameDraft}
           onKeyDown={blurOnEnter}
-          aria-label={t('settings.workspaces.nameAria', { label: workspace.label })}
+          aria-label={t('settings.workspaces.nameAria', {
+            label: workspace.label,
+          })}
           disabled={!canEdit}
           className="h-8 bg-transparent"
         />
       </div>
       <div className="grid gap-1.5">
-        <WorkspaceFieldLabel htmlFor={labelId} label={t('settings.workspaces.label')} tooltip={t('settings.workspaces.labelTooltip')} />
+        <WorkspaceFieldLabel
+          htmlFor={labelId}
+          label={t('settings.workspaces.label')}
+          tooltip={t('settings.workspaces.labelTooltip')}
+        />
         <Input
           id={labelId}
           value={shortLabelDraft}
@@ -120,17 +126,25 @@ function WorkspaceIdentityInputs({
           onChange={(event) => setShortLabelDraft(sanitizeWorkspaceShortLabel(event.target.value))}
           onBlur={commitShortLabelDraft}
           onKeyDown={blurOnEnter}
-          aria-label={t('settings.workspaces.labelAria', { label: workspace.label })}
+          aria-label={t('settings.workspaces.labelAria', {
+            label: workspace.label,
+          })}
           disabled={!canEdit}
           className="h-8 bg-transparent uppercase"
         />
       </div>
       <div className="grid gap-1.5">
-        <WorkspaceFieldLabel htmlFor={slugId} label={t('settings.workspaces.slug')} tooltip={t('settings.workspaces.slugTooltip')} />
+        <WorkspaceFieldLabel
+          htmlFor={slugId}
+          label={t('settings.workspaces.slug')}
+          tooltip={t('settings.workspaces.slugTooltip')}
+        />
         <Input
           id={slugId}
           value={vault.alias ?? workspace.alias}
-          aria-label={t('settings.workspaces.slugAria', { label: workspace.label })}
+          aria-label={t('settings.workspaces.slugAria', {
+            label: workspace.label,
+          })}
           readOnly
           aria-readonly="true"
           className="h-8 cursor-default bg-muted/30 text-muted-foreground"
@@ -140,32 +154,44 @@ function WorkspaceIdentityInputs({
   )
 }
 
-function WorkspaceRowActions({
-  canEdit,
-  canMoveDown,
-  canMoveUp,
-  locale,
-  onMoveVault,
-  onSetDefaultWorkspace,
-  onUpdateWorkspaceIdentity,
-  onRequestRemoveVault,
-  workspace,
-  vault,
-}: Pick<WorkspaceSettingsRowsProps, 'locale' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity'> & {
-  canEdit: boolean
-  canMoveDown: boolean
-  canMoveUp: boolean
-  onMoveVault?: (path: string, direction: VaultMoveDirection) => void
-  onRequestRemoveVault?: () => void
-  workspace: ReturnType<typeof workspaceIdentityFromVault>
-  vault: VaultOption
-}) {
+function WorkspaceRowActions(
+  options: Pick<WorkspaceSettingsRowsProps, 'locale' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity'> & {
+    canEdit: boolean
+    canMoveDown: boolean
+    canMoveUp: boolean
+    onMoveVault?: (path: string, direction: VaultMoveDirection) => void
+    onRequestRemoveVault?: () => void
+    workspace: ReturnType<typeof workspaceIdentityFromVault>
+    vault: VaultOption
+  },
+) {
+  const {
+    canEdit,
+    canMoveDown,
+    canMoveUp,
+    locale,
+    onMoveVault,
+    onSetDefaultWorkspace,
+    onUpdateWorkspaceIdentity,
+    onRequestRemoveVault,
+    workspace,
+    vault,
+  } = options
   const t = createTranslator(locale)
-  const removeLabel = t('settings.workspaces.removeAria', { label: workspace.label })
+  const removeLabel = t('settings.workspaces.removeAria', {
+    label: workspace.label,
+  })
 
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
-      <WorkspaceMoveButtons canMoveDown={canMoveDown} canMoveUp={canMoveUp} locale={locale} onMoveVault={onMoveVault} vault={vault} workspace={workspace} />
+      <WorkspaceMoveButtons
+        canMoveDown={canMoveDown}
+        canMoveUp={canMoveUp}
+        locale={locale}
+        onMoveVault={onMoveVault}
+        vault={vault}
+        workspace={workspace}
+      />
       <AccentColorPicker
         className="gap-1.5"
         disabled={!canEdit}
@@ -179,7 +205,9 @@ function WorkspaceRowActions({
         size="xs"
         onClick={() => {
           onSetDefaultWorkspace?.(vault.path)
-          trackEvent('workspace_default_changed', { workspace_alias: workspace.alias })
+          trackEvent('workspace_default_changed', {
+            workspace_alias: workspace.alias,
+          })
         }}
         disabled={!onSetDefaultWorkspace || workspace.defaultForNewNotes}
         data-testid={`settings-workspace-default-${workspace.alias}`}
@@ -245,26 +273,32 @@ function WorkspaceRemovalConfirmation({
   )
 }
 
-function WorkspaceSettingsRow({
-  defaultWorkspacePath,
-  locale,
-  onCancelRemoveVault,
-  onConfirmRemoveVault,
-  onMoveVault,
-  onRequestRemoveVault,
-  onSetDefaultWorkspace,
-  onUpdateWorkspaceIdentity,
-  vaults,
-  vault,
-  pendingRemoval,
-}: Pick<WorkspaceSettingsRowsProps, 'defaultWorkspacePath' | 'locale' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity' | 'vaults'> & {
-  onCancelRemoveVault: () => void
-  onConfirmRemoveVault?: () => void
-  onMoveVault?: (path: string, direction: VaultMoveDirection) => void
-  onRequestRemoveVault?: () => void
-  pendingRemoval: boolean
-  vault: VaultOption
-}) {
+function WorkspaceSettingsRow(
+  options: Pick<
+    WorkspaceSettingsRowsProps,
+    'defaultWorkspacePath' | 'locale' | 'onSetDefaultWorkspace' | 'onUpdateWorkspaceIdentity' | 'vaults'
+  > & {
+    onCancelRemoveVault: () => void
+    onConfirmRemoveVault?: () => void
+    onMoveVault?: (path: string, direction: VaultMoveDirection) => void
+    onRequestRemoveVault?: () => void
+    pendingRemoval: boolean
+    vault: VaultOption
+  },
+) {
+  const {
+    defaultWorkspacePath,
+    locale,
+    onCancelRemoveVault,
+    onConfirmRemoveVault,
+    onMoveVault,
+    onRequestRemoveVault,
+    onSetDefaultWorkspace,
+    onUpdateWorkspaceIdentity,
+    vaults,
+    vault,
+    pendingRemoval,
+  } = options
   const workspace = workspaceIdentityFromVault(vault, { defaultWorkspacePath })
   const canEdit = !!onUpdateWorkspaceIdentity && vault.path !== '' && !vault.managedDefault
 
@@ -296,7 +330,12 @@ function WorkspaceSettingsRow({
           workspace={workspace}
         />
       )}
-      <WorkspaceIdentityInputs canEdit={canEdit} locale={locale} onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity} vault={vault} />
+      <WorkspaceIdentityInputs
+        canEdit={canEdit}
+        locale={locale}
+        onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
+        vault={vault}
+      />
     </div>
   )
 }
@@ -335,10 +374,14 @@ export function WorkspaceSettingsRows({
             defaultWorkspacePath={defaultWorkspacePath}
             locale={locale}
             onCancelRemoveVault={() => setPendingRemovalPath(null)}
-            onConfirmRemoveVault={onRemoveVault ? () => {
+            onConfirmRemoveVault={
+              onRemoveVault
+                ? () => {
               onRemoveVault(vault.path)
               setPendingRemovalPath(null)
-            } : undefined}
+                  }
+                : undefined
+            }
             onMoveVault={onReorderVaults ? moveVault : undefined}
             onRequestRemoveVault={onRemoveVault ? () => setPendingRemovalPath(vault.path) : undefined}
             onSetDefaultWorkspace={onSetDefaultWorkspace}

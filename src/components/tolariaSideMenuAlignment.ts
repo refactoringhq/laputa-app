@@ -144,20 +144,20 @@ function createSideMenuAlignmentController(editor: TolariaBlockNoteEditor, block
 
   const state = createSideMenuAlignmentState()
   let resizeObserver: ResizeObserver | null = null
-  const observeTargets = () => observeSideMenuAlignmentTargets({
+  const observeTargets = () => { observeSideMenuAlignmentTargets({
     blockId,
     editorElement,
     resizeObserver,
     state,
-  })
-  const scheduleAlignment = () => scheduleSideMenuTextAlignment({
+  }); }
+  const scheduleAlignment = () => { scheduleSideMenuTextAlignment({
     blockId,
     editorElement,
     observeTargets,
     ownerWindow,
     retry: scheduleAlignment,
     state,
-  })
+  }); }
 
   resizeObserver = createSideMenuResizeObserver(scheduleAlignment)
   scheduleAlignment()

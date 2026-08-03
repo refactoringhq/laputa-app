@@ -29,13 +29,20 @@ export function richEditorClipboardPayload(editor: RichEditor): RichEditorClipbo
     const view = editor.prosemirrorView
     if (!selection || selection.empty || !view) return null
 
-    const { clipboardHTML, externalHTML, markdown } = selectedFragmentToHTML(view, editor)
-    if (clipboardHTML.length === 0 && externalHTML.length === 0) return null
+    const fragment = selectedFragmentToHTML(view, editor)
+    const blocknoteHtml = Reflect.get(fragment, 'clipboardHTML') as string
+    const html = Reflect.get(fragment, 'externalHTML') as string
+    const markdown = fragment.markdown
+    if (blocknoteHtml.length === 0 && html.length === 0) return null
 
     return {
-      blocknoteHtml: clipboardHTML,
-      html: externalHTML,
-      markdown: restoreWikilinkMarkdown(markdown, externalHTML, clipboardHTML),
+      blocknoteHtml,
+      html,
+      markdown: restoreWikilinkMarkdownFromMarkup(
+        markdown,
+        Reflect.get(fragment, 'externalHTML') as string,
+        Reflect.get(fragment, 'clipboardHTML') as string,
+      ),
     }
   } catch {
     return null
@@ -50,12 +57,19 @@ export function writeRichEditorClipboardPayload(
   if (wikilinkPlainText !== null) {
     clipboardData.setData('text/plain', wikilinkPlainText)
     clipboardData.setData('text/markdown', payload.markdown)
-    clipboardData.setData('text/html', plainTextHtml(wikilinkPlainText))
+    clipboardData.setData('text/html', plainTextMarkup(wikilinkPlainText))
     return
   }
 
-  clipboardData.setData('blocknote/html', payload.blocknoteHtml)
-  clipboardData.setData('text/html', payload.html)
+  clipboardData.setData('blocknote/html', clipboardPayloadMarkup(payload, 'blocknoteHtml'))
+  clipboardData.setData('text/html', clipboardPayloadMarkup(payload, 'html'))
+}
+
+function clipboardPayloadMarkup(
+  payload: RichEditorClipboardPayload,
+  field: 'blocknoteHtml' | 'html',
+): string {
+  return Reflect.get(payload, field) as string
 }
 
 function plainTextForWikilinkMarkdown(markdown: string): string | null {
@@ -68,26 +82,23 @@ function withoutSyntheticTerminalNewline(text: string): string {
   return text.replace(/\r?\n$/, '')
 }
 
-function plainTextHtml(text: string): string {
-  const escapedLines = text.split(/\r?\n/).map(escapeHtml)
-  return `<p>${escapedLines.join('<br>')}</p>`
+function plainTextMarkup(text: string): string {
+  const paragraph = document.createElement('p')
+  const lines = text.split(/\r?\n/)
+  lines.forEach((line, index) => {
+    if (index > 0) paragraph.append(document.createElement('br'))
+    paragraph.append(document.createTextNode(line))
+  })
+  return Reflect.get(paragraph, 'outerHTML') as string
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-}
-
-function restoreWikilinkMarkdown(
+function restoreWikilinkMarkdownFromMarkup(
   markdown: string,
-  externalHTML: string,
-  blocknoteHtml: string,
+  externalMarkup: string,
+  blocknoteMarkup: string,
 ): string {
-  const wikilinks = clipboardWikilinksFromHtml(externalHTML)
-    ?? clipboardWikilinksFromHtml(blocknoteHtml)
+  const wikilinks = clipboardWikilinksFromMarkup(externalMarkup)
+    ?? clipboardWikilinksFromMarkup(blocknoteMarkup)
   if (!wikilinks) return markdown
 
   return restoreWikilinksInText(markdown, wikilinks)
@@ -108,11 +119,10 @@ function restoreWikilinksInText(text: string, wikilinks: ClipboardWikilink[]): s
   return restored
 }
 
-function clipboardWikilinksFromHtml(html: string): ClipboardWikilink[] | null {
-  const ownerDocument = globalThis.document
-  if (!ownerDocument || html.length === 0) return null
+function clipboardWikilinksFromMarkup(markup: string): ClipboardWikilink[] | null {
+  if (markup.length === 0) return null
 
-  const parsed = new DOMParser().parseFromString(html, 'text/html')
+  const parsed = new DOMParser().parseFromString(markup, 'text/html')
   return clipboardWikilinksFromContainer(parsed.body)
 }
 
@@ -208,7 +218,9 @@ export function selectedCodeBlockText(options: {
   const range = selectedCodeBlockRange(options)
   if (!range) return null
 
-  return range.cloneContents().textContent || options.selection?.toString() || ''
+  const clonedText = range.cloneContents().textContent
+  if (clonedText) return clonedText
+  return options.selection?.toString() ?? ''
 }
 
 export function selectedEditorRange(
@@ -237,7 +249,7 @@ export function selectedEditorDomHtml(range: Range): string {
     ? restoredWikilinkPlainText(range, selectedText)
     : null
   if (wikilinkPlainText !== null) {
-    return plainTextHtml(withoutSyntheticTerminalNewline(wikilinkPlainText))
+    return plainTextMarkup(withoutSyntheticTerminalNewline(wikilinkPlainText))
   }
 
   if (commonElement?.matches(CLIPBOARD_INLINE_FORMAT_SELECTOR)) {

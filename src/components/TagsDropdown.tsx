@@ -35,7 +35,13 @@ export function TagPill({ tag, className }: { tag: string; className?: string })
   )
 }
 
-function ColorPickerRow({ tag, onColorChange }: { tag: string; onColorChange: (tag: string, colorKey: string) => void }) {
+function ColorPickerRow({
+  tag,
+  onColorChange,
+}: {
+  tag: string
+  onColorChange: (tag: string, colorKey: string) => void
+}) {
   const currentKey = getTagColorKey(tag)
   return (
     <div className="flex items-center gap-1 px-3 py-1.5" data-testid={`tag-color-picker-${tag}`}>
@@ -52,23 +58,29 @@ function ColorPickerRow({ tag, onColorChange }: { tag: string; onColorChange: (t
   )
 }
 
-function TagOption({
-  tag, selected, highlighted, onToggle, onMouseEnter,
-  colorEditing, onToggleColor, onColorChange,
-}: {
-  tag: string; selected: boolean; highlighted: boolean
-  onToggle: (tag: string) => void; onMouseEnter: () => void
+function TagOption(options: {
+  tag: string
+  selected: boolean
+  highlighted: boolean
+  onToggle: (tag: string) => void
+  onMouseEnter: () => void
   colorEditing: boolean
-  onToggleColor: (tag: string) => void; onColorChange: (tag: string, colorKey: string) => void
+  onToggleColor: (tag: string) => void
+  onColorChange: (tag: string, colorKey: string) => void
 }) {
+  const { tag, selected, highlighted, onToggle, onMouseEnter, colorEditing, onToggleColor, onColorChange } = options
   const style = getTagStyle(tag)
   return (
     <>
       <div
         className="flex w-full items-center gap-1 px-2 py-1 transition-colors"
-        style={{ borderRadius: 4, backgroundColor: highlighted ? 'var(--muted)' : 'transparent' }}
+        style={{
+          borderRadius: 4,
+          backgroundColor: highlighted ? 'var(--muted)' : 'transparent',
+        }}
       >
-        <button type="button"
+        <button
+          type="button"
           className="flex min-w-0 flex-1 items-center gap-1.5 border-none bg-transparent p-0 text-left"
           onClick={() => onToggle(tag)}
           onMouseEnter={onMouseEnter}
@@ -79,7 +91,8 @@ function TagOption({
           </span>
           <TagPill tag={tag} />
         </button>
-        <button type="button"
+        <button
+          type="button"
           className="flex size-4 shrink-0 items-center justify-center rounded-full border-none p-0"
           style={{ backgroundColor: style.color }}
           onClick={() => onToggleColor(tag)}
@@ -103,7 +116,9 @@ const SECTION_LABEL_STYLE = {
 function SectionLabel({ children }: { children: string }) {
   return (
     <div className="px-2 py-1">
-      <span className="text-muted-foreground" style={SECTION_LABEL_STYLE}>{children}</span>
+      <span className="text-muted-foreground" style={SECTION_LABEL_STYLE}>
+        {children}
+      </span>
     </div>
   )
 }
@@ -111,7 +126,7 @@ function SectionLabel({ children }: { children: string }) {
 function useTagFiltering(query: string, vaultTags: string[]) {
   return useMemo(() => {
     const lowerQuery = query.toLowerCase()
-    const filtered = vaultTags.filter(t => t.toLowerCase().includes(lowerQuery))
+    const filtered = vaultTags.filter((t) => t.toLowerCase().includes(lowerQuery))
     return { filtered }
   }, [query, vaultTags])
 }
@@ -124,13 +139,7 @@ interface TagSelectionOptions {
   selectedTags: Set<string>
 }
 
-function getTagValueToToggle({
-  highlightIndex,
-  filtered,
-  showCreateOption,
-  query,
-  selectedTags,
-}: TagSelectionOptions) {
+function getTagValueToToggle({ highlightIndex, filtered, showCreateOption, query, selectedTags }: TagSelectionOptions) {
   const trimmed = query.trim()
   if (highlightIndex >= 0 && highlightIndex < filtered.length) return filtered.at(highlightIndex)
   if (showCreateOption && highlightIndex === filtered.length && trimmed) return trimmed
@@ -139,28 +148,44 @@ function getTagValueToToggle({
 }
 
 function useTagKeyboard(opts: {
-  filtered: string[]; totalOptions: number; showCreateOption: boolean
-  query: string; selectedTags: Set<string>
-  onToggle: (tag: string) => void; onClose: () => void
+  filtered: string[]
+  totalOptions: number
+  showCreateOption: boolean
+  query: string
+  selectedTags: Set<string>
+  onToggle: (tag: string) => void
+  onClose: () => void
   listRef: React.RefObject<HTMLDivElement | null>
 }) {
   const { filtered, totalOptions, showCreateOption, query, selectedTags, onToggle, onClose, listRef } = opts
   const [highlightIndex, setHighlightIndex] = useState(-1)
 
-  const scrollIntoView = useCallback((index: number) => {
+  const scrollIntoView = useCallback(
+    (index: number) => {
     const list = listRef.current
     if (!list) return
     const items = list.querySelectorAll('[data-testid^="tag-option-"], [data-testid="tag-create-option"]')
     items.item(index)?.scrollIntoView({ block: 'nearest' })
-  }, [listRef])
+    },
+    [listRef],
+  )
 
-  const moveHighlight = useCallback((nextIndex: number) => {
+  const moveHighlight = useCallback(
+    (nextIndex: number) => {
     setHighlightIndex(nextIndex)
     scrollIntoView(nextIndex)
-  }, [scrollIntoView])
+    },
+    [scrollIntoView],
+  )
 
   const submitHighlightedTag = useCallback(() => {
-    const value = getTagValueToToggle({ highlightIndex, filtered, showCreateOption, query, selectedTags })
+    const value = getTagValueToToggle({
+      highlightIndex,
+      filtered,
+      showCreateOption,
+      query,
+      selectedTags,
+    })
     if (value) onToggle(value)
   }, [highlightIndex, filtered, showCreateOption, query, selectedTags, onToggle])
 
@@ -197,10 +222,15 @@ function useTagKeyboard(opts: {
 }
 
 export function TagsDropdown({
-  selectedTags, vaultTags, onToggle, onClose,
+  selectedTags,
+  vaultTags,
+  onToggle,
+  onClose,
 }: {
-  selectedTags: string[]; vaultTags: string[]
-  onToggle: (tag: string) => void; onClose: () => void
+  selectedTags: string[]
+  vaultTags: string[]
+  onToggle: (tag: string) => void
+  onClose: () => void
 }) {
   const [query, setQuery] = useState('')
   const [colorEditingTag, setColorEditingTag] = useState<string | null>(null)
@@ -225,11 +255,19 @@ export function TagsDropdown({
 
   const totalOptions = filtered.length + (showCreateOption ? 1 : 0)
 
-  const { highlightIndex, setHighlightIndex, handleKeyDown, resetHighlight } =
-    useTagKeyboard({ filtered, totalOptions, showCreateOption, query, selectedTags: selectedSet, onToggle, onClose, listRef })
+  const { highlightIndex, setHighlightIndex, handleKeyDown, resetHighlight } = useTagKeyboard({
+    filtered,
+    totalOptions,
+    showCreateOption,
+    query,
+    selectedTags: selectedSet,
+    onToggle,
+    onClose,
+    listRef,
+  })
 
   const handleToggleColor = useCallback((tag: string) => {
-    setColorEditingTag(prev => prev === tag ? null : tag)
+    setColorEditingTag((prev) => (prev === tag ? null : tag))
   }, [])
 
   const handleColorChange = useCallback((tag: string, colorKey: string) => {
@@ -238,10 +276,13 @@ export function TagsDropdown({
     setColorEditingTag(null)
   }, [])
 
-  const handleQueryChange = useCallback((value: string) => {
+  const handleQueryChange = useCallback(
+    (value: string) => {
     setQuery(value)
     resetHighlight()
-  }, [resetHighlight])
+    },
+    [resetHighlight],
+  )
 
   return (
     <span ref={anchorRef} data-testid="tags-dropdown">
@@ -266,7 +307,7 @@ export function TagsDropdown({
                 className="w-full border-none bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
                 placeholder="Type a tag..."
                 value={query}
-                onChange={e => handleQueryChange(e.target.value)}
+                onChange={(e) => handleQueryChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 data-testid="tags-search-input"
               />
@@ -311,16 +352,9 @@ interface VaultTagSectionProps {
   onColorChange: (tag: string, colorKey: string) => void
 }
 
-function VaultTagSection({
-  tags,
-  selectedTags,
-  highlightIndex,
-  colorEditingTag,
-  onToggle,
-  onHighlight,
-  onToggleColor,
-  onColorChange,
-}: VaultTagSectionProps) {
+function VaultTagSection(options: VaultTagSectionProps) {
+  const { tags, selectedTags, highlightIndex, colorEditingTag, onToggle, onHighlight, onToggleColor, onColorChange } =
+    options
   if (tags.length === 0) return null
   return (
     <div>
@@ -342,16 +376,28 @@ function VaultTagSection({
   )
 }
 
-function CreateTagSection({ show, query, showDivider, highlighted, onToggle, onMouseEnter }: {
-  show: boolean; query: string; showDivider: boolean; highlighted: boolean
-  onToggle: (tag: string) => void; onMouseEnter: () => void
+function CreateTagSection({
+  show,
+  query,
+  showDivider,
+  highlighted,
+  onToggle,
+  onMouseEnter,
+}: {
+  show: boolean
+  query: string
+  showDivider: boolean
+  highlighted: boolean
+  onToggle: (tag: string) => void
+  onMouseEnter: () => void
 }) {
   if (!show) return null
   const trimmed = query.trim()
   return (
     <>
       {showDivider && <div className="my-1 h-px bg-border" />}
-      <button type="button"
+      <button
+        type="button"
         className="flex w-full items-center gap-1.5 border-none bg-transparent px-2 py-1 text-left text-[11px] transition-colors"
         style={{
           borderRadius: 4,
@@ -370,9 +416,5 @@ function CreateTagSection({ show, query, showDivider, highlighted, onToggle, onM
 
 function EmptyTagMessage({ show }: { show: boolean }) {
   if (!show) return null
-  return (
-    <div className="px-2 py-2 text-center text-[11px] text-muted-foreground">
-      No matching tags
-    </div>
-  )
+  return <div className="px-2 py-2 text-center text-[11px] text-muted-foreground">No matching tags</div>
 }

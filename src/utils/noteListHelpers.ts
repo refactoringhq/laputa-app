@@ -275,7 +275,7 @@ export function clearListSortFromLocalStorage(): void {
     const raw = getAppStorageItem('sortPreferences')
     if (!raw) return
     const parsed = JSON.parse(raw)
-    delete parsed['__list__']
+    delete parsed.__list__
     if (Object.keys(parsed).length === 0) {
       localStorage.removeItem(APP_STORAGE_KEYS.sortPreferences)
       localStorage.removeItem(LEGACY_APP_STORAGE_KEYS.sortPreferences)

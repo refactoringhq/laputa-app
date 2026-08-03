@@ -255,15 +255,11 @@ async function deleteExistingView(context: DeleteViewContext): Promise<void> {
 
 function availableViewFields(visibleEntries: VaultEntry[]): string[] {
   const builtIn = ['type', 'status', 'title', 'favorite', 'body']
-  if (!visibleEntries?.length) return builtIn
+  if (visibleEntries.length === 0) return builtIn
   const customFields = new Set<string>()
   for (const entry of visibleEntries) {
-    if (entry.properties) {
-      for (const key of Object.keys(entry.properties)) customFields.add(key)
-    }
-    if (entry.relationships) {
-      for (const key of Object.keys(entry.relationships)) customFields.add(key)
-    }
+    for (const key of Object.keys(entry.properties)) customFields.add(key)
+    for (const key of Object.keys(entry.relationships)) customFields.add(key)
   }
   return [...builtIn, ...Array.from(customFields).sort()]
 }
@@ -332,7 +328,7 @@ function useViewMutationActions(params: ViewMutationActionParams) {
         trackEvent('view_updated', { source: 'sidebar_view_actions' })
         if (typeof patch.name === 'string') setToastMessage(`View "${patch.name}" renamed`)
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         setToastMessage(`Could not save view: ${errorMessage(err)}`)
       })
   }, [handleUpdateViewDefinition, setToastMessage])

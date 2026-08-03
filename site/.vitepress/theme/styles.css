@@ -102,7 +102,7 @@ html.tolaria-landing-page #app {
 
 .tolaria-landing-shell .VPNav,
 .tolaria-landing-shell .VPNavBar,
-.tolaria-landing-shell .VPNavBar:not(.has-sidebar):not(.home.top),
+.tolaria-landing-shell .VPNavBar:not(.has-sidebar, .home.top),
 .tolaria-landing-shell .VPNavBar:not(.home.top) .content-body,
 .tolaria-landing-shell .VPNavBar .content-body {
   background: var(--tolaria-bg);

@@ -1,7 +1,14 @@
 import { Check, CircleNotch as Loader2, FileText, Warning as AlertTriangle } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { ConflictFileState } from '../hooks/useConflictResolver'
 import { cn } from '@/lib/utils'
 
@@ -58,7 +65,7 @@ interface ConflictResolverModalProps {
 
 function isBinaryFile(file: string): boolean {
   const normalizedFile = file.toLowerCase()
-  return BINARY_FILE_EXTENSIONS.some(ext => normalizedFile.endsWith(ext))
+  return BINARY_FILE_EXTENSIONS.some((ext) => normalizedFile.endsWith(ext))
 }
 
 function fileName(path: string): string {
@@ -69,7 +76,8 @@ function ResolutionLabel({ resolution }: { resolution: ConflictFileState['resolu
   if (!resolution) return null
   return (
     <span className="flex items-center gap-1 text-xs text-[var(--feedback-success-text)]">
-      <Check size={12} />{RESOLUTION_LABELS_BY_VALUE.get(resolution)}
+      <Check size={12} />
+      {RESOLUTION_LABELS_BY_VALUE.get(resolution)}
     </span>
   )
 }
@@ -109,7 +117,9 @@ function ConflictFileRow({
     >
       <td className="flex min-w-0 flex-1 items-center gap-2">
         <FileText size={14} className="shrink-0 text-muted-foreground" />
-        <span className="text-sm truncate" title={state.file}>{fileName(state.file)}</span>
+        <span className="text-sm truncate" title={state.file}>
+          {fileName(state.file)}
+        </span>
         <ResolutionLabel resolution={state.resolution} />
       </td>
       <td className="flex shrink-0 items-center gap-1">
@@ -168,16 +178,22 @@ function useConflictFocus(fileCount: number) {
   const focusIdxRef = useRef(0)
   const visibleFocusIdx = clampFocusIndex(focusIdx, fileCount)
 
-  const syncFocusIdx = useCallback((nextIndex: number) => {
+  const syncFocusIdx = useCallback(
+    (nextIndex: number) => {
     const clampedIndex = clampFocusIndex(nextIndex, fileCount)
     setFocusIdx(clampedIndex)
     focusIdxRef.current = clampedIndex
-  }, [fileCount])
+    },
+    [fileCount],
+  )
 
-  const moveFocus = useCallback((offset: number) => {
+  const moveFocus = useCallback(
+    (offset: number) => {
     const currentIndex = clampFocusIndex(focusIdxRef.current, fileCount)
     syncFocusIdx(currentIndex + offset)
-  }, [fileCount, syncFocusIdx])
+    },
+    [fileCount, syncFocusIdx],
+  )
 
   return {
     focusIdx: visibleFocusIdx,
@@ -289,10 +305,7 @@ function ConflictFileList({
   onResolveFile: (file: string, strategy: ConflictResolutionStrategy) => void
 }) {
   return (
-    <table
-      className="block max-h-[300px] overflow-y-auto"
-      data-testid="conflict-file-list"
-    >
+    <table className="block max-h-[300px] overflow-y-auto" data-testid="conflict-file-list">
       <tbody className="flex flex-col gap-2">
         {fileStates.map((state, index) => (
           <ConflictFileRow
@@ -313,7 +326,8 @@ function CommitButtonContent({ committing }: { committing: boolean }) {
   if (!committing) return 'Commit & continue'
   return (
     <>
-      <Loader2 size={14} className="animate-spin mr-1" />Committing…
+      <Loader2 size={14} className="animate-spin mr-1" />
+      Committing…
     </>
   )
 }
@@ -335,12 +349,10 @@ function ConflictDialogFooter({
         K = keep mine · T = keep theirs · O = open · Enter = commit
       </span>
       <div className="flex gap-2">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button
-          onClick={onCommit}
-          disabled={!allResolved || committing}
-          data-testid="conflict-commit-btn"
-        >
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={onCommit} disabled={!allResolved || committing} data-testid="conflict-commit-btn">
           <CommitButtonContent committing={committing} />
         </Button>
       </div>
@@ -348,42 +360,25 @@ function ConflictDialogFooter({
   )
 }
 
-export function ConflictResolverModal({
-  open,
-  onClose,
-  ...contentProps
-}: ConflictResolverModalProps) {
+export function ConflictResolverModal({ open, onClose, ...contentProps }: ConflictResolverModalProps) {
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
-      {open ? (
-        <ConflictResolverDialogContent
+    <Dialog
           open={open}
-          onClose={onClose}
-          {...contentProps}
-        />
-      ) : null}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose()
+      }}
+    >
+      {open ? <ConflictResolverDialogContent open={open} onClose={onClose} {...contentProps} /> : null}
     </Dialog>
   )
 }
 
-function ConflictResolverDialogContent({
-  fileStates,
-  allResolved,
-  committing,
-  error,
-  onResolveFile,
-  onOpenInEditor,
-  onCommit,
-  onClose,
-}: ConflictResolverModalProps) {
-  const {
-    focusIdx,
-    focusIdxRef,
-    moveFocus,
-    syncFocusIdx,
-  } = useConflictFocus(fileStates.length)
+function ConflictResolverDialogContent(options: ConflictResolverModalProps) {
+  const { fileStates, allResolved, committing, error, onResolveFile, onOpenInEditor, onCommit, onClose } = options
+  const { focusIdx, focusIdxRef, moveFocus, syncFocusIdx } = useConflictFocus(fileStates.length)
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose()
       return
@@ -396,14 +391,12 @@ function ConflictResolverDialogContent({
     if (handleResolutionShortcut(e, file, onResolveFile)) return
     if (handleOpenShortcut(e, file, onOpenInEditor)) return
     handleCommitShortcut({ allResolved, committing, event: e, onCommit })
-  }, [allResolved, committing, fileStates, focusIdxRef, moveFocus, onClose, onCommit, onOpenInEditor, onResolveFile])
+    },
+    [allResolved, committing, fileStates, focusIdxRef, moveFocus, onClose, onCommit, onOpenInEditor, onResolveFile],
+  )
 
   return (
-    <DialogContent
-      showCloseButton={false}
-      className="sm:max-w-[520px]"
-      onKeyDown={handleKeyDown}
-    >
+    <DialogContent showCloseButton={false} className="sm:max-w-[520px]" onKeyDown={handleKeyDown}>
       <ConflictDialogHeader fileCount={fileStates.length} />
 
       <ConflictFileList
@@ -415,15 +408,12 @@ function ConflictResolverDialogContent({
       />
 
       {error && (
-        <p className="text-xs text-destructive" data-testid="conflict-error">{error}</p>
+        <p className="text-xs text-destructive" data-testid="conflict-error">
+          {error}
+        </p>
       )}
 
-      <ConflictDialogFooter
-        allResolved={allResolved}
-        committing={committing}
-        onClose={onClose}
-        onCommit={onCommit}
-      />
+      <ConflictDialogFooter allResolved={allResolved} committing={committing} onClose={onClose} onCommit={onCommit} />
     </DialogContent>
   )
 }

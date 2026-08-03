@@ -62,7 +62,9 @@ function useDebouncedCallback(fn: (v: string) => void, delay: number): Debounced
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pendingValueRef = useRef<string | null>(null)
   const fnRef = useRef(fn)
-  useEffect(() => { fnRef.current = fn })
+  useEffect(() => {
+    fnRef.current = fn
+  })
 
   const flush = useCallback(() => {
     clearTimeout(timerRef.current)
@@ -74,13 +76,21 @@ function useDebouncedCallback(fn: (v: string) => void, delay: number): Debounced
     fnRef.current(value)
   }, [])
 
-  const run = useCallback((value: string) => {
+  const run = useCallback(
+    (value: string) => {
     clearTimeout(timerRef.current)
     pendingValueRef.current = value
     timerRef.current = setTimeout(flush, delay)
-  }, [delay, flush])
+    },
+    [delay, flush],
+  )
 
-  useEffect(() => () => { flush() }, [flush])
+  useEffect(
+    () => () => {
+      flush()
+    },
+    [flush],
+  )
 
   return useMemo(() => ({ flush, run }), [flush, run])
 }
@@ -89,24 +99,12 @@ function ColorSection({ selectedColor, locale, onSelectColor }: ColorSectionProp
   return (
     <>
       <div className="font-mono-overline mb-2 text-muted-foreground">{translate(locale, 'customize.color')}</div>
-      <AccentColorPicker
-        className="mb-3 gap-2"
-        selectedColor={selectedColor}
-        onSelectColor={onSelectColor}
-        size={24}
-      />
+      <AccentColorPicker className="mb-3 gap-2" selectedColor={selectedColor} onSelectColor={onSelectColor} size={24} />
     </>
   )
 }
 
-function IconSection({
-  selectedIcon,
-  search,
-  filteredIcons,
-  locale,
-  onSearchChange,
-  onSelectIcon,
-}: IconSectionProps) {
+function IconSection({ selectedIcon, search, filteredIcons, locale, onSearchChange, onSelectIcon }: IconSectionProps) {
   return (
     <>
       <div className="font-mono-overline mb-2 text-muted-foreground">{translate(locale, 'customize.icon')}</div>
@@ -125,7 +123,10 @@ function IconSection({
       </div>
       <div
         className="grid gap-1 overflow-y-auto"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(30px, 1fr))', maxHeight: 160 }}
+        style={{
+          gridTemplateColumns: 'repeat(auto-fit, minmax(30px, 1fr))',
+          maxHeight: 160,
+        }}
       >
         {filteredIcons.length === 0 ? (
           <div className="w-full py-6 text-center text-[12px] text-muted-foreground">
@@ -160,7 +161,9 @@ function IconSection({
 function TemplateSection({ templateText, locale, onTemplateChange }: TemplateSectionProps) {
   return (
     <>
-      <div className="font-mono-overline mb-2 mt-3 text-muted-foreground">{translate(locale, 'customize.template')}</div>
+      <div className="font-mono-overline mb-2 mt-3 text-muted-foreground">
+        {translate(locale, 'customize.template')}
+      </div>
       <Textarea
         value={templateText}
         onChange={(event) => onTemplateChange(event.target.value)}
@@ -188,19 +191,20 @@ function DoneSection({ locale, onClose }: { locale: AppLocale; onClose: () => vo
   )
 }
 
-export function TypeCustomizePopover({
-  currentIcon,
-  currentColor,
-  currentTemplate,
-  onChangeIcon,
-  onChangeColor,
-  onChangeTemplate,
-  onClose,
-  showTemplate = true,
-  showDone = true,
-  surface = 'popover',
-  locale = 'en',
-}: TypeCustomizePopoverProps) {
+export function TypeCustomizePopover(options: TypeCustomizePopoverProps) {
+  const {
+    currentIcon,
+    currentColor,
+    currentTemplate,
+    onChangeIcon,
+    onChangeColor,
+    onChangeTemplate,
+    onClose,
+    showTemplate = true,
+    showDone = true,
+    surface = 'popover',
+    locale = 'en',
+  } = options
   const [selectedColor, setSelectedColor] = useState(currentColor)
   const [selectedIcon, setSelectedIcon] = useState(currentIcon)
   const [search, setSearch] = useState('')
@@ -231,10 +235,7 @@ export function TypeCustomizePopover({
 
   return (
     <div
-      className={cn(
-        'text-popover-foreground z-50',
-        surface === 'popover' && 'rounded-lg border bg-popover shadow-md',
-      )}
+      className={cn('text-popover-foreground z-50', surface === 'popover' && 'rounded-lg border bg-popover shadow-md')}
       style={surface === 'popover' ? { width: 320, padding: 12 } : undefined}
     >
       <ColorSection selectedColor={selectedColor} locale={locale} onSelectColor={handleColorClick} />

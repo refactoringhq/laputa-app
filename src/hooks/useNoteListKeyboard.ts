@@ -47,9 +47,7 @@ function resolveHighlightedPath(items: VaultEntry[], selectedNotePath: string | 
   if (items.length === 0) return null
   if (!selectedNotePath) return items[0].path
 
-  return getItemIndex(items).entryByPath.has(selectedNotePath)
-    ? selectedNotePath
-    : items[0].path
+  return getItemIndex(items).entryByPath.has(selectedNotePath) ? selectedNotePath : items[0].path
 }
 
 function isListActive(container: HTMLDivElement | null): boolean {
@@ -67,10 +65,11 @@ function isPanelActive(panel: HTMLDivElement | null): boolean {
 function isEditableElement(element: Element | null): boolean {
   if (!element) return false
   if (
-    element instanceof HTMLInputElement
-    || element instanceof HTMLTextAreaElement
-    || element instanceof HTMLSelectElement
-  ) return true
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  )
+    return true
   if (!(element instanceof HTMLElement)) return false
   return element.isContentEditable || !!element.closest('[contenteditable="true"]')
 }
@@ -78,20 +77,17 @@ function isEditableElement(element: Element | null): boolean {
 function isInteractiveElement(element: Element | null): boolean {
   if (!element) return false
   if (isEditableElement(element)) return true
-  return element.tagName === 'BUTTON'
-    || element.tagName === 'A'
-    || element.getAttribute('role') === 'button'
+  return element.tagName === 'BUTTON' || element.tagName === 'A' || element.getAttribute('role') === 'button'
 }
 
-function isNestedInteractiveTarget(
-  target: EventTarget | null,
-  currentTarget: EventTarget | null,
-): boolean {
-  return target instanceof Element
-    && currentTarget instanceof Element
-    && target !== currentTarget
-    && currentTarget.contains(target)
-    && isInteractiveElement(target)
+function isNestedInteractiveTarget(target: EventTarget | null, currentTarget: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    currentTarget instanceof Element &&
+    target !== currentTarget &&
+    currentTarget.contains(target) &&
+    isInteractiveElement(target)
+  )
 }
 
 function resolveCurrentIndex(
@@ -104,11 +100,7 @@ function resolveCurrentIndex(
   return getItemIndex(items).indexByPath.get(activePath) ?? -1
 }
 
-function moveHighlightIndex(
-  previousIndex: number,
-  direction: 1 | -1,
-  itemCount: number,
-): number {
+function moveHighlightIndex(previousIndex: number, direction: 1 | -1, itemCount: number): number {
   if (itemCount === 0) return -1
   if (previousIndex < 0) return direction === 1 ? 0 : itemCount - 1
 
@@ -124,9 +116,7 @@ function resolveHighlightedEntry(items: VaultEntry[], highlightedPath: string | 
 }
 
 function usesPlatformCommandModifier(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
-  return isMac()
-    ? event.metaKey && !event.ctrlKey
-    : event.ctrlKey && !event.metaKey
+  return isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
 }
 
 function hasCommandLikeModifier(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey'>): boolean {
@@ -221,13 +211,19 @@ function scheduleOpenForNextFrame(
 function useScheduledOpen(onOpen: (entry: VaultEntry) => void, enabled: boolean) {
   const stateRef = useRef<ScheduledOpenState>({ entry: null, frameId: null })
 
-  const scheduleOpen = useCallback((entry: VaultEntry) => {
+  const scheduleOpen = useCallback(
+    (entry: VaultEntry) => {
     scheduleOpenForNextFrame(stateRef, onOpen, entry)
-  }, [onOpen])
+    },
+    [onOpen],
+  )
 
-  const flushOpen = useCallback((entry?: VaultEntry) => {
+  const flushOpen = useCallback(
+    (entry?: VaultEntry) => {
     flushScheduledOpen(stateRef, onOpen, entry)
-  }, [onOpen])
+    },
+    [onOpen],
+  )
 
   const cancelOpen = useCallback(() => {
     cancelScheduledOpen(stateRef)
@@ -260,7 +256,8 @@ function useMoveHighlight({
   onPrefetch?: (entry: VaultEntry) => void
   scheduleOpen: (entry: VaultEntry) => void
 }) {
-  return useCallback((direction: 1 | -1) => {
+  return useCallback(
+    (direction: 1 | -1) => {
     const startedAt = performance.now()
     const currentIndex = resolveCurrentIndex(items, highlightedPathRef.current, selectedNotePath)
     const nextIndex = moveHighlightIndex(currentIndex, direction, items.length)
@@ -269,11 +266,16 @@ function useMoveHighlight({
     if (!nextItem || nextItem.path === currentPath) return
 
     syncHighlightedPath(nextItem.path)
-    virtuosoRef.current?.scrollIntoView({ index: nextIndex, behavior: 'auto' })
+      virtuosoRef.current?.scrollIntoView({
+        index: nextIndex,
+        behavior: 'auto',
+      })
     scheduleOpen(nextItem)
     onPrefetch?.(nextItem)
     logKeyboardNavigationTrace(direction === 1 ? 'down' : 'up', items.length, performance.now() - startedAt)
-  }, [highlightedPathRef, items, onPrefetch, scheduleOpen, selectedNotePath, syncHighlightedPath, virtuosoRef])
+    },
+    [highlightedPathRef, items, onPrefetch, scheduleOpen, selectedNotePath, syncHighlightedPath, virtuosoRef],
+  )
 }
 
 function resolveEntryForActivation(
@@ -290,13 +292,7 @@ function handleNeighborhoodActivation(options: {
   cancelOpen: () => void
   onEnterNeighborhood?: (entry: VaultEntry) => void | Promise<void>
 }): boolean {
-  const {
-    event,
-    items,
-    highlightedPathRef,
-    cancelOpen,
-    onEnterNeighborhood,
-  } = options
+  const { event, items, highlightedPathRef, cancelOpen, onEnterNeighborhood } = options
 
   const highlightedItem = resolveEntryForActivation(items, highlightedPathRef)
   if (!highlightedItem) return false
@@ -332,12 +328,7 @@ function handleHighlightedOpen(options: {
   highlightedPathRef: React.RefObject<string | null>
   flushOpen: (entry?: VaultEntry) => void
 }): boolean {
-  const {
-    event,
-    items,
-    highlightedPathRef,
-    flushOpen,
-  } = options
+  const { event, items, highlightedPathRef, flushOpen } = options
 
   const highlightedItem = resolveEntryForActivation(items, highlightedPathRef)
   if (!highlightedItem) return false
@@ -347,16 +338,7 @@ function handleHighlightedOpen(options: {
   return true
 }
 
-function useProcessKeyDown({
-  enabled,
-  items,
-  highlightedPathRef,
-  moveHighlight,
-  flushOpen,
-  cancelOpen,
-  onEnterNeighborhood,
-  onToggleSearchShortcut,
-}: {
+function useProcessKeyDown(options: {
   enabled: boolean
   items: VaultEntry[]
   highlightedPathRef: React.RefObject<string | null>
@@ -366,23 +348,39 @@ function useProcessKeyDown({
   onEnterNeighborhood?: (entry: VaultEntry) => void | Promise<void>
   onToggleSearchShortcut?: () => void
 }) {
-  return useCallback((event: Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'preventDefault'>) => {
+  const { enabled, items, highlightedPathRef, moveHighlight, flushOpen, cancelOpen, onEnterNeighborhood, onToggleSearchShortcut } = options
+  return useCallback(
+    (event: Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'preventDefault'>) => {
     if (!enabled) return
 
     if (handleSearchShortcutEvent(event, onToggleSearchShortcut)) return
     if (items.length === 0) return
-    if (handleNeighborhoodShortcutEvent({
+      if (
+        handleNeighborhoodShortcutEvent({
       event,
       items,
       highlightedPathRef,
       cancelOpen,
       onEnterNeighborhood,
-    })) return
+        })
+      )
+        return
     if (shouldIgnoreListKeyboardEvent(event)) return
     if (handleArrowNavigation(event, moveHighlight)) return
 
     handleEnterShortcutEvent(event, items, highlightedPathRef, flushOpen)
-  }, [cancelOpen, enabled, flushOpen, highlightedPathRef, items, moveHighlight, onEnterNeighborhood, onToggleSearchShortcut])
+    },
+    [
+      cancelOpen,
+      enabled,
+      flushOpen,
+      highlightedPathRef,
+      items,
+      moveHighlight,
+      onEnterNeighborhood,
+      onToggleSearchShortcut,
+    ],
+  )
 }
 
 function useFocusHandlers({
@@ -448,14 +446,17 @@ function useGlobalKeyboardHandling({
   containerRef: React.RefObject<HTMLDivElement | null>
   processKeyDown: (event: KeyboardEvent) => void
 }) {
-  const shouldSkipGlobalKeyDown = useCallback((activeElement: Element | null) => {
+  const shouldSkipGlobalKeyDown = useCallback(
+    (activeElement: Element | null) => {
     if (isEditableElement(activeElement)) return true
     return Boolean(
-      activeElement !== containerRef.current
-      && containerRef.current?.contains(activeElement)
-      && isInteractiveElement(activeElement)
+        activeElement !== containerRef.current &&
+          containerRef.current?.contains(activeElement) &&
+          isInteractiveElement(activeElement),
+      )
+    },
+    [containerRef],
     )
-  }, [containerRef])
 
   useEffect(() => {
     if (!enabled) return
@@ -487,19 +488,18 @@ function useSearchToggleShortcut({
   }, [focusList, searchVisible, toggleSearch])
 }
 
-function useDirectKeyDownHandler(
-  processKeyDown: (event: React.KeyboardEvent) => void,
-) {
-  return useCallback((event: React.KeyboardEvent) => {
+function useDirectKeyDownHandler(processKeyDown: (event: React.KeyboardEvent) => void) {
+  return useCallback(
+    (event: React.KeyboardEvent) => {
     if (isNestedInteractiveTarget(event.target, event.currentTarget)) return
     processKeyDown(event)
-  }, [processKeyDown])
+    },
+    [processKeyDown],
+  )
 }
 
 function resolveStableHighlightedPath(items: VaultEntry[], highlightedPathState: string | null): string | null {
-  return getItemIndex(items).entryByPath.has(highlightedPathState ?? '')
-    ? highlightedPathState
-    : null
+  return getItemIndex(items).entryByPath.has(highlightedPathState ?? '') ? highlightedPathState : null
 }
 
 function handleSearchShortcutEvent(
@@ -519,13 +519,7 @@ function handleNeighborhoodShortcutEvent(options: {
   cancelOpen: () => void
   onEnterNeighborhood?: (entry: VaultEntry) => void | Promise<void>
 }): boolean {
-  const {
-    event,
-    items,
-    highlightedPathRef,
-    cancelOpen,
-    onEnterNeighborhood,
-  } = options
+  const { event, items, highlightedPathRef, cancelOpen, onEnterNeighborhood } = options
 
   if (!isNeighborhoodKey(event)) return false
   handleNeighborhoodActivation({
@@ -538,9 +532,7 @@ function handleNeighborhoodShortcutEvent(options: {
   return true
 }
 
-function shouldIgnoreListKeyboardEvent(
-  event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'altKey'>,
-): boolean {
+function shouldIgnoreListKeyboardEvent(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'altKey'>): boolean {
   return hasCommandLikeModifier(event) || event.altKey
 }
 
@@ -575,16 +567,15 @@ function createGlobalKeyDownHandler(
   }
 }
 
-export function useNoteListKeyboard({
-  items,
-  selectedNotePath,
-  onOpen,
-  onEnterNeighborhood,
-  onPrefetch,
-  searchVisible = false,
-  toggleSearch,
-  enabled,
-}: NoteListKeyboardOptions) {
+function useCancelScheduledOpenOnSelectionChange(selectedNotePath: string | null, cancelOpen: () => void): void {
+  useEffect(() => {
+    void selectedNotePath
+    cancelOpen()
+  }, [cancelOpen, selectedNotePath])
+}
+
+export function useNoteListKeyboard(options: NoteListKeyboardOptions) {
+  const { items, selectedNotePath, onOpen, onEnterNeighborhood, onPrefetch, searchVisible = false, toggleSearch, enabled } = options
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -597,7 +588,11 @@ export function useNoteListKeyboard({
     syncToCurrentSelection,
     syncHighlightedPath,
   })
-  const { handlePanelBlurCapture, handlePanelFocusCapture, isPanelActive: isPanelActiveState } = usePanelFocusState(panelRef)
+  const {
+    handlePanelBlurCapture,
+    handlePanelFocusCapture,
+    isPanelActive: isPanelActiveState,
+  } = usePanelFocusState(panelRef)
   const handleToggleSearchShortcut = useSearchToggleShortcut({
     focusList,
     searchVisible,
@@ -623,11 +618,13 @@ export function useNoteListKeyboard({
     onToggleSearchShortcut: handleToggleSearchShortcut,
   })
   const handleKeyDown = useDirectKeyDownHandler(processKeyDown)
-  useGlobalKeyboardHandling({ enabled, panelRef, containerRef, processKeyDown })
-  useEffect(() => {
-    void selectedNotePath
-    cancelOpen()
-  }, [cancelOpen, selectedNotePath])
+  useGlobalKeyboardHandling({
+    enabled,
+    panelRef,
+    containerRef,
+    processKeyDown,
+  })
+  useCancelScheduledOpenOnSelectionChange(selectedNotePath, cancelOpen)
 
   const highlightedPath = resolveStableHighlightedPath(items, highlightedPathState)
 

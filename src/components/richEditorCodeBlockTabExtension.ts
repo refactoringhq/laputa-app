@@ -1,13 +1,16 @@
 import { createExtension } from '@blocknote/core'
-import type { useCreateBlockNote } from '@blocknote/react'
+import type { EditorView } from '@tiptap/pm/view'
 
 const CODE_BLOCK_TYPE = 'codeBlock'
 const CODE_BLOCK_INDENT = '  '
 
-type EditorLike = ReturnType<typeof useCreateBlockNote>
-type EditorViewLike = NonNullable<EditorLike['prosemirrorView']>
-type CodeBlockTabEditor = EditorLike & {
+type EditorViewLike = EditorView
+type CodeBlockTabEditor = {
+  _tiptapEditor?: { view: EditorViewLike }
+  getTextCursorPosition: () => { block: { type: unknown } }
   isEditable?: boolean
+  prosemirrorView?: EditorViewLike
+  transact: (callback: (transaction: CodeBlockIndentTransaction) => boolean) => boolean
 }
 type CodeBlockTabEvent = Pick<
   KeyboardEvent,

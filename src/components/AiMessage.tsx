@@ -47,15 +47,13 @@ function LocalMarker({ text }: { text: string }) {
   )
 }
 
-function ReferencePill({ reference, onClick }: {
-  reference: NoteReference
-  onClick?: (path: string) => void
-}) {
+function ReferencePill({ reference, onClick }: { reference: NoteReference; onClick?: (path: string) => void }) {
   const type = reference.type ?? null
   const color = getTypeColor(type)
   const lightColor = getTypeLightColor(type)
   return (
-    <button type="button"
+    <button
+      type="button"
       className="inline-flex items-center border-none cursor-pointer transition-opacity hover:opacity-80"
       style={{
         background: lightColor,
@@ -75,7 +73,11 @@ function ReferencePill({ reference, onClick }: {
   )
 }
 
-function UserBubble({ content, references, onOpenNote }: {
+function UserBubble({
+  content,
+  references,
+  onOpenNote,
+}: {
   content: string
   references?: NoteReference[]
   onOpenNote?: (path: string) => void
@@ -97,7 +99,7 @@ function UserBubble({ content, references, onOpenNote }: {
       >
         {references && references.length > 0 && (
           <div className="flex flex-wrap gap-1" style={{ marginBottom: 4 }}>
-            {references.map(ref => (
+            {references.map((ref) => (
               <ReferencePill key={ref.path} reference={ref} onClick={onOpenNote} />
             ))}
           </div>
@@ -108,8 +110,16 @@ function UserBubble({ content, references, onOpenNote }: {
   )
 }
 
-function ReasoningBlock({ locale, text, expanded, onToggle }: {
-  locale: AppLocale; text: string; expanded: boolean; onToggle: () => void
+function ReasoningBlock({
+  locale,
+  text,
+  expanded,
+  onToggle,
+}: {
+  locale: AppLocale
+  text: string
+  expanded: boolean
+  onToggle: () => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -122,7 +132,8 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <button type="button"
+      <button
+        type="button"
         className="flex items-center gap-1.5 w-full border-none bg-transparent cursor-pointer p-0 text-muted-foreground hover:text-foreground transition-colors"
         style={{ fontSize: 12, padding: '4px 0' }}
         onClick={onToggle}
@@ -136,7 +147,13 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
         <div
           ref={contentRef}
           className="text-muted-foreground"
-          style={{ fontSize: 12, lineHeight: 1.5, padding: '4px 0 4px 20px', maxHeight: 200, overflowY: 'auto' }}
+          style={{
+            fontSize: 12,
+            lineHeight: 1.5,
+            padding: '4px 0 4px 20px',
+            maxHeight: 200,
+            overflowY: 'auto',
+          }}
           data-testid="reasoning-content"
         >
           {text}
@@ -146,7 +163,12 @@ function ReasoningBlock({ locale, text, expanded, onToggle }: {
   )
 }
 
-function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
+function ActionCardsList({
+  actions,
+  onOpenNote,
+  expandedIds,
+  onToggleExpand,
+}: {
   actions: AiAction[]
   onOpenNote?: (path: string) => void
   expandedIds: Set<string>
@@ -355,7 +377,22 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, references, locale = 'en', messageId, reasoning, reasoningDone, actions, response, isStreaming, onFork, onOpenNote, onNavigateWikilink, onRegenerate }: AiMessageProps) {
+function ConversationMessage(options: AiMessageProps) {
+  const {
+    userMessage,
+    references,
+    locale = 'en',
+    messageId,
+    reasoning,
+    reasoningDone,
+    actions,
+    response,
+    isStreaming,
+    onFork,
+    onOpenNote,
+    onNavigateWikilink,
+    onRegenerate,
+  } = options
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState(false)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -367,7 +404,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
   const reasoningExpanded = userOverride ? !autoExpanded : autoExpanded
 
   const toggleAction = useCallback((toolId: string) => {
-    setExpandedActions(prev => {
+    setExpandedActions((prev) => {
       const next = new Set(prev)
       if (next.has(toolId)) next.delete(toolId)
       else next.add(toolId)
@@ -383,7 +420,7 @@ function ConversationMessage({ userMessage, references, locale = 'en', messageId
           locale={locale}
           text={reasoning}
           expanded={reasoningExpanded}
-          onToggle={() => setUserOverride(prev => !prev)}
+          onToggle={() => setUserOverride((prev) => !prev)}
         />
       )}
       {actions.length > 0 && (

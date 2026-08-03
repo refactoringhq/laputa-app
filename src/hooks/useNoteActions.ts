@@ -10,7 +10,11 @@ import { resolveEntry } from '../utils/wikilink'
 import { useNoteCreation } from './useNoteCreation'
 import {
   useNoteRename,
-  performRename, loadNoteContent, renameToastMessage, reloadTabsAfterRename, reloadVaultAfterRename,
+  performRename,
+  loadNoteContent,
+  renameToastMessage,
+  reloadTabsAfterRename,
+  reloadVaultAfterRename,
 } from './useNoteRename'
 import { runFrontmatterAndApply, type FrontmatterOpOptions } from './frontmatterOps'
 import { findByNotePath, notePathFilename, notePathsMatch } from '../utils/notePathIdentity'
@@ -62,9 +66,7 @@ function safeString(value: unknown): string {
 }
 
 function entryDisplayLabel(entry: VaultEntry): string {
-  return safeString(entry.title).trim()
-    || safeString(entry.filename).trim()
-    || 'Note'
+  return safeString(entry.title).trim() || safeString(entry.filename).trim() || 'Note'
 }
 
 type RenamedPathMap = Map<string, string>
@@ -154,8 +156,8 @@ function tabPathsExceptRenamed(
   newPath: string,
 ): string[] {
   return tabs
-    .filter(t => !notePathsMatch(t.entry.path, path) && !notePathsMatch(t.entry.path, newPath))
-    .map(t => t.entry.path)
+    .filter((t) => !notePathsMatch(t.entry.path, path) && !notePathsMatch(t.entry.path, newPath))
+    .map((t) => t.entry.path)
 }
 
 async function applyTitleRenamePathChange({
@@ -167,11 +169,27 @@ async function applyTitleRenamePathChange({
   const newFilename = notePathFilename(newPath)
   deps.onInternalVaultWrite?.(newPath)
   deps.onPathRenamed?.(path, newPath)
-  deps.replaceEntry?.(path, { path: newPath, filename: newFilename, title: newTitle } as Partial<VaultEntry> & { path: string })
+  deps.replaceEntry?.(path, {
+    path: newPath,
+    filename: newFilename,
+    title: newTitle,
+  } as Partial<VaultEntry> & { path: string })
   const newContent = await loadNoteContent({ path: newPath })
-  deps.setTabs(prev => prev.map(t => notePathsMatch(t.entry.path, path)
-    ? { entry: { ...t.entry, path: newPath, filename: newFilename, title: newTitle }, content: newContent }
-    : t))
+  deps.setTabs((prev) =>
+    prev.map((t) =>
+      notePathsMatch(t.entry.path, path)
+        ? {
+            entry: {
+              ...t.entry,
+              path: newPath,
+              filename: newFilename,
+              title: newTitle,
+            },
+            content: newContent,
+          }
+        : t,
+    ),
+  )
   if (notePathsMatch(deps.activeTabPathRef.current, path)) deps.handleSwitchTab(newPath)
   await reloadTabsAfterRename({
     tabPaths: tabPathsExceptRenamed(deps.tabsRef.current, path, newPath),
@@ -180,11 +198,21 @@ async function applyTitleRenamePathChange({
 }
 
 async function renameAfterTitleChange({ path, newTitle, deps }: RenameAfterTitleChangeParams): Promise<void> {
-  const oldTitle = deps.tabsRef.current.find(t => notePathsMatch(t.entry.path, path))?.entry.title
+  const oldTitle = deps.tabsRef.current.find((t) => notePathsMatch(t.entry.path, path))?.entry.title
   deps.onInternalVaultWrite?.(path)
-  const result = await performRename({ path, newTitle, vaultPath: deps.vaultPath, oldTitle })
+  const result = await performRename({
+    path,
+    newTitle,
+    vaultPath: deps.vaultPath,
+    oldTitle,
+  })
   if (!notePathsMatch(result.new_path, path)) {
-    await applyTitleRenamePathChange({ path, newPath: result.new_path, newTitle, deps })
+    await applyTitleRenamePathChange({
+      path,
+      newPath: result.new_path,
+      newTitle,
+      deps,
+    })
   }
   await reloadVaultAfterRename(deps.reloadVault)
   deps.setToastMessage(renameToastMessage(result.updated_files, result.failed_updates ?? 0))
@@ -357,7 +385,7 @@ const ENTRY_FRONTMATTER_SNAPSHOT_READERS = new Map<string, FrontmatterSnapshotRe
   ['_sort', (entry) => presentNullable(entry.sort)],
   ['view', (entry) => presentNullable(entry.view)],
   ['_width', (entry) => presentNullable(entry.noteWidth)],
-  ['visible', (entry) => entry.visible === false ? { exists: true, value: false } : ABSENT_FRONTMATTER],
+  ['visible', (entry) => (entry.visible === false ? { exists: true, value: false } : ABSENT_FRONTMATTER)],
   ['_organized', (entry) => presentBooleanFlag(entry.organized)],
   ['_favorite', (entry) => presentBooleanFlag(entry.favorite)],
   ['_favorite_index', (entry) => presentNullable(entry.favoriteIndex)],
@@ -383,12 +411,18 @@ function frontmatterSnapshotForMutation({ entries, path, key }: FrontmatterSnaps
   return entry ? frontmatterSnapshotFromEntry(entry, key) : ABSENT_FRONTMATTER
 }
 
-function shouldRecordFrontmatterHistory(actionHistory: ActionHistoryController, options?: FrontmatterOpOptions): boolean {
+function shouldRecordFrontmatterHistory(
+  actionHistory: ActionHistoryController,
+  options?: FrontmatterOpOptions,
+): boolean {
   return !options?.silent && !actionHistory.isReplaying()
 }
 
 function buildTabManagementOptions(
-  config: Pick<NoteActionsConfig, 'flushBeforeNoteSwitch' | 'onMissingActiveVault' | 'reloadVault' | 'setToastMessage' | 'unsavedPaths'>,
+  config: Pick<
+    NoteActionsConfig,
+    'flushBeforeNoteSwitch' | 'onMissingActiveVault' | 'reloadVault' | 'setToastMessage' | 'unsavedPaths'
+  >,
 ) {
   const options: {
     beforeNavigate?: (fromPath: string, toPath: string) => Promise<void>
@@ -412,8 +446,9 @@ function buildTabManagementOptions(
     },
   }
 
-  if (config.flushBeforeNoteSwitch) {
-    options.beforeNavigate = (fromPath: string) => config.flushBeforeNoteSwitch!(fromPath)
+  const flushBeforeNoteSwitch = config.flushBeforeNoteSwitch
+  if (flushBeforeNoteSwitch) {
+    options.beforeNavigate = (fromPath: string) => flushBeforeNoteSwitch(fromPath)
   }
 
   return options
@@ -468,19 +503,7 @@ function useGitignoredVisibilityTabCleanup({
   }, [activeTabPathRef, closeAllTabs, setToastMessage])
 }
 
-function useFrontmatterActionHandlers({
-  config,
-  onPathRenamed,
-  resolvePath,
-  renameTabsRef,
-  setTabs,
-  activeTabPathRef,
-  handleSwitchTab,
-  setToastMessage,
-  updateTabContent,
-  runFrontmatterOp,
-  actionHistory,
-}: {
+function useFrontmatterActionHandlers(functionOptions: {
   config: NoteActionsConfig
   onPathRenamed?: (oldPath: string, newPath: string) => void
   resolvePath: (path: string) => string
@@ -493,12 +516,21 @@ function useFrontmatterActionHandlers({
   runFrontmatterOp: RunFrontmatterOp
   actionHistory: ActionHistoryController
 }) {
-  const applySnapshot = useCallback(async (
-    path: string,
-    key: string,
-    snapshot: FrontmatterSnapshot,
-    options?: FrontmatterOpOptions,
-  ) => {
+  const {
+    config,
+    onPathRenamed,
+    resolvePath,
+    renameTabsRef,
+    setTabs,
+    activeTabPathRef,
+    handleSwitchTab,
+    setToastMessage,
+    updateTabContent,
+    runFrontmatterOp,
+    actionHistory,
+  } = functionOptions
+  const applySnapshot = useCallback(
+    async (path: string, key: string, snapshot: FrontmatterSnapshot, options?: FrontmatterOpOptions) => {
     const currentPath = resolvePath(path)
     if (snapshot.exists) {
       await updateFrontmatterAndMaybeRename({
@@ -529,7 +561,8 @@ function useFrontmatterActionHandlers({
     const newContent = await runFrontmatterOp('delete', currentPath, key, undefined, { ...options, silent: true })
     if (!applyFrontmatterCallbacks({ config, path: currentPath, newContent })) return
     await notifyFrontmatterPersisted(config, key)
-  }, [
+    },
+    [
     activeTabPathRef,
     config,
     handleSwitchTab,
@@ -540,9 +573,11 @@ function useFrontmatterActionHandlers({
     setTabs,
     setToastMessage,
     updateTabContent,
-  ])
+    ],
+  )
 
-  const recordFrontmatterHistory = useCallback((
+  const recordFrontmatterHistory = useCallback(
+    (
     path: string,
     key: string,
     before: FrontmatterSnapshot,
@@ -556,18 +591,20 @@ function useFrontmatterActionHandlers({
       undo: () => applySnapshot(path, key, before, options),
       redo: () => applySnapshot(path, key, after, options),
     })
-  }, [actionHistory, applySnapshot])
+    },
+    [actionHistory, applySnapshot],
+  )
 
-  const handleUpdateFrontmatter = useCallback(async (
-    path: string,
-    key: string,
-    value: FrontmatterValue,
-    options?: FrontmatterOpOptions,
-  ) => {
+  const handleUpdateFrontmatter = useCallback(
+    async (path: string, key: string, value: FrontmatterValue, options?: FrontmatterOpOptions) => {
     const currentPath = resolvePath(path)
     const shouldRecordHistory = shouldRecordFrontmatterHistory(actionHistory, options)
     const before = shouldRecordHistory
-      ? frontmatterSnapshotForMutation({ entries: config.entries, path: currentPath, key })
+        ? frontmatterSnapshotForMutation({
+            entries: config.entries,
+            path: currentPath,
+            key,
+          })
       : ABSENT_FRONTMATTER
     const updated = await updateFrontmatterAndMaybeRename({
       config,
@@ -593,13 +630,33 @@ function useFrontmatterActionHandlers({
     if (updated && shouldRecordHistory) {
       recordFrontmatterHistory(currentPath, key, before, { exists: true, value }, `Update ${key}`, options)
     }
-  }, [actionHistory, activeTabPathRef, config, handleSwitchTab, onPathRenamed, recordFrontmatterHistory, renameTabsRef, resolvePath, runFrontmatterOp, setTabs, setToastMessage, updateTabContent])
+    },
+    [
+      actionHistory,
+      activeTabPathRef,
+      config,
+      handleSwitchTab,
+      onPathRenamed,
+      recordFrontmatterHistory,
+      renameTabsRef,
+      resolvePath,
+      runFrontmatterOp,
+      setTabs,
+      setToastMessage,
+      updateTabContent,
+    ],
+  )
 
-  const handleDeleteProperty = useCallback(async (path: string, key: string, options?: FrontmatterOpOptions) => {
+  const handleDeleteProperty = useCallback(
+    async (path: string, key: string, options?: FrontmatterOpOptions) => {
     const currentPath = resolvePath(path)
     const shouldRecordHistory = shouldRecordFrontmatterHistory(actionHistory, options)
     const before = shouldRecordHistory
-      ? frontmatterSnapshotForMutation({ entries: config.entries, path: currentPath, key })
+        ? frontmatterSnapshotForMutation({
+            entries: config.entries,
+            path: currentPath,
+            key,
+          })
       : ABSENT_FRONTMATTER
     if (!activePathGuardAllowsMutation(currentPath, activeTabPathRef, options)) return
     const canFlush = await flushBeforeNoteMutation(currentPath, config.flushBeforeNoteMutation)
@@ -613,13 +670,20 @@ function useFrontmatterActionHandlers({
     if (shouldRecordHistory) {
       recordFrontmatterHistory(currentPath, key, before, ABSENT_FRONTMATTER, `Delete ${key}`, options)
     }
-  }, [actionHistory, activeTabPathRef, config, recordFrontmatterHistory, resolvePath, runFrontmatterOp])
+    },
+    [actionHistory, activeTabPathRef, config, recordFrontmatterHistory, resolvePath, runFrontmatterOp],
+  )
 
-  const handleAddProperty = useCallback(async (path: string, key: string, value: FrontmatterValue, options?: FrontmatterOpOptions) => {
+  const handleAddProperty = useCallback(
+    async (path: string, key: string, value: FrontmatterValue, options?: FrontmatterOpOptions) => {
     const currentPath = resolvePath(path)
     const shouldRecordHistory = shouldRecordFrontmatterHistory(actionHistory, options)
     const before = shouldRecordHistory
-      ? frontmatterSnapshotForMutation({ entries: config.entries, path: currentPath, key })
+        ? frontmatterSnapshotForMutation({
+            entries: config.entries,
+            path: currentPath,
+            key,
+          })
       : ABSENT_FRONTMATTER
     if (!activePathGuardAllowsMutation(currentPath, activeTabPathRef, options)) return
     const canFlush = await flushBeforeNoteMutation(currentPath, config.flushBeforeNoteMutation)
@@ -633,7 +697,9 @@ function useFrontmatterActionHandlers({
     if (shouldRecordHistory) {
       recordFrontmatterHistory(currentPath, key, before, { exists: true, value }, `Update ${key}`, options)
     }
-  }, [actionHistory, activeTabPathRef, config, recordFrontmatterHistory, resolvePath, runFrontmatterOp])
+    },
+    [actionHistory, activeTabPathRef, config, recordFrontmatterHistory, resolvePath, runFrontmatterOp],
+  )
 
   return {
     handleUpdateFrontmatter,
@@ -660,7 +726,8 @@ function useFrontmatterRunner({
   updateTabContent: (path: string, newContent: string) => void
 }): RunFrontmatterOp {
   return useCallback(
-    (op, path, key, value, options) => runFrontmatterAndApply({
+    (op, path, key, value, options) =>
+      runFrontmatterAndApply({
       op,
       path,
       key,
@@ -671,7 +738,8 @@ function useFrontmatterRunner({
         updateEntry,
         toast: setToastMessage,
         getEntry: (p) => findByNotePath(entries, p),
-        onMissingNotePath: (p) => handleMissingFrontmatterTarget({
+          onMissingNotePath: (p) =>
+            handleMissingFrontmatterTarget({
           activeTabPathRef,
           closeAllTabs,
           entries,
@@ -689,14 +757,25 @@ function useFrontmatterRunner({
 
 function useRenamedNotePathResolver(onPathRenamed?: (oldPath: string, newPath: string) => void) {
   const renamedPathsRef = useRef<RenamedPathMap>(new Map())
-  const handlePathRenamed = useCallback((oldPath: string, newPath: string) => {
-    trackRenamedNotePath({ renamedPaths: renamedPathsRef.current, oldPath, newPath })
+  const handlePathRenamed = useCallback(
+    (oldPath: string, newPath: string) => {
+      trackRenamedNotePath({
+        renamedPaths: renamedPathsRef.current,
+        oldPath,
+        newPath,
+      })
     onPathRenamed?.(oldPath, newPath)
-  }, [onPathRenamed])
-  const resolveActionPath = useCallback((path: string) => resolveLatestNotePath({
+    },
+    [onPathRenamed],
+  )
+  const resolveActionPath = useCallback(
+    (path: string) =>
+      resolveLatestNotePath({
     renamedPaths: renamedPathsRef.current,
     path,
-  }), [])
+      }),
+    [],
+  )
 
   return { handlePathRenamed, resolveActionPath }
 }
@@ -750,17 +829,15 @@ export function useNoteActions(config: NoteActionsConfig) {
   const { entries, setToastMessage, updateEntry } = config
   const { handlePathRenamed, resolveActionPath } = useRenamedNotePathResolver(config.onPathRenamed)
   const tabMgmt = useTabManagement(buildTabManagementOptions(config))
-  const {
-    setTabs,
-    handleSelectNote: selectTab,
-    openTabWithContent,
-    activeTabPathRef,
-    handleSwitchTab,
-  } = tabMgmt
-  const handleSelectNote = useCallback(async (entry: VaultEntry) => {
+  const { setTabs, handleSelectNote: selectTab, openTabWithContent, activeTabPathRef, handleSwitchTab } = tabMgmt
+  const handleSelectNote = useCallback(
+    async (entry: VaultEntry) => {
     await selectTab(entry)
-  }, [selectTab])
-  const revealActionHistoryTarget = useCallback(async (item: ActionHistoryEntry) => {
+    },
+    [selectTab],
+  )
+  const revealActionHistoryTarget = useCallback(
+    async (item: ActionHistoryEntry) => {
     const { path } = item
     if (!path) return
     if (activeTabPathRef.current === path) return
@@ -770,7 +847,9 @@ export function useNoteActions(config: NoteActionsConfig) {
       throw new Error(`Action history target is unavailable: ${path}`)
     }
     await handleSelectNote(entry)
-  }, [activeTabPathRef, entries, handleSelectNote, setToastMessage])
+    },
+    [activeTabPathRef, entries, handleSelectNote, setToastMessage],
+  )
   const actionHistory = useActionHistory({
     onRevealTarget: revealActionHistoryTarget,
     onToast: setToastMessage,
@@ -781,7 +860,8 @@ export function useNoteActions(config: NoteActionsConfig) {
     setToastMessage,
   })
 
-  const updateTabContent = useCallback((path: string, newContent: string) => {
+  const updateTabContent = useCallback(
+    (path: string, newContent: string) => {
     setTabs((prev) => {
       let changed = false
       const next = prev.map((tab) => {
@@ -792,16 +872,30 @@ export function useNoteActions(config: NoteActionsConfig) {
       })
       return changed ? next : prev
     })
-  }, [setTabs])
+    },
+    [setTabs],
+  )
 
   const creation = useNoteCreation(config, { openTabWithContent })
   const rename = useNoteRename(
-    { entries, setToastMessage, reloadVault: config.reloadVault, onPathRenamed: handlePathRenamed },
-    { tabs: tabMgmt.tabs, setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    {
+      entries,
+      setToastMessage,
+      reloadVault: config.reloadVault,
+      onPathRenamed: handlePathRenamed,
+    },
+    {
+      tabs: tabMgmt.tabs,
+      setTabs,
+      activeTabPathRef,
+      handleSwitchTab,
+      updateTabContent,
+    },
   )
 
   const handleNavigateWikilink = useCallback(
-    (target: string) => navigateWikilink({
+    (target: string) =>
+      navigateWikilink({
       entries,
       sourceEntry: tabMgmt.tabs.find((tab) => notePathsMatch(tab.entry.path, tabMgmt.activeTabPath))?.entry,
       target,

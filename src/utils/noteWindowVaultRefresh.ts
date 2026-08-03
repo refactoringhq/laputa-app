@@ -48,7 +48,7 @@ export async function refreshNoteWindowVaultChanges(
     hasUnsavedChanges: options.hasUnsavedChanges,
     isActiveTabContentCurrent: options.isActiveTabContentCurrent,
     reloadFolders: () => undefined,
-    reloadVault: async () => nextEntries,
+    reloadVault: () => Promise.resolve(nextEntries),
     reloadViews: () => undefined,
     replaceActiveTab: options.replaceActiveTab,
     refocusActiveEditor: options.refocusActiveEditor,

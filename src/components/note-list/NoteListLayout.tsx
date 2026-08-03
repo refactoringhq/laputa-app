@@ -19,19 +19,14 @@ function NoteListLoadingBar({ width }: { width: number }) {
   return <span aria-hidden="true" className="block h-4 rounded bg-muted" style={{ width }} />
 }
 
-function NoteListLoadingRow({
-  title,
-  line,
-  selected,
-}: {
-  title: number
-  line: number
-  selected: boolean
-}) {
+function NoteListLoadingRow({ title, line, selected }: { title: number; line: number; selected: boolean }) {
   return (
     <div
       className="border-b border-border"
-      style={{ padding: '12px 12px 10px', background: selected ? 'var(--accent-green-light)' : undefined }}
+      style={{
+        padding: '12px 12px 10px',
+        background: selected ? 'var(--accent-green-light)' : undefined,
+      }}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <NoteListLoadingBar width={title} />
@@ -66,7 +61,15 @@ function MultiSelectBar({
   handleBulkArchive,
   handleBulkDeletePermanently,
   handleBulkUnarchive,
-}: Pick<NoteListLayoutProps, 'multiSelect' | 'isArchivedView' | 'handleBulkOrganize' | 'handleBulkArchive' | 'handleBulkDeletePermanently' | 'handleBulkUnarchive'>) {
+}: Pick<
+  NoteListLayoutProps,
+  | 'multiSelect'
+  | 'isArchivedView'
+  | 'handleBulkOrganize'
+  | 'handleBulkArchive'
+  | 'handleBulkDeletePermanently'
+  | 'handleBulkUnarchive'
+>) {
   if (!multiSelect.isMultiSelecting) return null
 
   return (
@@ -82,25 +85,8 @@ function MultiSelectBar({
   )
 }
 
-function NoteListContent({
-  entitySelection,
-  searchedGroups,
-  query,
-  collapsedGroups,
-  sortPrefs,
-  toggleGroup,
-  handleSortChange,
-  renderItem,
-  isArchivedView,
-  isChangesView,
-  isInboxView,
-  modifiedFilesError,
-  searched,
-  noteListVirtuosoRef,
-  locale,
-  loading,
-  showFilterPills,
-}: Pick<
+function NoteListContent(
+  options: Pick<
   NoteListLayoutProps,
   | 'entitySelection'
   | 'searchedGroups'
@@ -119,7 +105,27 @@ function NoteListContent({
   | 'locale'
   | 'loading'
   | 'showFilterPills'
->) {
+  >,
+) {
+  const {
+    entitySelection,
+    searchedGroups,
+    query,
+    collapsedGroups,
+    sortPrefs,
+    toggleGroup,
+    handleSortChange,
+    renderItem,
+    isArchivedView,
+    isChangesView,
+    isInboxView,
+    modifiedFilesError,
+    searched,
+    noteListVirtuosoRef,
+    locale,
+    loading,
+    showFilterPills,
+  } = options
   return (
     <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
       {loading ? (
@@ -154,33 +160,8 @@ function NoteListContent({
   )
 }
 
-function NoteListBody({
-  handleListKeyDown,
-  noteListContainerRef,
-  handleNoteListBlur,
-  handleNoteListFocus,
-  focusNoteList,
-  noteListVirtuosoRef,
-  entitySelection,
-  searchedGroups,
-  query,
-  collapsedGroups,
-  sortPrefs,
-  toggleGroup,
-  handleSortChange,
-  renderItem,
-  isArchivedView,
-  isChangesView,
-  isInboxView,
-  modifiedFilesError,
-  searched,
-  locale,
-  showFilterPills,
-  noteListFilter,
-  filterCounts,
-  onNoteListFilterChange,
-  loading,
-}: Pick<
+function NoteListBody(
+  options: Pick<
   NoteListLayoutProps,
   | 'handleListKeyDown'
   | 'noteListContainerRef'
@@ -207,7 +188,35 @@ function NoteListBody({
   | 'filterCounts'
   | 'onNoteListFilterChange'
   | 'loading'
->) {
+  >,
+) {
+  const {
+    handleListKeyDown,
+    noteListContainerRef,
+    handleNoteListBlur,
+    handleNoteListFocus,
+    focusNoteList,
+    noteListVirtuosoRef,
+    entitySelection,
+    searchedGroups,
+    query,
+    collapsedGroups,
+    sortPrefs,
+    toggleGroup,
+    handleSortChange,
+    renderItem,
+    isArchivedView,
+    isChangesView,
+    isInboxView,
+    modifiedFilesError,
+    searched,
+    locale,
+    showFilterPills,
+    noteListFilter,
+    filterCounts,
+    onNoteListFilterChange,
+    loading,
+  } = options
   return (
     <div
       ref={noteListContainerRef}
@@ -254,31 +263,8 @@ function NoteListBody({
   )
 }
 
-function NoteListLayoutHeader({
-  title,
-  typeDocument,
-  isEntityView,
-  isChangesView,
-  listSort,
-  listDirection,
-  customProperties,
-  gitRepositories,
-  selectedGitRepositoryPath,
-  onGitRepositoryChange,
-  locale,
-  sidebarCollapsed,
-  searchVisible,
-  search,
-  isSearching,
-  searchInputRef,
-  propertyPicker,
-  handleSortChange,
-  handleCreateNote,
-  onOpenType,
-  toggleSearch,
-  setSearch,
-  handleSearchKeyDown,
-}: Pick<
+function NoteListLayoutHeader(
+  options: Pick<
   NoteListLayoutProps,
   | 'title'
   | 'typeDocument'
@@ -303,7 +289,33 @@ function NoteListLayoutHeader({
   | 'toggleSearch'
   | 'setSearch'
   | 'handleSearchKeyDown'
->) {
+  >,
+) {
+  const {
+    title,
+    typeDocument,
+    isEntityView,
+    isChangesView,
+    listSort,
+    listDirection,
+    customProperties,
+    gitRepositories,
+    selectedGitRepositoryPath,
+    onGitRepositoryChange,
+    locale,
+    sidebarCollapsed,
+    searchVisible,
+    search,
+    isSearching,
+    searchInputRef,
+    propertyPicker,
+    handleSortChange,
+    handleCreateNote,
+    onOpenType,
+    toggleSearch,
+    setSearch,
+    handleSearchKeyDown,
+  } = options
   return (
     <NoteListHeader
       title={title}
@@ -333,16 +345,8 @@ function NoteListLayoutHeader({
   )
 }
 
-function NoteListFooter({
-  multiSelect,
-  isArchivedView,
-  handleBulkOrganize,
-  handleBulkArchive,
-  handleBulkDeletePermanently,
-  handleBulkUnarchive,
-  contextMenuNode,
-  dialogNode,
-}: Pick<
+function NoteListFooter(
+  options: Pick<
   NoteListLayoutProps,
   | 'multiSelect'
   | 'isArchivedView'
@@ -352,7 +356,18 @@ function NoteListFooter({
   | 'handleBulkUnarchive'
   | 'contextMenuNode'
   | 'dialogNode'
->) {
+  >,
+) {
+  const {
+    multiSelect,
+    isArchivedView,
+    handleBulkOrganize,
+    handleBulkArchive,
+    handleBulkDeletePermanently,
+    handleBulkUnarchive,
+    contextMenuNode,
+    dialogNode,
+  } = options
   return (
     <>
       <MultiSelectBar
@@ -363,7 +378,8 @@ function NoteListFooter({
         handleBulkDeletePermanently={handleBulkDeletePermanently}
         handleBulkUnarchive={handleBulkUnarchive}
       />
-      {contextMenuNode}{dialogNode}
+      {contextMenuNode}
+      {dialogNode}
     </>
   )
 }

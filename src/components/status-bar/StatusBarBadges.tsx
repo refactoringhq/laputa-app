@@ -1,4 +1,15 @@
-import { ArrowDown, ArrowsClockwise as RefreshCw, CircleNotch as Loader2, Cpu, GitBranch, GitCommit as GitCommitHorizontal, GitDiff, Pulse, Terminal, Warning as AlertTriangle } from '@phosphor-icons/react'
+import {
+  ArrowDown,
+  ArrowsClockwise as RefreshCw,
+  CircleNotch as Loader2,
+  Cpu,
+  GitBranch,
+  GitCommit as GitCommitHorizontal,
+  GitDiff,
+  Pulse,
+  Terminal,
+  Warning as AlertTriangle,
+} from '@phosphor-icons/react'
 import { useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { ActionTooltip, type ActionTooltipCopy } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
@@ -25,9 +36,7 @@ const SYNC_COLORS = new Map<SyncStatus, string>([
   ['pull_required', 'var(--accent-orange)'],
 ])
 
-const MCP_TOOLTIP_KEYS = new Map<McpStatus, TranslationKey>([
-  ['not_installed', 'status.mcp.notConnected'],
-])
+const MCP_TOOLTIP_KEYS = new Map<McpStatus, TranslationKey>([['not_installed', 'status.mcp.notConnected']])
 
 const CLAUDE_INSTALL_URL = 'https://docs.anthropic.com/en/docs/claude-code'
 
@@ -36,7 +45,9 @@ function formatElapsedSync(locale: AppLocale, lastSyncTime: number | null): stri
   const secs = Math.round((Date.now() - lastSyncTime) / 1000)
   return secs < 60
     ? translate(locale, 'status.sync.justNow')
-    : translate(locale, 'status.sync.minutesAgo', { minutes: Math.floor(secs / 60) })
+    : translate(locale, 'status.sync.minutesAgo', {
+        minutes: Math.floor(secs / 60),
+      })
 }
 
 function formatSyncLabel(locale: AppLocale, status: SyncStatus, lastSyncTime: number | null): string {
@@ -91,7 +102,10 @@ function isRemoteMissing(remoteStatus: GitRemoteStatus | null | undefined): bool
   return remoteStatus?.hasRemote === false
 }
 
-function commitButtonTooltipCopy(locale: AppLocale, remoteStatus: GitRemoteStatus | null | undefined): ActionTooltipCopy {
+function commitButtonTooltipCopy(
+  locale: AppLocale,
+  remoteStatus: GitRemoteStatus | null | undefined,
+): ActionTooltipCopy {
   return {
     label: isRemoteMissing(remoteStatus)
       ? translate(locale, 'status.commit.local')
@@ -121,28 +135,14 @@ function getClaudeCodeBadgeConfig(locale: AppLocale, status: ClaudeCodeStatus, v
   }
 }
 
-function handleStatusBarActionKeyDown(
-  event: ReactKeyboardEvent<HTMLButtonElement>,
-  onClick?: () => void,
-) {
+function handleStatusBarActionKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, onClick?: () => void) {
   if (!onClick) return
   if (event.key !== 'Enter' && event.key !== ' ') return
   event.preventDefault()
   onClick()
 }
 
-function StatusBarAction({
-  copy,
-  children,
-  onClick,
-  testId,
-  ariaLabel,
-  className,
-  style,
-  disabled = false,
-  busy = false,
-  compact = false,
-}: {
+function StatusBarAction(options: {
   copy: ActionTooltipCopy
   children: ReactNode
   onClick?: () => void
@@ -154,6 +154,18 @@ function StatusBarAction({
   busy?: boolean
   compact?: boolean
 }) {
+  const {
+    copy,
+    children,
+    onClick,
+    testId,
+    ariaLabel,
+    className,
+    style,
+    disabled = false,
+    busy = false,
+    compact = false,
+  } = options
   return (
     <ActionTooltip copy={copy} side="top">
       <Button
@@ -185,17 +197,7 @@ function StatusBarSeparator({ show = true }: { show?: boolean }) {
   return <span style={SEP_STYLE}>|</span>
 }
 
-function CompactStatusActionBadge({
-  showSeparator,
-  copyLabel,
-  onClick,
-  testId,
-  className,
-  compact,
-  icon,
-  label,
-  trailingWarning = false,
-}: {
+function CompactStatusActionBadge(options: {
   showSeparator: boolean
   copyLabel: string
   onClick?: () => void
@@ -206,6 +208,17 @@ function CompactStatusActionBadge({
   label: ReactNode
   trailingWarning?: boolean
 }) {
+  const {
+    showSeparator,
+    copyLabel,
+    onClick,
+    testId,
+    className,
+    compact,
+    icon,
+    label,
+    trailingWarning = false,
+  } = options
   return (
     <>
       <StatusBarSeparator show={showSeparator} />
@@ -226,24 +239,26 @@ function CompactStatusActionBadge({
   )
 }
 
-type RemoteSummaryState =
-  | { kind: 'missing' }
-  | { kind: 'inSync' }
-  | { kind: 'diverged'; ahead: number; behind: number }
+type RemoteSummaryState = { kind: 'missing' } | { kind: 'inSync' } | { kind: 'diverged'; ahead: number; behind: number }
 
 function getRemoteSummaryState(remoteStatus: GitRemoteStatus | null): RemoteSummaryState {
   if (!hasRemote(remoteStatus)) return { kind: 'missing' }
 
   const ahead = remoteStatus?.ahead ?? 0
   const behind = remoteStatus?.behind ?? 0
-  return ahead === 0 && behind === 0
-    ? { kind: 'inSync' }
-    : { kind: 'diverged', ahead, behind }
+  return ahead === 0 && behind === 0 ? { kind: 'inSync' } : { kind: 'diverged', ahead, behind }
 }
 
 function RemoteSummaryLine({ children }: { children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 6, color: 'var(--muted-foreground)' }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        marginBottom: 6,
+        color: 'var(--muted-foreground)',
+      }}
+    >
       {children}
     </div>
   )
@@ -266,7 +281,13 @@ function RemoteDivergenceItem({
   const style = direction === 'behind' ? { color: 'var(--accent-orange)' } : undefined
 
   return (
-    <span title={translate(locale, titleKey, { count, plural: count > 1 ? 's' : '' })} style={style}>
+    <span
+      title={translate(locale, titleKey, {
+        count,
+        plural: count > 1 ? 's' : '',
+      })}
+      style={style}
+    >
       {arrow} {translate(locale, labelKey, { count })}
     </span>
   )
@@ -318,11 +339,7 @@ type ClaudeCodeBadgeProps = StatusBadgeDisplayOptions & {
   version?: string | null
 }
 
-function withStatusBadgeDefaults({
-  showSeparator = true,
-  compact = false,
-  locale = 'en',
-}: StatusBadgeDisplayOptions) {
+function withStatusBadgeDefaults({ showSeparator = true, compact = false, locale = 'en' }: StatusBadgeDisplayOptions) {
   return { showSeparator, compact, locale }
 }
 
@@ -335,7 +352,10 @@ function getStatusWarningBadgeConfig(props: StatusWarningBadgeProps): StatusWarn
         testId: 'status-conflict-count',
         className: 'text-[var(--destructive)]',
         icon: <AlertTriangle size={13} />,
-        label: translate(props.locale, 'status.conflict.count', { count: props.count, plural: props.count > 1 ? 's' : '' }),
+        label: translate(props.locale, 'status.conflict.count', {
+          count: props.count,
+          plural: props.count > 1 ? 's' : '',
+        }),
       }
     case 'missingGit':
       return {
@@ -349,7 +369,8 @@ function getStatusWarningBadgeConfig(props: StatusWarningBadgeProps): StatusWarn
       }
     case 'mcp': {
       const config = getMcpBadgeConfig(props.locale, props.status, props.onInstall)
-      return config && {
+      return (
+        config && {
         copyLabel: config.tooltip,
         onClick: config.onClick,
         testId: 'status-mcp',
@@ -358,10 +379,12 @@ function getStatusWarningBadgeConfig(props: StatusWarningBadgeProps): StatusWarn
         label: 'MCP',
         trailingWarning: true,
       }
+      )
     }
     case 'claude': {
       const config = getClaudeCodeBadgeConfig(props.locale, props.status, props.version)
-      return config && {
+      return (
+        config && {
         copyLabel: config.tooltip,
         onClick: config.onActivate,
         testId: 'status-claude-code',
@@ -370,6 +393,7 @@ function getStatusWarningBadgeConfig(props: StatusWarningBadgeProps): StatusWarn
         label: config.label,
         trailingWarning: config.missing,
       }
+      )
     }
   }
 }
@@ -378,16 +402,16 @@ function StatusWarningBadge(props: StatusWarningBadgeProps) {
   const config = getStatusWarningBadgeConfig(props)
   if (!config) return null
 
-  return (
-    <CompactStatusActionBadge
-      showSeparator={props.showSeparator}
-      compact={props.compact}
-      {...config}
-    />
-  )
+  return <CompactStatusActionBadge showSeparator={props.showSeparator} compact={props.compact} {...config} />
 }
 
-function RemoteStatusSummary({ remoteStatus, locale = 'en' }: { remoteStatus: GitRemoteStatus | null; locale?: AppLocale }) {
+function RemoteStatusSummary({
+  remoteStatus,
+  locale = 'en',
+}: {
+  remoteStatus: GitRemoteStatus | null
+  locale?: AppLocale
+}) {
   const state = getRemoteSummaryState(remoteStatus)
   const branch = branchLabel(remoteStatus)
 
@@ -395,7 +419,9 @@ function RemoteStatusSummary({ remoteStatus, locale = 'en' }: { remoteStatus: Gi
     return (
       <>
         {branch && <RemoteSummaryLine>{translate(locale, 'status.git.branchLine', { branch })}</RemoteSummaryLine>}
-        <div style={{ color: 'var(--muted-foreground)', marginBottom: 6 }}>{translate(locale, 'status.remote.noneConfigured')}</div>
+        <div style={{ color: 'var(--muted-foreground)', marginBottom: 6 }}>
+          {translate(locale, 'status.remote.noneConfigured')}
+        </div>
       </>
     )
   }
@@ -408,7 +434,9 @@ function RemoteStatusSummary({ remoteStatus, locale = 'en' }: { remoteStatus: Gi
         {branch && <RemoteSummaryLine>{translate(locale, 'status.git.branchLine', { branch })}</RemoteSummaryLine>}
         <RemoteSummaryLine>
           {upstreamMissing
-            ? translate(locale, 'status.remote.noUpstream', { branch: branch ?? translate(locale, 'status.git.unknownBranch') })
+            ? translate(locale, 'status.remote.noUpstream', {
+                branch: branch ?? translate(locale, 'status.git.unknownBranch'),
+              })
             : translate(locale, 'status.remote.inSync')}
         </RemoteSummaryLine>
       </>
@@ -441,7 +469,15 @@ function PullAction({
   if (remoteStatus?.hasUpstream === false) return null
 
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 4,
+        marginTop: 6,
+        borderTop: '1px solid var(--border)',
+        paddingTop: 6,
+      }}
+    >
       <Button
         type="button"
         variant="outline"
@@ -453,7 +489,8 @@ function PullAction({
         className="h-6 gap-1 rounded-sm border-border bg-transparent px-2 text-[11px] text-foreground hover:bg-[var(--hover)]"
         data-testid="git-status-pull-btn"
       >
-        <ArrowDown size={11} />{translate(locale, 'status.sync.pull')}
+        <ArrowDown size={11} />
+        {translate(locale, 'status.sync.pull')}
       </Button>
     </div>
   )
@@ -477,7 +514,9 @@ export function BranchBadge({
     <>
       <StatusBarSeparator show={showSeparator} />
       <StatusBarAction
-        copy={{ label: translate(locale, 'status.git.currentBranch', { branch }) }}
+        copy={{
+          label: translate(locale, 'status.git.currentBranch', { branch }),
+        }}
         testId="status-git-branch"
         ariaLabel={translate(locale, 'status.git.currentBranch', { branch })}
         compact={compact}
@@ -527,8 +566,18 @@ function GitStatusPopup({
       }}
     >
       <RemoteStatusSummary remoteStatus={remoteStatus} locale={locale} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, color: 'var(--muted-foreground)' }}>
-        {translate(locale, 'status.sync.status', { status: syncStatusText(locale, status) })}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 4,
+          color: 'var(--muted-foreground)',
+        }}
+      >
+        {translate(locale, 'status.sync.status', {
+          status: syncStatusText(locale, status),
+        })}
       </div>
       <PullAction remoteStatus={remoteStatus} locale={locale} onPull={onPull} onClose={onClose} />
     </div>
@@ -547,7 +596,9 @@ export function CommitBadge({ info, locale = 'en' }: { info: LastCommitInfo; loc
         onClick={() => openExternalUrl(commitUrl)}
         className="h-auto gap-1 rounded-sm px-1 py-0.5 text-[12px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
         style={ICON_STYLE}
-        title={translate(locale, 'status.commit.openOnGitHub', { hash: info.shortHash })}
+        title={translate(locale, 'status.commit.openOnGitHub', {
+          hash: info.shortHash,
+        })}
         data-testid="status-commit-link"
       >
         <GitCommitHorizontal size={13} />
@@ -617,7 +668,11 @@ export function VaultReloadingBadge({
   return (
     <>
       <StatusBarSeparator show={showSeparator} />
-      <StatusBarAction copy={{ label: translate(locale, 'status.vault.reloadingTooltip') }} testId="status-vault-reloading" compact={compact}>
+      <StatusBarAction
+        copy={{ label: translate(locale, 'status.vault.reloadingTooltip') }}
+        testId="status-vault-reloading"
+        compact={compact}
+      >
         <span style={ICON_STYLE}>
           <Loader2 size={13} className="animate-spin" />
           {compact ? null : translate(locale, 'status.vault.reloading')}
@@ -683,19 +738,7 @@ export function NoRemoteBadge({
   )
 }
 
-export function SyncBadge({
-  status,
-  lastSyncTime,
-  remoteStatus,
-  repositories,
-  selectedRepositoryPath,
-  onRepositoryChange,
-  onTriggerSync,
-  onPullAndPush,
-  onOpenConflictResolver,
-  compact = false,
-  locale = 'en',
-}: {
+export function SyncBadge(options: {
   status: SyncStatus
   lastSyncTime: number | null
   remoteStatus?: GitRemoteStatus | null
@@ -708,6 +751,19 @@ export function SyncBadge({
   compact?: boolean
   locale?: AppLocale
 }) {
+  const {
+    status,
+    lastSyncTime,
+    remoteStatus,
+    repositories,
+    selectedRepositoryPath,
+    onRepositoryChange,
+    onTriggerSync,
+    onPullAndPush,
+    onOpenConflictResolver,
+    compact = false,
+    locale = 'en',
+  } = options
   const [showPopup, setShowPopup] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
   const isSyncing = status === 'syncing'
@@ -730,7 +786,12 @@ export function SyncBadge({
 
   return (
     <div ref={popupRef} style={{ position: 'relative' }}>
-      <StatusBarAction copy={syncBadgeTooltipCopy(locale, status)} onClick={handleClick} testId="status-sync" compact={compact}>
+      <StatusBarAction
+        copy={syncBadgeTooltipCopy(locale, status)}
+        onClick={handleClick}
+        testId="status-sync"
+        compact={compact}
+      >
         <span style={ICON_STYLE}>
           <SyncStatusIcon status={status} color={syncIconColor(status)} spinning={isSyncing} />
           {compact ? null : formatSyncLabel(locale, status, lastSyncTime)}
@@ -752,20 +813,11 @@ export function SyncBadge({
   )
 }
 
-export function ConflictBadge({
-  count,
-  onClick,
-  ...displayOptions
-}: ConflictBadgeProps) {
+export function ConflictBadge({ count, onClick, ...displayOptions }: ConflictBadgeProps) {
   if (count <= 0) return null
 
   return (
-    <StatusWarningBadge
-      kind="conflict"
-      count={count}
-      onClick={onClick}
-      {...withStatusBadgeDefaults(displayOptions)}
-    />
+    <StatusWarningBadge kind="conflict" count={count} onClick={onClick} {...withStatusBadgeDefaults(displayOptions)} />
   )
 }
 
@@ -787,7 +839,12 @@ export function ChangesBadge({
   return (
     <>
       <StatusBarSeparator show={showSeparator} />
-      <StatusBarAction copy={{ label: translate(locale, 'status.changes.view') }} onClick={onClick} testId="status-modified-count" compact={compact}>
+      <StatusBarAction
+        copy={{ label: translate(locale, 'status.changes.view') }}
+        onClick={onClick}
+        testId="status-modified-count"
+        compact={compact}
+      >
         <span style={ICON_STYLE}>
           <GitDiff size={13} style={{ color: 'var(--accent-orange)' }} />
           <span
@@ -835,7 +892,14 @@ export function CommitButton({
   return (
     <>
       <StatusBarSeparator show={showSeparator} />
-      <StatusBarAction copy={copy} onClick={onClick} testId="status-commit-push" disabled={pending} busy={pending} compact={compact}>
+      <StatusBarAction
+        copy={copy}
+        onClick={onClick}
+        testId="status-commit-push"
+        disabled={pending}
+        busy={pending}
+        compact={compact}
+      >
         <span style={ICON_STYLE}>
           {pending ? <Loader2 size={13} className="animate-spin" /> : <GitCommitHorizontal size={13} />}
           {compact ? null : translate(locale, 'status.commit.label')}
@@ -845,17 +909,8 @@ export function CommitButton({
   )
 }
 
-export function MissingGitBadge({
-  onClick,
-  ...displayOptions
-}: MissingGitBadgeProps) {
-  return (
-    <StatusWarningBadge
-      kind="missingGit"
-      onClick={onClick}
-      {...withStatusBadgeDefaults(displayOptions)}
-    />
-  )
+export function MissingGitBadge({ onClick, ...displayOptions }: MissingGitBadgeProps) {
+  return <StatusWarningBadge kind="missingGit" onClick={onClick} {...withStatusBadgeDefaults(displayOptions)} />
 }
 
 export function PulseBadge({
@@ -875,7 +930,9 @@ export function PulseBadge({
     <>
       <StatusBarSeparator show={showSeparator} />
       <StatusBarAction
-        copy={{ label: translate(locale, disabled ? 'status.history.onlyGit' : 'status.history.open') }}
+        copy={{
+          label: translate(locale, disabled ? 'status.history.onlyGit' : 'status.history.open'),
+        }}
         onClick={disabled ? undefined : onClick}
         testId="status-pulse"
         disabled={Boolean(disabled)}
@@ -890,32 +947,14 @@ export function PulseBadge({
   )
 }
 
-export function McpBadge({
-  status,
-  onInstall,
-  ...displayOptions
-}: McpBadgeProps) {
+export function McpBadge({ status, onInstall, ...displayOptions }: McpBadgeProps) {
   return (
-    <StatusWarningBadge
-      kind="mcp"
-      status={status}
-      onInstall={onInstall}
-      {...withStatusBadgeDefaults(displayOptions)}
-    />
+    <StatusWarningBadge kind="mcp" status={status} onInstall={onInstall} {...withStatusBadgeDefaults(displayOptions)} />
   )
 }
 
-export function ClaudeCodeBadge({
-  status,
-  version,
-  ...displayOptions
-}: ClaudeCodeBadgeProps) {
+export function ClaudeCodeBadge({ status, version, ...displayOptions }: ClaudeCodeBadgeProps) {
   return (
-    <StatusWarningBadge
-      kind="claude"
-      status={status}
-      version={version}
-      {...withStatusBadgeDefaults(displayOptions)}
-    />
+    <StatusWarningBadge kind="claude" status={status} version={version} {...withStatusBadgeDefaults(displayOptions)} />
   )
 }

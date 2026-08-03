@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test'
 
-const baseURL = process.env.BASE_URL || 'http://127.0.0.1:41741'
+const baseURL = process.env.BASE_URL ?? 'http://127.0.0.1:41741'
 const port = new URL(baseURL).port || '41741'
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER
   ? process.env.PLAYWRIGHT_REUSE_SERVER === '1'

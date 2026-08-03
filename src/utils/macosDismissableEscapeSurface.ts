@@ -15,7 +15,7 @@ function reportOpenState(open: boolean): void {
   lastReportedOpen = open
   void import('@tauri-apps/api/core')
     .then(({ invoke }) => invoke('set_macos_dismissable_escape_surface_open', { open }))
-    .catch(() => {})
+    .catch(() => { /* A missing native command must not block surface dismissal. */ })
 }
 
 export function registerMacosDismissableEscapeSurface(): () => void {

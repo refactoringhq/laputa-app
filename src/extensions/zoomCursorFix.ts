@@ -1,4 +1,4 @@
-import { EditorView, ViewPlugin } from '@codemirror/view'
+import { type EditorView, ViewPlugin } from '@codemirror/view'
 
 function parseZoomValue(source: string | undefined): number | null {
   const value = source?.trim() ?? ''

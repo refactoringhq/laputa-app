@@ -162,17 +162,7 @@ function RepositorySelectorRow({
   )
 }
 
-function HeaderActions({
-  isEntityView,
-  listSort,
-  listDirection,
-  customProperties,
-  propertyPicker,
-  locale,
-  onSortChange,
-  onCreateNote,
-  onToggleSearch,
-}: Pick<
+function HeaderActions(options: Pick<
   NoteListHeaderProps,
   | 'isEntityView'
   | 'listSort'
@@ -186,6 +176,17 @@ function HeaderActions({
 > & {
   locale: AppLocale
 }) {
+  const {
+    isEntityView,
+    listSort,
+    listDirection,
+    customProperties,
+    propertyPicker,
+    locale,
+    onSortChange,
+    onCreateNote,
+    onToggleSearch,
+} = options
   return (
     <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
       {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
@@ -302,31 +303,32 @@ function SearchRow({
   )
 }
 
-export function NoteListHeader({
-  title,
-  typeDocument,
-  isEntityView,
-  isChangesView = false,
-  listSort,
-  listDirection,
-  customProperties,
-  sidebarCollapsed,
-  searchVisible,
-  search,
-  isSearching,
-  searchInputRef,
-  propertyPicker,
-  gitRepositories = [],
-  selectedGitRepositoryPath = '',
-  locale = 'en',
-  onSortChange,
-  onCreateNote,
-  onOpenType,
-  onToggleSearch,
-  onSearchChange,
-  onSearchKeyDown,
-  onGitRepositoryChange,
-}: NoteListHeaderProps) {
+export function NoteListHeader(options: NoteListHeaderProps) {
+  const {
+    title,
+    typeDocument,
+    isEntityView,
+    isChangesView = false,
+    listSort,
+    listDirection,
+    customProperties,
+    sidebarCollapsed,
+    searchVisible,
+    search,
+    isSearching,
+    searchInputRef,
+    propertyPicker,
+    gitRepositories = [],
+    selectedGitRepositoryPath = '',
+    locale = 'en',
+    onSortChange,
+    onCreateNote,
+    onOpenType,
+    onToggleSearch,
+    onSearchChange,
+    onSearchKeyDown,
+    onGitRepositoryChange,
+} = options
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapsedSidebarPadding = sidebarCollapsed && isMac()
     ? `var(--tolaria-macos-traffic-light-padding, ${MACOS_TRAFFIC_LIGHT_SAFE_PADDING}px)`

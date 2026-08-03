@@ -185,11 +185,11 @@ function diffSummaryPrompt(files: ModifiedFile[], fallback: string, excerpts: Di
 function streamCallbacks(onText: (text: string) => void): AgentStreamCallbacks {
   return {
     onText,
-    onThinking: () => {},
-    onToolStart: () => {},
-    onToolDone: () => {},
-    onError: () => {},
-    onDone: () => {},
+    onThinking: () => { /* Only streamed text contributes to commit messages. */ },
+    onToolStart: () => { /* Tool lifecycle updates are intentionally ignored. */ },
+    onToolDone: () => { /* Tool lifecycle updates are intentionally ignored. */ },
+    onError: () => { /* The caller handles the stream result. */ },
+    onDone: () => { /* The caller handles the stream result. */ },
   }
 }
 

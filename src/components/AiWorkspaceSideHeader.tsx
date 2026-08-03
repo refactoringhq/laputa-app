@@ -1,18 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowsInLineHorizontal, ArrowsOutLineHorizontal, Plus, SidebarSimple, X } from '@phosphor-icons/react'
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  type DragEndEvent,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable'
+import { DndContext, PointerSensor, closestCenter, type DragEndEvent, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,18 +58,7 @@ function SideWorkspaceTitleEditor({
   )
 }
 
-function SideWorkspaceTab({
-  active,
-  conversation,
-  editing,
-  locale,
-  onClose,
-  onCancelRename,
-  onRename,
-  onSelect,
-  onStartRename,
-  status,
-}: {
+function SideWorkspaceTab(options: {
   active: boolean
   conversation: AiConversation
   editing: boolean
@@ -92,8 +70,15 @@ function SideWorkspaceTab({
   onStartRename: (id: string) => void
   status: AgentStatus | undefined
 }) {
-  const closeLabel = translate(locale, 'ai.workspace.closeChat', { title: conversation.title })
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: conversation.id, disabled: editing })
+  const { active, conversation, editing, locale, onClose, onCancelRename, onRename, onSelect, onStartRename, status } =
+    options
+  const closeLabel = translate(locale, 'ai.workspace.closeChat', {
+    title: conversation.title,
+  })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: conversation.id,
+    disabled: editing,
+  })
 
   return (
     <div
@@ -133,7 +118,9 @@ function SideWorkspaceTab({
           }}
         >
           <span className="whitespace-nowrap">{conversation.title}</span>
-          {(status === 'thinking' || status === 'tool-executing') && <span className="ml-2 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />}
+          {(status === 'thinking' || status === 'tool-executing') && (
+            <span className="ml-2 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+          )}
         </Button>
       )}
       {!editing && (
@@ -195,9 +182,7 @@ function useHorizontalScrollFades(dependencyKey: string) {
     if (!element) return
 
     element.addEventListener('scroll', updateFades, { passive: true })
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(updateFades)
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateFades)
     resizeObserver?.observe(element)
     if (element.firstElementChild) resizeObserver?.observe(element.firstElementChild)
 
@@ -214,17 +199,7 @@ function useHorizontalScrollFades(dependencyKey: string) {
   }
 }
 
-function SideWorkspaceTabs({
-  activeId,
-  conversations,
-  locale,
-  onCloseConversation,
-  onNewChat,
-  onRename,
-  onReorder,
-  onSelect,
-  statuses,
-}: {
+function SideWorkspaceTabs(options: {
   activeId: string
   conversations: AiConversation[]
   locale: AppLocale
@@ -235,6 +210,8 @@ function SideWorkspaceTabs({
   onSelect: (id: string) => void
   statuses: Record<string, AgentStatus>
 }) {
+  const { activeId, conversations, locale, onCloseConversation, onNewChat, onRename, onReorder, onSelect, statuses } =
+    options
   const [editingId, setEditingId] = useState<string | null>(null)
   const visibleConversations = conversations.filter((conversation) => !conversation.archived)
   const visibleConversationIds = visibleConversations.map((conversation) => conversation.id)
@@ -243,13 +220,16 @@ function SideWorkspaceTabs({
     .join('\0')
   const { scrollRef, showLeftFade, showRightFade } = useHorizontalScrollFades(tabDependencyKey)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
     const activeConversationId = String(event.active.id)
     const overConversationId = event.over ? String(event.over.id) : ''
     if (!overConversationId || activeConversationId === overConversationId) return
 
     onReorder(activeConversationId, overConversationId)
-  }, [onReorder])
+    },
+    [onReorder],
+  )
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -307,21 +287,7 @@ function SideWorkspaceTabs({
   )
 }
 
-export function SideWorkspaceHeader({
-  activeId,
-  conversations,
-  expanded,
-  locale,
-  onClose,
-  onCloseConversation,
-  onNewChat,
-  onRename,
-  onReorder,
-  onSelect,
-  onToggleExpanded,
-  separated,
-  statuses,
-}: {
+export function SideWorkspaceHeader(options: {
   activeId: string
   conversations: AiConversation[]
   expanded: boolean
@@ -336,14 +302,26 @@ export function SideWorkspaceHeader({
   separated: boolean
   statuses: Record<string, AgentStatus>
 }) {
+  const {
+    activeId,
+    conversations,
+    expanded,
+    locale,
+    onClose,
+    onCloseConversation,
+    onNewChat,
+    onRename,
+    onReorder,
+    onSelect,
+    onToggleExpanded,
+    separated,
+    statuses,
+  } = options
   const expandLabel = translate(locale, expanded ? 'ai.workspace.restorePanel' : 'ai.workspace.expandPanel')
 
   return (
     <div
-      className={cn(
-        'flex h-[52px] shrink-0 items-center gap-2 px-2',
-        separated && 'border-b border-border',
-      )}
+      className={cn('flex h-[52px] shrink-0 items-center gap-2 px-2', separated && 'border-b border-border')}
       data-testid="ai-workspace-side-header"
     >
       <SideWorkspaceTabs

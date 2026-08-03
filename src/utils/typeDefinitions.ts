@@ -27,7 +27,8 @@ export function normalizeTypeName({ type }: TypeNameQuery): string {
 }
 
 export function typeWorkspaceKey({ path }: WorkspacePathQuery): string {
-  return path?.trim() || NO_WORKSPACE_KEY
+  const normalizedPath = path?.trim()
+  return normalizedPath?.length ? normalizedPath : NO_WORKSPACE_KEY
 }
 
 export function entryTypeWorkspaceKey(entry: Pick<VaultEntry, 'workspace'>): string {

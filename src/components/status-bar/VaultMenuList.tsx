@@ -160,7 +160,7 @@ function VaultOpenWindowButton(props: { locale: AppLocale; vault: VaultOption })
         size="icon-xs"
         onClick={(event) => {
           event.stopPropagation()
-          void openVaultInNewWindow(vault).catch((error) => {
+          void openVaultInNewWindow(vault).catch((error: unknown) => {
             console.warn('Failed to open vault in a separate window:', error)
           })
         }}
@@ -226,7 +226,7 @@ function VaultMenuItem(props: VaultMenuItemProps) {
     }
 
     item.addEventListener('click', handleItemClick)
-    return () => item.removeEventListener('click', handleItemClick)
+    return () => { item.removeEventListener('click', handleItemClick); }
   }, [onSelect, unavailable])
 
   return (
@@ -304,10 +304,10 @@ function renderVaultMenuItem(props: VaultMenuListProps, vault: VaultOption) {
       disableMountToggle={props.disableMountToggleForPath(vault.path)}
       locale={props.locale}
       multiWorkspaceEnabled={props.multiWorkspaceEnabled}
-      onSelect={() => props.onSelectVault(vault.path)}
+      onSelect={() => { props.onSelectVault(vault.path); }}
       onMountedChange={props.onMountedChange}
       onRequestRemove={props.onRemoveVault
-        ? () => props.setVaultPendingRemoval(vault)
+        ? () => { props.setVaultPendingRemoval(vault); }
         : undefined}
     />
   )

@@ -1,9 +1,4 @@
-import {
-  AI_AGENT_DEFINITIONS,
-  isAiAgentInstalled,
-  type AiAgentId,
-  type AiAgentsStatus,
-} from '../../lib/aiAgents'
+import { AI_AGENT_DEFINITIONS, isAiAgentInstalled, type AiAgentId, type AiAgentsStatus } from '../../lib/aiAgents'
 import {
   isVaultAiGuidanceStatusChecking,
   vaultAiGuidanceNeedsRestore,
@@ -11,13 +6,15 @@ import {
 } from '../../lib/vaultAiGuidance'
 import type { CommandAction } from './types'
 
-const AI_AGENT_KEYWORDS = Array.from(new Set(
+const AI_AGENT_KEYWORDS = Array.from(
+  new Set(
   AI_AGENT_DEFINITIONS.flatMap((definition) => [
     definition.id,
     definition.shortLabel.toLowerCase(),
     definition.label.toLowerCase(),
   ]),
-))
+  ),
+)
 
 function aiAgentKeywords(...keywords: string[]): string[] {
   return [...keywords, ...AI_AGENT_KEYWORDS]
@@ -42,8 +39,7 @@ function explicitSwitchCommands({
 }: Pick<AiAgentCommandsConfig, 'aiAgentsStatus' | 'selectedAiAgent' | 'onSetDefaultAiAgent'>): CommandAction[] {
   if (!aiAgentsStatus || !selectedAiAgent || !onSetDefaultAiAgent) return []
 
-  return AI_AGENT_DEFINITIONS
-    .filter((definition) => definition.id !== selectedAiAgent)
+  return AI_AGENT_DEFINITIONS.filter((definition) => definition.id !== selectedAiAgent)
     .filter((definition) => isAiAgentInstalled(aiAgentsStatus, definition.id))
     .map((definition) => ({
       id: `switch-ai-agent-${definition.id}`,
@@ -75,17 +71,18 @@ function restoreGuidanceCommands({
   ]
 }
 
-export function buildAiAgentCommands({
-  aiFeaturesEnabled = true,
-  aiAgentsStatus,
-  vaultAiGuidanceStatus,
-  selectedAiAgent,
-  selectedAiAgentLabel,
-  onOpenAiAgents,
-  onRestoreVaultAiGuidance,
-  onCycleDefaultAiAgent,
-  onSetDefaultAiAgent,
-}: AiAgentCommandsConfig): CommandAction[] {
+export function buildAiAgentCommands(options: AiAgentCommandsConfig): CommandAction[] {
+  const {
+    aiFeaturesEnabled = true,
+    aiAgentsStatus,
+    vaultAiGuidanceStatus,
+    selectedAiAgent,
+    selectedAiAgentLabel,
+    onOpenAiAgents,
+    onRestoreVaultAiGuidance,
+    onCycleDefaultAiAgent,
+    onSetDefaultAiAgent,
+  } = options
   if (!aiFeaturesEnabled) return []
 
   const commands: CommandAction[] = [
@@ -99,10 +96,12 @@ export function buildAiAgentCommands({
     },
   ]
 
-  commands.push(...restoreGuidanceCommands({
+  commands.push(
+    ...restoreGuidanceCommands({
     vaultAiGuidanceStatus,
     onRestoreVaultAiGuidance,
-  }))
+    }),
+  )
 
   const switchCommands = explicitSwitchCommands({
     aiAgentsStatus,

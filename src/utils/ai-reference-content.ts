@@ -1,17 +1,11 @@
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { NoteReference } from './ai-context'
 
-async function readNoteContent(path: string): Promise<string | null> {
-  try {
-    if (!isTauri()) {
-      return await mockInvoke<string>('get_note_content', { path })
-    }
-
-    const { invoke } = await import('@tauri-apps/api/core')
-    return await invoke<string>('get_note_content', { path })
-  } catch {
-    return null
-  }
+function readNoteContent(path: string): Promise<string | null> {
+  const request = isTauri()
+    ? import('@tauri-apps/api/core').then(({ invoke }) => invoke<string>('get_note_content', { path }))
+    : mockInvoke<string>('get_note_content', { path })
+  return request.catch(() => null)
 }
 
 export async function hydrateNoteReferences(references?: NoteReference[]): Promise<NoteReference[] | undefined> {

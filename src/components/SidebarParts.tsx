@@ -2,7 +2,7 @@ import { useEffect, useRef, type ComponentType, type MouseEvent as ReactMouseEve
 import type { SidebarSelection, VaultEntry, WorkspaceIdentity } from '../types'
 import { cn } from '@/lib/utils'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
-import { type IconProps } from '@phosphor-icons/react'
+import type { IconProps } from '@phosphor-icons/react'
 import { SIDEBAR_ITEM_PADDING } from './sidebar/sidebarStyles'
 import { useSidebarInlineRenameInput } from './sidebar/sidebarHooks'
 import { Button } from './ui/button'
@@ -10,10 +10,7 @@ import { Checkbox } from './ui/checkbox'
 import { Input } from './ui/input'
 import { translate, type AppLocale } from '../lib/i18n'
 import { WorkspaceInitialsBadge } from './WorkspaceInitialsBadge'
-import {
-  collectTypeVisibilityWorkspaces,
-  findTypeDefinitionForWorkspace,
-} from '../utils/typeVisibility'
+import { collectTypeVisibilityWorkspaces, findTypeDefinitionForWorkspace } from '../utils/typeVisibility'
 
 const SIDEBAR_COUNT_PILL_STYLE = {
   borderRadius: 9999,
@@ -40,15 +37,20 @@ function resolveSectionColors(type: string, customColor?: string | null) {
 export function isSelectionActive(current: SidebarSelection, check: SidebarSelection): boolean {
   if (current.kind !== check.kind) return false
   switch (check.kind) {
-    case 'filter': return (current as typeof check).filter === check.filter
-    case 'sectionGroup': return (current as typeof check).type === check.type
-    case 'folder': return (current as typeof check).path === check.path
-    case 'entity': return (current as typeof check).entry.path === check.entry.path
+    case 'filter':
+      return (current as typeof check).filter === check.filter
+    case 'sectionGroup':
+      return (current as typeof check).type === check.type
+    case 'folder':
+      return (current as typeof check).path === check.path
+    case 'entity':
+      return (current as typeof check).entry.path === check.entry.path
     case 'view': {
       const currentView = current as typeof check
       return currentView.filename === check.filename && (currentView.rootPath ?? '') === (check.rootPath ?? '')
     }
-    default: return false
+    default:
+      return false
   }
 }
 
@@ -101,7 +103,19 @@ function SidebarNavIcon({
   iconSize: number
   isActive?: boolean
 }) {
-  if (emoji) return <span style={{ fontSize: iconSize, lineHeight: 1, width: iconSize, textAlign: 'center' }}>{emoji}</span>
+  if (emoji)
+    return (
+      <span
+        style={{
+          fontSize: iconSize,
+          lineHeight: 1,
+          width: iconSize,
+          textAlign: 'center',
+        }}
+      >
+        {emoji}
+      </span>
+    )
   return <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
 }
 
@@ -121,15 +135,25 @@ export function SidebarCountPill({
   return (
     <span
       data-testid={testId}
-      className={cn("flex items-center justify-center", className)}
-      style={{ height: compact ? 18 : 20, ...SIDEBAR_COUNT_PILL_STYLE, ...style }}
+      className={cn('flex items-center justify-center', className)}
+      style={{
+        height: compact ? 18 : 20,
+        ...SIDEBAR_COUNT_PILL_STYLE,
+        ...style,
+      }}
     >
       {count}
     </span>
   )
 }
 
-export function SidebarLoadingCountPill({ compact, testId = 'sidebar-count-skeleton' }: { compact?: boolean; testId?: string }) {
+export function SidebarLoadingCountPill({
+  compact,
+  testId = 'sidebar-count-skeleton',
+}: {
+  compact?: boolean
+  testId?: string
+}) {
   return (
     <span
       aria-hidden="true"
@@ -141,7 +165,9 @@ export function SidebarLoadingCountPill({ compact, testId = 'sidebar-count-skele
 }
 
 function NavItemLabel({ label, compact }: { label: string; compact?: boolean }) {
-  return <span className={cn("min-w-0 flex-1 truncate text-left font-medium", getNavItemTextClass(compact))}>{label}</span>
+  return (
+    <span className={cn('min-w-0 flex-1 truncate text-left font-medium', getNavItemTextClass(compact))}>{label}</span>
+  )
 }
 
 function NavItemCount({
@@ -159,14 +185,7 @@ function NavItemCount({
 }) {
   if (countLoading) return <SidebarLoadingCountPill compact={compact} />
   if (!hasSidebarCount(count)) return null
-  return (
-    <SidebarCountPill
-      count={count}
-      className={className}
-      style={style}
-      compact={compact}
-    />
-  )
+  return <SidebarCountPill count={count} className={className} style={style} compact={compact} />
 }
 
 function DisabledNavItem({
@@ -185,29 +204,18 @@ function DisabledNavItem({
   padding: ReturnType<typeof getNavItemPadding>
 }) {
   return (
-    <div className="flex select-none items-center gap-2 rounded text-foreground" style={{ padding, borderRadius: 4, opacity: 0.4, cursor: 'not-allowed' }} title={disabledTooltip ?? "Coming soon"}>
+    <div
+      className="flex select-none items-center gap-2 rounded text-foreground"
+      style={{ padding, borderRadius: 4, opacity: 0.4, cursor: 'not-allowed' }}
+      title={disabledTooltip ?? 'Coming soon'}
+    >
       <SidebarNavIcon Icon={Icon} emoji={emoji} iconSize={getNavItemIconSize(compact)} />
       <NavItemLabel label={label} compact={compact} />
     </div>
   )
 }
 
-function ClickableNavItem({
-  Icon,
-  emoji,
-  label,
-  count,
-  countLoading,
-  isActive,
-  activeClassName,
-  badgeClassName,
-  badgeStyle,
-  activeBadgeClassName,
-  activeBadgeStyle,
-  onClick,
-  compact,
-  padding,
-}: {
+function ClickableNavItem(options: {
   Icon: ComponentType<IconProps>
   emoji?: string | null
   label: string
@@ -223,12 +231,31 @@ function ClickableNavItem({
   compact?: boolean
   padding: ReturnType<typeof getNavItemPadding>
 }) {
+  const {
+    Icon,
+    emoji,
+    label,
+    count,
+    countLoading,
+    isActive,
+    activeClassName,
+    badgeClassName,
+    badgeStyle,
+    activeBadgeClassName,
+    activeBadgeStyle,
+    onClick,
+    compact,
+    padding,
+  } = options
   return (
     <Button
       type="button"
       variant="ghost"
       size="sm"
-      className={cn("h-auto w-full cursor-pointer select-none justify-start rounded text-left transition-colors", isActive ? activeClassName : "text-foreground hover:bg-accent")}
+      className={cn(
+        'h-auto w-full cursor-pointer select-none justify-start rounded text-left transition-colors',
+        isActive ? activeClassName : 'text-foreground hover:bg-accent',
+      )}
       style={{ padding, borderRadius: 4 }}
       onClick={onClick}
     >
@@ -245,7 +272,7 @@ function ClickableNavItem({
   )
 }
 
-export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact }: {
+export function NavItem(options: {
   icon: ComponentType<IconProps>
   emoji?: string | null
   label: string
@@ -262,6 +289,23 @@ export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActiv
   disabledTooltip?: string
   compact?: boolean
 }) {
+  const {
+    icon: Icon,
+    emoji,
+    label,
+    count,
+    countLoading,
+    isActive,
+    activeClassName = 'bg-primary/10 text-primary',
+    badgeClassName,
+    badgeStyle,
+    activeBadgeClassName,
+    activeBadgeStyle,
+    onClick,
+    disabled,
+    disabledTooltip,
+    compact,
+  } = options
   const padding = getNavItemPadding(compact, countLoading || hasSidebarCount(count))
   if (disabled) {
     return (
@@ -314,18 +358,30 @@ export interface SectionContentProps {
   locale?: AppLocale
 }
 
-export function SectionContent({
-  group, itemCount, selection, onSelect,
-  onContextMenu, dragHandleProps,
-  isRenaming, renameInitialValue, onRenameSubmit, onRenameCancel, locale,
-  onStartRename, onSelectTypeNote,
-}: SectionContentProps) {
+export function SectionContent(options: SectionContentProps) {
+  const {
+    group,
+    itemCount,
+    selection,
+    onSelect,
+    onContextMenu,
+    dragHandleProps,
+    isRenaming,
+    renameInitialValue,
+    onRenameSubmit,
+    onRenameCancel,
+    locale,
+    onStartRename,
+    onSelectTypeNote,
+  } = options
   const { label, type, Icon, customColor } = group
   const { sectionColor, sectionLightColor } = resolveSectionColors(type, customColor)
 
   return (
     <SectionHeader
-      label={label} type={type} Icon={Icon}
+      label={label}
+      type={type}
+      Icon={Icon}
       sectionColor={sectionColor}
       sectionLightColor={sectionLightColor}
       itemCount={itemCount}
@@ -344,22 +400,24 @@ export function SectionContent({
   )
 }
 
-function InlineRenameInput({ initialValue, onSubmit, onCancel, locale }: {
+function InlineRenameInput({
+  initialValue,
+  onSubmit,
+  onCancel,
+  locale,
+}: {
   initialValue: string
   onSubmit: (value: string) => void
   onCancel: () => void
   locale?: AppLocale
 }) {
-  const {
-    handleKeyDown,
-    inputRef,
-    setValue,
-    submitValue,
-    value,
-  } = useSidebarInlineRenameInput({
+  const { handleKeyDown, inputRef, setValue, submitValue, value } = useSidebarInlineRenameInput({
     initialValue,
     onCancel,
-    onSubmit: (nextValue) => onSubmit(nextValue.trim()),
+    onSubmit: (nextValue) => {
+      onSubmit(nextValue.trim())
+      return true
+    },
   })
 
   return (
@@ -368,7 +426,9 @@ function InlineRenameInput({ initialValue, onSubmit, onCancel, locale }: {
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
-      onBlur={() => { void submitValue() }}
+      onBlur={() => {
+        void submitValue()
+      }}
       onClick={(e) => e.stopPropagation()}
       aria-label={translate(locale ?? 'en', 'sidebar.section.name')}
       className="h-auto min-h-0 flex-1 rounded border-primary bg-background px-1 py-px text-[13px] font-medium text-foreground"
@@ -395,10 +455,7 @@ function getSectionSelectHandler(isRenaming: boolean | undefined, onSelect: () =
   return onSelect
 }
 
-function getSectionContextMenuHandler(
-  isRenaming: boolean | undefined,
-  onContextMenu: (e: React.MouseEvent) => void,
-) {
+function getSectionContextMenuHandler(isRenaming: boolean | undefined, onContextMenu: (e: React.MouseEvent) => void) {
   if (isRenaming) return undefined
   return onContextMenu
 }
@@ -411,23 +468,15 @@ function resolveInlineRenameHandlers({
   isRenaming?: boolean
   onRenameCancel?: () => void
   onRenameSubmit?: (value: string) => void
-}): { onRenameCancel: () => void; onRenameSubmit: (value: string) => void } | null {
+}): {
+  onRenameCancel: () => void
+  onRenameSubmit: (value: string) => void
+} | null {
   if (!isRenaming || !onRenameSubmit || !onRenameCancel) return null
   return { onRenameCancel, onRenameSubmit }
 }
 
-function SectionHeaderLabel({
-  type,
-  label,
-  isActive,
-  sectionColor,
-  isRenaming,
-  renameInitialValue,
-  onRenameSubmit,
-  onRenameCancel,
-  onStartRename,
-  locale,
-}: {
+function SectionHeaderLabel(options: {
   type: string
   label: string
   isActive: boolean
@@ -439,6 +488,18 @@ function SectionHeaderLabel({
   onStartRename?: () => void
   locale?: AppLocale
 }) {
+  const {
+    type,
+    label,
+    isActive,
+    sectionColor,
+    isRenaming,
+    renameInitialValue,
+    onRenameSubmit,
+    onRenameCancel,
+    onStartRename,
+    locale,
+  } = options
   const inlineRenameHandlers = resolveInlineRenameHandlers({
     isRenaming,
     onRenameCancel,
@@ -461,7 +522,10 @@ function SectionHeaderLabel({
     <button
       type="button"
       className="min-w-0 truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium"
-      style={{ marginLeft: 4, color: getSectionHeaderTitleColor(isActive, sectionColor) }}
+      style={{
+        marginLeft: 4,
+        color: getSectionHeaderTitleColor(isActive, sectionColor),
+      }}
       onDoubleClick={(event) => {
         event.stopPropagation()
         onStartRename?.()
@@ -491,16 +555,44 @@ function SectionHeaderCountPill({
   )
 }
 
-function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, itemCount, isActive, onSelect, onContextMenu, dragHandleProps, isRenaming, renameInitialValue, onRenameSubmit, onRenameCancel, onStartRename, onSelectTypeNote, locale }: {
-  label: string; type: string; Icon: ComponentType<IconProps>
-  sectionColor: string; sectionLightColor: string; itemCount: number; isActive: boolean
-  onSelect: () => void; onContextMenu: (e: React.MouseEvent) => void
+function SectionHeader(options: {
+  label: string
+  type: string
+  Icon: ComponentType<IconProps>
+  sectionColor: string
+  sectionLightColor: string
+  itemCount: number
+  isActive: boolean
+  onSelect: () => void
+  onContextMenu: (e: React.MouseEvent) => void
   dragHandleProps?: Record<string, unknown>
-  isRenaming?: boolean; renameInitialValue?: string
-  onRenameSubmit?: (value: string) => void; onRenameCancel?: () => void
-  onStartRename?: () => void; onSelectTypeNote?: () => void
+  isRenaming?: boolean
+  renameInitialValue?: string
+  onRenameSubmit?: (value: string) => void
+  onRenameCancel?: () => void
+  onStartRename?: () => void
+  onSelectTypeNote?: () => void
   locale?: AppLocale
 }) {
+  const {
+    label,
+    type,
+    Icon,
+    sectionColor,
+    sectionLightColor,
+    itemCount,
+    isActive,
+    onSelect,
+    onContextMenu,
+    dragHandleProps,
+    isRenaming,
+    renameInitialValue,
+    onRenameSubmit,
+    onRenameCancel,
+    onStartRename,
+    onSelectTypeNote,
+    locale,
+  } = options
   const headerRef = useRef<HTMLDivElement>(null)
   const selectHandler = getSectionSelectHandler(isRenaming, onSelect)
   const contextMenuHandler = getSectionContextMenuHandler(isRenaming, onContextMenu)
@@ -527,8 +619,16 @@ function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, ite
   return (
     <div
       ref={headerRef}
-      className={cn("group/section flex cursor-pointer select-none items-center justify-between rounded transition-colors", !isActive && "hover:bg-accent")}
-      style={{ padding: SIDEBAR_ITEM_PADDING.withCount, borderRadius: 4, gap: 4, ...getSectionHeaderBackground(isActive, sectionLightColor) }}
+      className={cn(
+        'group/section flex cursor-pointer select-none items-center justify-between rounded transition-colors',
+        !isActive && 'hover:bg-accent',
+      )}
+      style={{
+        padding: SIDEBAR_ITEM_PADDING.withCount,
+        borderRadius: 4,
+        gap: 4,
+        ...getSectionHeaderBackground(isActive, sectionLightColor),
+      }}
       {...dragHandleProps}
     >
       <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
@@ -546,9 +646,7 @@ function SectionHeader({ label, type, Icon, sectionColor, sectionLightColor, ite
           locale={locale}
         />
       </div>
-      {!isRenaming && (
-        <SectionHeaderCountPill itemCount={itemCount} isActive={isActive} sectionColor={sectionColor} />
-      )}
+      {!isRenaming && <SectionHeaderCountPill itemCount={itemCount} isActive={isActive} sectionColor={sectionColor} />}
     </div>
   )
 }
@@ -590,7 +688,9 @@ function VisibilityMatrixHeader({ workspaces }: { workspaces: WorkspaceIdentity[
   return (
     <div
       className="grid items-center gap-2 px-3 pb-1"
-      style={{ gridTemplateColumns: `minmax(96px, 1fr) repeat(${workspaces.length}, 28px)` }}
+      style={{
+        gridTemplateColumns: `minmax(96px, 1fr) repeat(${workspaces.length}, 28px)`,
+      }}
     >
       <div />
       {workspaces.map((workspace) => (
@@ -623,7 +723,9 @@ function VisibilityMatrixCell({
     <Checkbox
       checked={typeEntry.visible !== false}
       onCheckedChange={() => onToggle(group.type, typeEntry.path)}
-      aria-label={translate(locale, 'sidebar.section.toggle', { label: `${group.label} ${workspace.shortLabel}` })}
+      aria-label={translate(locale, 'sidebar.section.toggle', {
+        label: `${group.label} ${workspace.shortLabel}`,
+      })}
       className="mx-auto"
     />
   )
@@ -648,7 +750,9 @@ function VisibilityMatrixRow({
   return (
     <div
       className="grid items-center gap-2 px-3 py-1.5"
-      style={{ gridTemplateColumns: `minmax(96px, 1fr) repeat(${workspaces.length}, 28px)` }}
+      style={{
+        gridTemplateColumns: `minmax(96px, 1fr) repeat(${workspaces.length}, 28px)`,
+      }}
     >
       <div className="flex min-w-0 items-center gap-2">
         <Icon size={14} style={{ color: sectionColor }} />
@@ -700,7 +804,14 @@ function VisibilityMatrixPopover({
 
 // --- Visibility Popover ---
 
-export function VisibilityPopover({ entries, sections, isSectionVisible, onToggle, workspaceOrder = [], locale = 'en' }: {
+export function VisibilityPopover({
+  entries,
+  sections,
+  isSectionVisible,
+  onToggle,
+  workspaceOrder = [],
+  locale = 'en',
+}: {
   entries: VaultEntry[]
   sections: SectionGroup[]
   isSectionVisible: (type: string) => boolean
@@ -714,9 +825,20 @@ export function VisibilityPopover({ entries, sections, isSectionVisible, onToggl
   return (
     <div
       className="border border-border bg-popover text-popover-foreground"
-      style={{ position: 'absolute', top: '100%', left: 6, right: 6, zIndex: 50, borderRadius: 8, padding: '8px 0', boxShadow: '0 4px 12px var(--shadow-dialog)' }}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        left: 6,
+        right: 6,
+        zIndex: 50,
+        borderRadius: 8,
+        padding: '8px 0',
+        boxShadow: '0 4px 12px var(--shadow-dialog)',
+      }}
     >
-      <div className="text-[12px] font-semibold text-muted-foreground" style={{ padding: '0 12px 4px' }}>{translate(locale, 'sidebar.section.showInSidebar')}</div>
+      <div className="text-[12px] font-semibold text-muted-foreground" style={{ padding: '0 12px 4px' }}>
+        {translate(locale, 'sidebar.section.showInSidebar')}
+      </div>
       {showMatrix ? (
         <VisibilityMatrixPopover
           entries={entries}
@@ -742,8 +864,27 @@ export function VisibilityPopover({ entries, sections, isSectionVisible, onToggl
 
 function ToggleSwitch({ on }: { on: boolean }) {
   return (
-    <div className="flex items-center" style={{ width: 32, height: 18, borderRadius: 9, padding: 2, backgroundColor: on ? 'var(--primary)' : 'var(--muted)', justifyContent: on ? 'flex-end' : 'flex-start', transition: 'background-color 150ms' }}>
-      <div style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'var(--background)', transition: 'transform 150ms' }} />
+    <div
+      className="flex items-center"
+      style={{
+        width: 32,
+        height: 18,
+        borderRadius: 9,
+        padding: 2,
+        backgroundColor: on ? 'var(--primary)' : 'var(--muted)',
+        justifyContent: on ? 'flex-end' : 'flex-start',
+        transition: 'background-color 150ms',
+      }}
+    >
+      <div
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          backgroundColor: 'var(--background)',
+          transition: 'transform 150ms',
+        }}
+      />
     </div>
   )
 }

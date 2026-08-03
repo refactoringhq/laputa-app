@@ -25,13 +25,7 @@ interface SheetContextMenuProps {
   onUnfreezeRows: () => void
 }
 
-function SheetContextMenuItem({
-  children,
-  onClick,
-}: {
-  children: string
-  onClick: () => void
-}) {
+function SheetContextMenuItem({ children, onClick }: { children: string; onClick: () => void }) {
   return (
     <Button
       className="sheet-context-menu__item"
@@ -46,28 +40,8 @@ function SheetContextMenuItem({
   )
 }
 
-export function SheetContextMenu({
-  locale,
-  state,
-  onBold,
-  onClearFormatting,
-  onClose,
-  onDeleteColumn,
-  onDeleteRow,
-  onDecreaseDecimals,
-  onFreezeColumns,
-  onFreezeRows,
-  onIncreaseDecimals,
-  onInsertColumnLeft,
-  onInsertColumnRight,
-  onInsertRowAbove,
-  onInsertRowBelow,
-  onItalic,
-  onNumberFormat,
-  onToggleWrapText,
-  onUnfreezeColumns,
-  onUnfreezeRows,
-}: SheetContextMenuProps) {
+export function SheetContextMenu(options: SheetContextMenuProps) {
+  const { locale, state, onBold, onClearFormatting, onClose, onDeleteColumn, onDeleteRow, onDecreaseDecimals, onFreezeColumns, onFreezeRows, onIncreaseDecimals, onInsertColumnLeft, onInsertColumnRight, onInsertRowAbove, onInsertRowBelow, onItalic, onNumberFormat, onToggleWrapText, onUnfreezeColumns, onUnfreezeRows } = options
   return (
     <div
       className="sheet-context-menu"
@@ -96,18 +70,26 @@ export function SheetContextMenu({
           {translate(locale, 'editor.sheet.context.insertColumnRight')}
         </SheetContextMenuItem>
         <SheetContextMenuItem onClick={onDeleteRow}>
-          {translate(locale, 'editor.sheet.context.deleteRow', { row: String(state.row) })}
+          {translate(locale, 'editor.sheet.context.deleteRow', {
+            row: String(state.row),
+          })}
         </SheetContextMenuItem>
         <SheetContextMenuItem onClick={onDeleteColumn}>
-          {translate(locale, 'editor.sheet.context.deleteColumn', { column: state.columnName })}
+          {translate(locale, 'editor.sheet.context.deleteColumn', {
+            column: state.columnName,
+          })}
         </SheetContextMenuItem>
       </div>
       <div className="sheet-context-menu__group">
         <SheetContextMenuItem onClick={onFreezeRows}>
-          {translate(locale, 'editor.sheet.context.freezeRows', { row: String(state.row) })}
+          {translate(locale, 'editor.sheet.context.freezeRows', {
+            row: String(state.row),
+          })}
         </SheetContextMenuItem>
         <SheetContextMenuItem onClick={onFreezeColumns}>
-          {translate(locale, 'editor.sheet.context.freezeColumns', { column: state.columnName })}
+          {translate(locale, 'editor.sheet.context.freezeColumns', {
+            column: state.columnName,
+          })}
         </SheetContextMenuItem>
         {state.frozenRows > 0 && (
           <SheetContextMenuItem onClick={onUnfreezeRows}>
@@ -146,9 +128,7 @@ export function SheetContextMenu({
         </SheetContextMenuItem>
       </div>
       <div className="sheet-context-menu__group">
-        <SheetContextMenuItem onClick={onBold}>
-          {translate(locale, 'editor.sheet.context.bold')}
-        </SheetContextMenuItem>
+        <SheetContextMenuItem onClick={onBold}>{translate(locale, 'editor.sheet.context.bold')}</SheetContextMenuItem>
         <SheetContextMenuItem onClick={onItalic}>
           {translate(locale, 'editor.sheet.context.italic')}
         </SheetContextMenuItem>

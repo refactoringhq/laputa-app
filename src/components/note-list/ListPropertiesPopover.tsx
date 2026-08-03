@@ -11,14 +11,8 @@ import {
   type NoteListPropertiesScope,
   type OpenListPropertiesEventDetail,
 } from './noteListPropertiesEvents'
-import {
-  DndContext, closestCenter, PointerSensor,
-  useSensor, useSensors, type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext, useSortable, verticalListSortingStrategy,
-  arrayMove,
-} from '@dnd-kit/sortable'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
 type NoteListPropertyKey = string
@@ -57,7 +51,11 @@ function filterOrderedItems(orderedItems: NoteListPropertyKey[], query: string) 
   return orderedItems.filter((property) => property.toLowerCase().includes(normalized))
 }
 
-function toggleDisplayProperty(currentDisplay: NoteListPropertyKey[], selectedSet: Set<NoteListPropertyKey>, key: NoteListPropertyKey) {
+function toggleDisplayProperty(
+  currentDisplay: NoteListPropertyKey[],
+  selectedSet: Set<NoteListPropertyKey>,
+  key: NoteListPropertyKey,
+) {
   if (selectedSet.has(key)) {
     const filtered = currentDisplay.filter((property) => property !== key)
     return filtered.length > 0 ? filtered : null
@@ -66,7 +64,11 @@ function toggleDisplayProperty(currentDisplay: NoteListPropertyKey[], selectedSe
   return [...currentDisplay, key]
 }
 
-function reorderDisplayProperties(event: DragEndEvent, currentDisplay: NoteListPropertyKey[], availableProperties: NoteListPropertyKey[]) {
+function reorderDisplayProperties(
+  event: DragEndEvent,
+  currentDisplay: NoteListPropertyKey[],
+  availableProperties: NoteListPropertyKey[],
+) {
   const { active, over } = event
   if (!over || active.id === over.id) return undefined
 
@@ -78,7 +80,17 @@ function reorderDisplayProperties(event: DragEndEvent, currentDisplay: NoteListP
   return arrayMove(selected, oldIndex, newIndex)
 }
 
-function SortablePropertyItem({ id, checked, locale = 'en', onToggle }: { id: NoteListPropertyKey; checked: boolean; locale?: AppLocale; onToggle: (key: NoteListPropertyKey) => void }) {
+function SortablePropertyItem({
+  id,
+  checked,
+  locale = 'en',
+  onToggle,
+}: {
+  id: NoteListPropertyKey
+  checked: boolean
+  locale?: AppLocale
+  onToggle: (key: NoteListPropertyKey) => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const inputId = propertyInputId(id)
@@ -91,16 +103,8 @@ function SortablePropertyItem({ id, checked, locale = 'en', onToggle }: { id: No
       className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted"
       data-testid={`list-prop-item-${id}`}
     >
-      <Checkbox
-        id={inputId}
-        checked={checked}
-        onCheckedChange={() => onToggle(id)}
-        aria-label={id}
-      />
-      <label
-        htmlFor={inputId}
-        className="flex flex-1 cursor-pointer items-center gap-2 text-[13px]"
-      >
+      <Checkbox id={inputId} checked={checked} onCheckedChange={() => onToggle(id)} aria-label={id} />
+      <label htmlFor={inputId} className="flex flex-1 cursor-pointer items-center gap-2 text-[13px]">
         <span className="truncate">{id}</span>
       </label>
       <Button
@@ -108,7 +112,9 @@ function SortablePropertyItem({ id, checked, locale = 'en', onToggle }: { id: No
         variant="ghost"
         size="icon-xs"
         className="shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing"
-        aria-label={translate(locale, 'noteList.properties.reorder', { name: id })}
+        aria-label={translate(locale, 'noteList.properties.reorder', {
+          name: id,
+        })}
         {...dragAttributes}
         {...listeners}
       >
@@ -199,21 +205,7 @@ function ListPropertiesOptionsList({
   )
 }
 
-function ListPropertiesPopoverPanel({
-  inputRef,
-  query,
-  open,
-  listboxId,
-  filteredItems,
-  selectedSet,
-  sensors,
-  locale = 'en',
-  onQueryChange,
-  onSearchKeyDown,
-  onPanelKeyDown,
-  onDragEnd,
-  onToggle,
-}: {
+function ListPropertiesPopoverPanel(options: {
   inputRef: RefObject<HTMLInputElement | null>
   query: string
   open: boolean
@@ -228,6 +220,21 @@ function ListPropertiesPopoverPanel({
   onDragEnd: (event: DragEndEvent) => void
   onToggle: (key: string) => void
 }) {
+  const {
+    inputRef,
+    query,
+    open,
+    listboxId,
+    filteredItems,
+    selectedSet,
+    sensors,
+    locale = 'en',
+    onQueryChange,
+    onSearchKeyDown,
+    onPanelKeyDown,
+    onDragEnd,
+    onToggle,
+  } = options
   return (
     <PopoverContent
       align="end"
@@ -287,17 +294,12 @@ function useListPropertiesPopoverState({
     () => getOrderedItems(currentDisplay, availableProperties),
     [availableProperties, currentDisplay],
   )
-  const filteredItems = useMemo(
-    () => filterOrderedItems(orderedItems, query),
-    [orderedItems, query],
-  )
+  const filteredItems = useMemo(() => filterOrderedItems(orderedItems, query), [orderedItems, query])
   const selectedSet = useMemo(
     () => new Set(getSelectedProperties(currentDisplay, availableProperties)),
     [availableProperties, currentDisplay],
   )
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -313,25 +315,37 @@ function useListPropertiesPopoverState({
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [open])
 
-  const handleToggle = useCallback((key: string) => {
+  const handleToggle = useCallback(
+    (key: string) => {
     const nextSelected = toggleDisplayProperty(currentDisplay, selectedSet, key)
     onSave(nextSelected)
-  }, [currentDisplay, onSave, selectedSet])
+    },
+    [currentDisplay, onSave, selectedSet],
+  )
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
     const reordered = reorderDisplayProperties(event, currentDisplay, availableProperties)
     if (!reordered) return
 
     onSave(reordered)
-  }, [availableProperties, currentDisplay, onSave])
+    },
+    [availableProperties, currentDisplay, onSave],
+  )
 
-  const handleSearchKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
     handleEscapeKey(event, closePopover)
-  }, [closePopover])
+    },
+    [closePopover],
+  )
 
-  const handlePanelKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+  const handlePanelKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
     handleEscapeKey(event, closePopover)
-  }, [closePopover])
+    },
+    [closePopover],
+  )
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen)
@@ -378,7 +392,12 @@ export function ListPropertiesPopover({
     handleDragEnd,
     handleOpenChange,
     handleToggle,
-  } = useListPropertiesPopoverState({ scope, availableProperties, currentDisplay, onSave })
+  } = useListPropertiesPopoverState({
+    scope,
+    availableProperties,
+    currentDisplay,
+    onSave,
+  })
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>

@@ -112,17 +112,18 @@ function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
   )
 }
 
-function McpSetupActions({
-  buttonsDisabled,
-  connectBusy,
-  disconnectBusy,
-  locale = 'en',
-  primaryLabel,
-  secondaryLabel,
-  onClose,
-  onConnect,
-  onDisconnect,
-}: McpSetupActionsProps) {
+function McpSetupActions(options: McpSetupActionsProps) {
+  const {
+    buttonsDisabled,
+    connectBusy,
+    disconnectBusy,
+    locale = 'en',
+    primaryLabel,
+    secondaryLabel,
+    onClose,
+    onConnect,
+    onDisconnect,
+  } = options
   const t = createTranslator(locale)
 
   return (
@@ -144,35 +145,30 @@ function McpSetupActions({
           {disconnectBusy ? t('mcp.setup.disconnecting') : secondaryLabel}
         </Button>
       ) : null}
-      <Button
-        type="button"
-        autoFocus
-        onClick={onConnect}
-        disabled={buttonsDisabled}
-        data-testid="mcp-setup-connect"
-      >
+      <Button type="button" autoFocus onClick={onConnect} disabled={buttonsDisabled} data-testid="mcp-setup-connect">
         {connectBusy ? t('mcp.setup.connecting') : primaryLabel}
       </Button>
     </DialogFooter>
   )
 }
 
-export function McpSetupDialog({
-  open,
-  status,
-  busyAction,
-  manualConfigError,
-  manualConfigLoading = false,
-  manualConfigSnippet,
-  opencodeManualConfigSnippet,
-  locale = 'en',
-  onClose,
-  onConnect,
-  onCopyManualConfig,
-  onCopyOpenCodeManualConfig,
-  onDisconnect,
-  onLoadManualConfig,
-}: McpSetupDialogProps) {
+export function McpSetupDialog(options: McpSetupDialogProps) {
+  const {
+    open,
+    status,
+    busyAction,
+    manualConfigError,
+    manualConfigLoading = false,
+    manualConfigSnippet,
+    opencodeManualConfigSnippet,
+    locale = 'en',
+    onClose,
+    onConnect,
+    onCopyManualConfig,
+    onCopyOpenCodeManualConfig,
+    onDisconnect,
+    onLoadManualConfig,
+  } = options
   const t = createTranslator(locale)
   const copy = actionCopy(status, t)
   const connectBusy = busyAction === 'connect'
@@ -184,7 +180,12 @@ export function McpSetupDialog({
   }, [open, onLoadManualConfig])
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
+      }}
+    >
       <DialogContent
         showCloseButton={false}
         className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-[520px]"
@@ -202,12 +203,8 @@ export function McpSetupDialog({
           className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 text-sm leading-6 text-muted-foreground"
           data-testid="mcp-setup-scroll-body"
         >
-          <p>
-            {t('mcp.setup.runtimeRequirement')}
-          </p>
-          <p>
-            {t('mcp.setup.writeEntryDescription', { entry: 'tolaria' })}
-          </p>
+          <p>{t('mcp.setup.runtimeRequirement')}</p>
+          <p>{t('mcp.setup.writeEntryDescription', { entry: 'tolaria' })}</p>
           <div className="rounded-md border border-border bg-muted/30 px-3 py-3 font-mono text-xs text-foreground">
             <div>~/.claude.json</div>
             <div>~/.claude/mcp.json</div>
@@ -241,12 +238,8 @@ export function McpSetupDialog({
               title={t('mcp.setup.manual.opencodeTitle')}
             />
           </div>
-          <p>
-            {t('mcp.setup.clientPathsDescription')}
-          </p>
-          <p>
-            {t('mcp.setup.geminiGuidanceDescription')}
-          </p>
+          <p>{t('mcp.setup.clientPathsDescription')}</p>
+          <p>{t('mcp.setup.geminiGuidanceDescription')}</p>
         </div>
 
         <McpSetupActions

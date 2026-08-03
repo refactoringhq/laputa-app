@@ -71,7 +71,7 @@ describe('BreadcrumbBar filename visibility', () => {
   it('offsets the editor-only breadcrumb title past the macOS traffic lights', () => {
     const editorCss = readFileSync(`${process.cwd()}/src/components/Editor.css`, 'utf8')
 
-    expect(editorCss).toContain('body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar')
+    expect(editorCss).toContain('body.mac-chrome .app:not(:has(.app__sidebar), :has(.app__note-list)) .breadcrumb-bar')
     expect(editorCss).toContain('--breadcrumb-bar-left-padding: var(--tolaria-macos-traffic-light-padding, 90px);')
   })
 

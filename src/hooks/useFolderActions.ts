@@ -16,18 +16,19 @@ interface UseFolderActionsInput {
   setToastMessage: (message: string | null) => void
 }
 
-export function useFolderActions({
-  vaultPath,
-  selection,
-  setSelection,
-  setTabs,
-  activeTabPathRef,
-  handleSwitchTab,
-  closeAllTabs,
-  reloadVault,
-  reloadFolders,
-  setToastMessage,
-}: UseFolderActionsInput) {
+export function useFolderActions(options: UseFolderActionsInput) {
+  const {
+    vaultPath,
+    selection,
+    setSelection,
+    setTabs,
+    activeTabPathRef,
+    handleSwitchTab,
+    closeAllTabs,
+    reloadVault,
+    reloadFolders,
+    setToastMessage,
+  } = options
   const renameActions = useFolderRename({
     activeTabPathRef,
     handleSwitchTab,

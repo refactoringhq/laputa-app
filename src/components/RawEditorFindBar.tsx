@@ -41,12 +41,7 @@ function selectMatch(view: EditorView, match: EditorFindMatch, focusEditor: bool
   if (focusEditor) view.focus()
 }
 
-function matchStatusText(
-  locale: AppLocale,
-  error: string | null,
-  activeIndex: number,
-  matchCount: number,
-): string {
+function matchStatusText(locale: AppLocale, error: string | null, activeIndex: number, matchCount: number): string {
   if (error === 'Invalid regex') return translate(locale, 'editor.find.invalidRegex')
   if (error) return translate(locale, 'editor.find.regexMustMatchText')
   if (matchCount === 0) return translate(locale, 'editor.find.noMatches')
@@ -85,10 +80,7 @@ function focusEditorOnNextFrame(viewRef: React.MutableRefObject<EditorView | nul
   requestAnimationFrame(() => viewRef.current?.focus())
 }
 
-function closeRawEditorFind(
-  onClose: () => void,
-  viewRef: React.MutableRefObject<EditorView | null>,
-): void {
+function closeRawEditorFind(onClose: () => void, viewRef: React.MutableRefObject<EditorView | null>): void {
   onClose()
   focusEditorOnNextFrame(viewRef)
 }
@@ -138,7 +130,10 @@ function replaceCurrentEditorFindMatch({
   const change = buildEditorFindReplacementChange(activeMatch, query, replacement, options)
   view.dispatch({
     changes: change,
-    selection: { anchor: change.from, head: change.from + change.insert.length },
+    selection: {
+      anchor: change.from,
+      head: change.from + change.insert.length,
+    },
     effects: EditorView.scrollIntoView(change.from, { y: 'center' }),
   })
   view.focus()
@@ -186,16 +181,10 @@ interface RawEditorFindController {
   toggleRegex: () => void
 }
 
-function useRawEditorFindController({
-  doc,
-  locale = 'en',
-  onClose,
-  onReplaceOpenChange,
-  open,
-  path,
-  request,
-  viewRef,
-}: Omit<RawEditorFindBarProps, 'replaceOpen'>): RawEditorFindController {
+function useRawEditorFindController(
+  functionOptions: Omit<RawEditorFindBarProps, 'replaceOpen'>,
+): RawEditorFindController {
+  const { doc, locale = 'en', onClose, onReplaceOpenChange, open, path, request, viewRef } = functionOptions
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [replacement, setReplacement] = useState('')
@@ -215,9 +204,12 @@ function useRawEditorFindController({
     selectActiveEditorFindMatch(viewRef, open, activeMatch)
   }, [activeMatch, open, viewRef])
 
-  const moveMatch = useCallback((direction: 1 | -1) => {
+  const moveMatch = useCallback(
+    (direction: 1 | -1) => {
     setActiveIndex((current) => nextEditorFindIndex(current, result.matches.length, direction))
-  }, [result.matches.length])
+    },
+    [result.matches.length],
+  )
   const movePrevious = useCallback(() => moveMatch(-1), [moveMatch])
   const moveNext = useCallback(() => moveMatch(1), [moveMatch])
   const handleFindChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,22 +219,33 @@ function useRawEditorFindController({
 
   const close = useCallback(() => closeRawEditorFind(onClose, viewRef), [onClose, viewRef])
 
-  const handleFindKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleFindKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
     handleRawEditorFindKeyDown(event, close, moveMatch)
-  }, [close, moveMatch])
+    },
+    [close, moveMatch],
+  )
 
   const replaceCurrent = useCallback(() => {
-    replaceCurrentEditorFindMatch({ activeMatch, options, query, replacement, viewRef })
+    replaceCurrentEditorFindMatch({
+      activeMatch,
+      options,
+      query,
+      replacement,
+      viewRef,
+    })
   }, [activeMatch, options, query, replacement, viewRef])
 
   const replaceAll = useCallback(() => {
-    if (replaceAllEditorFindMatches({
+    if (
+      replaceAllEditorFindMatches({
       matches: result.matches,
       options,
       query,
       replacement,
       viewRef,
-    })) {
+      })
+    ) {
       setActiveIndex(0)
     }
   }, [options, query, replacement, result.matches, viewRef])
@@ -289,32 +292,37 @@ type FindControlsProps = Pick<
   replaceOpen: boolean
 }
 
-function FindControls({
-  caseSensitive,
-  close,
-  findInputRef,
-  handleFindChange,
-  handleFindKeyDown,
-  hasMatches,
-  locale,
-  moveNext,
-  movePrevious,
-  onReplaceOpenChange,
-  query,
-  regex,
-  replaceOpen,
-  status,
-  toggleCaseSensitive,
-  toggleRegex,
-}: FindControlsProps) {
+function FindControls(options: FindControlsProps) {
+  const {
+    caseSensitive,
+    close,
+    findInputRef,
+    handleFindChange,
+    handleFindKeyDown,
+    hasMatches,
+    locale,
+    moveNext,
+    movePrevious,
+    onReplaceOpenChange,
+    query,
+    regex,
+    replaceOpen,
+    status,
+    toggleCaseSensitive,
+    toggleRegex,
+  } = options
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <Button
         type="button"
         variant="ghost"
         size="icon-xs"
-        aria-label={replaceOpen ? translate(locale, 'editor.find.hideReplace') : translate(locale, 'editor.find.showReplace')}
-        title={replaceOpen ? translate(locale, 'editor.find.hideReplace') : translate(locale, 'editor.find.showReplace')}
+        aria-label={
+          replaceOpen ? translate(locale, 'editor.find.hideReplace') : translate(locale, 'editor.find.showReplace')
+        }
+        title={
+          replaceOpen ? translate(locale, 'editor.find.hideReplace') : translate(locale, 'editor.find.showReplace')
+        }
         onClick={() => onReplaceOpenChange(!replaceOpen)}
       >
         <ChevronRight className={cn('transition-transform', replaceOpen && 'rotate-90')} />
@@ -421,22 +429,10 @@ function ReplaceControls({
         className="h-7 min-w-[12rem] flex-1 rounded px-2 text-xs"
         data-testid="raw-editor-replace-input"
       />
-      <Button
-        type="button"
-        variant="outline"
-        size="xs"
-        disabled={!hasMatches}
-        onClick={replaceCurrent}
-      >
+      <Button type="button" variant="outline" size="xs" disabled={!hasMatches} onClick={replaceCurrent}>
         {translate(locale, 'editor.find.replace')}
       </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="xs"
-        disabled={!hasMatches}
-        onClick={replaceAll}
-      >
+      <Button type="button" variant="outline" size="xs" disabled={!hasMatches} onClick={replaceAll}>
         {translate(locale, 'editor.find.replaceAll')}
       </Button>
     </div>

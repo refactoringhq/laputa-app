@@ -425,8 +425,7 @@ function handleMoveNoteToWorkspace(args: {
   return { new_path: newPath, updated_files: updatedFiles, failed_updates: 0 }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock handler map accepts heterogeneous arg types
-export const mockHandlers: Record<string, (args: any) => any> = {
+export const mockHandlers = {
   read_vault_snapshot: () => MOCK_ENTRIES,
   record_startup_milestone: ({ name, detail }: { name: string; detail?: number | null }) => ({
     name,
@@ -762,7 +761,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return 'Vault repaired'
   },
   reinit_telemetry: (): null => null,
-}
+} satisfies Record<string, (...args: never[]) => unknown>
 
 export function addMockEntry(_entry: VaultEntry, content: string): void {
   writeMockContent({ path: _entry.path, content })

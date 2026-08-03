@@ -893,7 +893,7 @@ The Inspector panel (`src/components/Inspector.tsx`) is composed of sub-panels:
 
 ## Search
 
-### Search
+### Keyword Search
 
 Keyword-based search scans all vault `.md` files using `walkdir` and applies the same Gitignored-content visibility filter as vault loading:
 
@@ -1055,7 +1055,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **`TelemetryConsentDialog`** — First-launch dialog asking user to opt in to anonymous crash reporting. Two buttons: accept (sets `telemetry_consent: true`, generates `anonymous_id`) or decline.
 - **`TelemetryToggle`** — Checkbox component in `SettingsPanel` for crash reporting and analytics toggles.
 
-### Hooks
+### Telemetry Hooks
 - **`useTelemetry(settings, loaded)`** — Reactively initializes/tears down Sentry and PostHog based on settings. Called once in `App`.
 
 ### Libraries
@@ -1072,14 +1072,14 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **Automatic update checks** — `automatic_update_checks_changed` records only whether startup/background update checks were enabled or disabled.
 - **All Notes visibility** — `all_notes_visibility_changed` records only the toggled category and enabled state.
 
-### Tauri Commands
+### Telemetry Commands
 - **`reinit_telemetry`** — Re-reads settings and toggles Rust Sentry on/off. Called from frontend when user changes crash reporting setting.
 
 ---
 
 ## Updates & Feature Flags
 
-### Hooks
+### Update Hooks
 - **`useUpdater(releaseChannel, automaticChecksEnabled)`** — Channel-aware updater state machine. When automatic checks are enabled, it checks the selected feed after startup; manual checks always remain available. It surfaces checking/available/downloading/ready states and delegates install work to Rust.
 - **`useFeatureFlag(flag)`** — Returns boolean for a named feature flag. Checks `localStorage` override (`ff_<name>`), then falls back to telemetry-backed evaluation. Type-safe via `FeatureFlagName` union.
 
@@ -1091,7 +1091,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **`src-tauri/src/app_updater.rs`** — Chooses the correct update endpoint and adapts Tauri updater results into frontend-friendly payloads. Stable uses the public `stable/latest.json` feed. Alpha resolves the most recently published non-draft `alpha-vYYYY.M.D-alpha.NNNN` GitHub Release asset named `alpha-latest.json`, then falls back to the public `alpha/latest.json` feed if the release lookup is unavailable. Normal updates require increasing semver; ADR-0173 adds one bounded exception for a future-poisoned calendar build to accept a candidate dated today or tomorrow.
 - **`src-tauri/src/commands/version.rs`** — Formats app build/version labels for the status bar, including calendar alpha labels and legacy release compatibility.
 
-### Tauri Commands
+### Update Commands
 - **`check_for_app_update`** — Channel-aware update manifest lookup.
 - **`download_and_install_app_update`** — Channel-aware download/install with streamed progress events.
 

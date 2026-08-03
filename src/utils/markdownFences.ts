@@ -20,8 +20,8 @@ function fencePrefixPattern(options: MarkdownFenceScanOptions): RegExp {
 
 function hasAllowedIndent(match: RegExpExecArray, options: MarkdownFenceScanOptions): boolean {
   if (options.maxLeadingSpaces === null) return true
-  const maximum = options.maxLeadingSpaces === undefined ? DEFAULT_MAX_LEADING_SPACES : options.maxLeadingSpaces
-  return (match.at(1)?.length || 0) <= maximum
+  const maximum = options.maxLeadingSpaces ?? DEFAULT_MAX_LEADING_SPACES
+  return (match.at(1)?.length ?? 0) <= maximum
 }
 
 function readFenceMatch(line: string, options: MarkdownFenceScanOptions): RegExpExecArray | null {
@@ -30,7 +30,7 @@ function readFenceMatch(line: string, options: MarkdownFenceScanOptions): RegExp
 }
 
 function fenceFromMatch(match: RegExpExecArray): MarkdownFence {
-  const fence = match.at(2) || ''
+  const fence = match.at(2) ?? ''
   return {
     character: fence.charAt(0) as MarkdownFenceCharacter,
     length: fence.length,

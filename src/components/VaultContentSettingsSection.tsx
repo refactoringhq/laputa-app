@@ -3,13 +3,7 @@ import type { TranslationKey, TranslationValues } from '../lib/i18n'
 import type { NoteWidthMode } from '../types'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import { DATE_DISPLAY_FORMATS, type DateDisplayFormat } from '../utils/dateDisplay'
-import {
-  SectionHeading,
-  SelectControl,
-  SettingsGroup,
-  SettingsRow,
-  SettingsSwitchRow,
-} from './SettingsControls'
+import { SectionHeading, SelectControl, SettingsGroup, SettingsRow, SettingsSwitchRow } from './SettingsControls'
 
 type Translate = (key: TranslationKey, values?: TranslationValues) => string
 
@@ -55,31 +49,29 @@ function buildDateDisplayOptions(t: Translate): Array<{ value: DateDisplayFormat
   }))
 }
 
-export function VaultContentSettingsSection({
-  t,
-  dateDisplayFormat,
-  setDateDisplayFormat,
-  defaultNoteWidth,
-  setDefaultNoteWidth,
-  sidebarTypePluralizationEnabled,
-  setSidebarTypePluralizationEnabled,
-  initialH1AutoRename,
-  setInitialH1AutoRename,
-  hideGitignoredFiles,
-  setHideGitignoredFiles,
-  allNotesFileVisibility,
-  setAllNotesFileVisibility,
-}: VaultContentSettingsSectionProps) {
+export function VaultContentSettingsSection(functionOptions: VaultContentSettingsSectionProps) {
+  const {
+    t,
+    dateDisplayFormat,
+    setDateDisplayFormat,
+    defaultNoteWidth,
+    setDefaultNoteWidth,
+    sidebarTypePluralizationEnabled,
+    setSidebarTypePluralizationEnabled,
+    initialH1AutoRename,
+    setInitialH1AutoRename,
+    hideGitignoredFiles,
+    setHideGitignoredFiles,
+    allNotesFileVisibility,
+    setAllNotesFileVisibility,
+  } = functionOptions
   const updateAllNotesFileVisibility = (patch: Partial<AllNotesFileVisibility>) => {
     setAllNotesFileVisibility({ ...allNotesFileVisibility, ...patch })
   }
 
   return (
     <>
-      <SectionHeading
-        icon={<Article size={16} aria-hidden="true" />}
-        title={t('settings.vaultContent.title')}
-      />
+      <SectionHeading icon={<Article size={16} aria-hidden="true" />} title={t('settings.vaultContent.title')} />
 
       <SettingsGroup>
         <SettingsRow
@@ -95,10 +87,7 @@ export function VaultContentSettingsSection({
           />
         </SettingsRow>
 
-        <SettingsRow
-          label={t('settings.noteWidth.default')}
-          description={t('settings.noteWidth.defaultDescription')}
-        >
+        <SettingsRow label={t('settings.noteWidth.default')} description={t('settings.noteWidth.defaultDescription')}>
           <SelectControl
             ariaLabel={t('settings.noteWidth.default')}
             value={defaultNoteWidth}

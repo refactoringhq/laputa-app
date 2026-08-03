@@ -46,7 +46,7 @@ function withoutMarkdownExtension(pathStem: WikilinkTarget): WikilinkTarget {
 export function relativePathStem(absolutePath: AbsoluteNotePath, vaultPath: VaultPath): WikilinkTarget {
   const normalizedAbsolutePath = normalizeFilesystemPath(absolutePath)
   const normalizedVaultPath = normalizeFilesystemPath(vaultPath)
-  const prefix = normalizedVaultPath.endsWith('/') ? normalizedVaultPath : normalizedVaultPath + '/'
+  const prefix = normalizedVaultPath.endsWith('/') ? normalizedVaultPath : `${normalizedVaultPath}/`
   if (normalizedAbsolutePath.toLowerCase().startsWith(prefix.toLowerCase())) {
     return withoutMarkdownExtension(normalizedAbsolutePath.slice(prefix.length))
   }

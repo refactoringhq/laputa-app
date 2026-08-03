@@ -4,11 +4,7 @@ import { notePathsMatch } from '../../utils/notePathIdentity'
 import { isExternalFormulaInput } from '../../utils/sheetExternalReferences'
 import { metadataCellAddress } from '../../utils/sheetMetadata'
 import { selectedCellIndexes } from '../../utils/sheetSelection'
-import {
-  resolveExternalFormulaInput,
-  SHEET_INDEX,
-  type SheetExternalFormulaContext,
-} from '../../utils/sheetWorkbook'
+import { resolveExternalFormulaInput, SHEET_INDEX, type SheetExternalFormulaContext } from '../../utils/sheetWorkbook'
 import { visibleSheetTextInput } from './sheetEditorHelpers'
 import type { ScheduleSheetSerializeOptions, SheetWorkbookState } from './sheetEditorTypes'
 import { isReleasedWorkbookModelError } from './sheetReleasedModel'
@@ -40,7 +36,10 @@ interface SheetTextInputTrackerRefs {
 
 type CommitSheetCellInput = (
   input: string,
-  options?: { allowPendingExternal?: boolean; target?: SheetCellInputTarget | null },
+  options?: {
+    allowPendingExternal?: boolean
+    target?: SheetCellInputTarget | null
+  },
 ) => boolean
 
 interface UseSheetCellInputCommitOptions {
@@ -99,17 +98,17 @@ function trackSheetTextInputEditForRefs(
   if (!input || !current) return null
   refs.committedTextInputRef.current = null
 
-  return trackedInputForExistingEdit(input, refs.textInputTargetRef.current)
-    ?? trackedInputForSelectedCell(input, current, refs.textInputTargetRef)
+  return (
+    trackedInputForExistingEdit(input, refs.textInputTargetRef.current) ??
+    trackedInputForSelectedCell(input, current, refs.textInputTargetRef)
+  )
 }
 
 function committedInputTarget(
   input: HTMLInputElement | HTMLTextAreaElement,
   committed: CommittedSheetTextInput | null,
 ): TrackedSheetTextInput | null {
-  return committed && input.value === committed.value
-    ? { ...committed, dirty: false, input }
-    : null
+  return committed && input.value === committed.value ? { ...committed, dirty: false, input } : null
 }
 
 function sheetTextInputTargetForRefs(
@@ -120,8 +119,10 @@ function sheetTextInputTargetForRefs(
   const existing = refs.textInputTargetRef.current
   if (existing && !existing.dirty) return existing
 
-  return committedInputTarget(input, refs.committedTextInputRef.current)
-    ?? (existing?.input === input ? existing : trackSheetTextInputEditForRefs(input, refs))
+  return (
+    committedInputTarget(input, refs.committedTextInputRef.current) ??
+    (existing?.input === input ? existing : trackSheetTextInputEditForRefs(input, refs))
+  )
 }
 
 function commitTrackedTextInput(
@@ -150,16 +151,33 @@ function useSheetTextInputTargetTracker(workbookRef: MutableRefObject<SheetWorkb
   const textInputTargetRef = useRef<TrackedSheetTextInput | null>(null)
   const committedTextInputRef = useRef<CommittedSheetTextInput | null>(null)
 
-  const trackSheetTextInputEdit = useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
-    return trackSheetTextInputEditForRefs(input, { committedTextInputRef, textInputTargetRef, workbookRef })
-  }, [workbookRef])
+  const trackSheetTextInputEdit = useCallback(
+    (input: HTMLInputElement | HTMLTextAreaElement | null) => {
+      return trackSheetTextInputEditForRefs(input, {
+        committedTextInputRef,
+        textInputTargetRef,
+        workbookRef,
+      })
+    },
+    [workbookRef],
+  )
 
-  const sheetTextInputTarget = useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
-    return sheetTextInputTargetForRefs(input, { committedTextInputRef, textInputTargetRef, workbookRef })
-  }, [workbookRef])
+  const sheetTextInputTarget = useCallback(
+    (input: HTMLInputElement | HTMLTextAreaElement | null) => {
+      return sheetTextInputTargetForRefs(input, {
+        committedTextInputRef,
+        textInputTargetRef,
+        workbookRef,
+      })
+    },
+    [workbookRef],
+  )
 
   const markSheetTextInputCommitted = useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
-    commitTrackedTextInput(input, { committedTextInputRef, textInputTargetRef })
+    commitTrackedTextInput(input, {
+      committedTextInputRef,
+      textInputTargetRef,
+    })
   }, [])
 
   const releaseSheetTextInputTarget = useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
@@ -187,7 +205,10 @@ function writeExternalFormulaInput(
   if (!externalFormula) {
     if (pendingLoads.length === 0) return { applied: false, pendingLoads }
     current.model.setUserInput(SHEET_INDEX, row, column, input)
-    current.externalFormulaInputs.set(address, { evaluated: input, source: input })
+    current.externalFormulaInputs.set(address, {
+      evaluated: input,
+      source: input,
+    })
     return { applied: true, pendingLoads }
   }
 
@@ -236,12 +257,16 @@ function retryCommitAfterLoads({
   })
 }
 
-function useCellInputWriter(buildLiveExternalFormulaContext: UseSheetCellInputCommitOptions['buildLiveExternalFormulaContext']) {
-  return useCallback((current: SheetWorkbookState, row: number, column: number, input: string) => (
+function useCellInputWriter(
+  buildLiveExternalFormulaContext: UseSheetCellInputCommitOptions['buildLiveExternalFormulaContext'],
+) {
+  return useCallback(
+    (current: SheetWorkbookState, row: number, column: number, input: string) =>
     isExternalFormulaInput(input)
       ? writeExternalFormulaInput(current, row, column, input, buildLiveExternalFormulaContext)
-      : writePlainCellInput(current, row, column, input)
-  ), [buildLiveExternalFormulaContext])
+        : writePlainCellInput(current, row, column, input),
+    [buildLiveExternalFormulaContext],
+  )
 }
 
 function useCommitCellInputAt({
@@ -251,7 +276,8 @@ function useCommitCellInputAt({
   scheduleSerialize,
   workbookRef,
   writeCellInputAt,
-}: Pick<UseSheetCellInputCommitOptions,
+}: Pick<
+  UseSheetCellInputCommitOptions,
   | 'pendingExternalFormulaCommitRef'
   | 'refreshWorkbook'
   | 'scheduleSelectionChromePatch'
@@ -262,7 +288,8 @@ function useCommitCellInputAt({
 }) {
   const commitCellInputAtRef = useRef<(row: number, column: number, input: string) => boolean>(() => false)
 
-  const commitCellInputAt = useCallback((row: number, column: number, input: string) => {
+  const commitCellInputAt = useCallback(
+    (row: number, column: number, input: string) => {
     const current = workbookRef.current
     if (!current) return false
 
@@ -284,14 +311,16 @@ function useCommitCellInputAt({
       })
     }
     return true
-  }, [
+    },
+    [
     pendingExternalFormulaCommitRef,
     refreshWorkbook,
     scheduleSelectionChromePatch,
     scheduleSerialize,
     workbookRef,
     writeCellInputAt,
-  ])
+    ],
+  )
 
   useEffect(() => {
     commitCellInputAtRef.current = commitCellInputAt
@@ -306,15 +335,21 @@ function useCommitSelectedCellInput({
   commitCellInputAtRef,
   pendingExternalFormulaCommitRef,
   workbookRef,
-}: Pick<UseSheetCellInputCommitOptions,
-  | 'buildLiveExternalFormulaContext'
-  | 'pendingExternalFormulaCommitRef'
-  | 'workbookRef'
+}: Pick<
+  UseSheetCellInputCommitOptions,
+  'buildLiveExternalFormulaContext' | 'pendingExternalFormulaCommitRef' | 'workbookRef'
 > & {
   commitCellInputAt: (row: number, column: number, input: string) => boolean
   commitCellInputAtRef: MutableRefObject<(row: number, column: number, input: string) => boolean>
 }) {
-  return useCallback((input: string, options: { allowPendingExternal?: boolean; target?: SheetCellInputTarget | null } = {}) => {
+  return useCallback(
+    (
+      input: string,
+      options: {
+        allowPendingExternal?: boolean
+        target?: SheetCellInputTarget | null
+      } = {},
+    ) => {
     const current = workbookRef.current
     if (!current) return false
     const cell = options.target ?? selectedCellInputTarget(current)
@@ -336,7 +371,15 @@ function useCommitSelectedCellInput({
       row: cell.row,
     })
     return true
-  }, [buildLiveExternalFormulaContext, commitCellInputAt, commitCellInputAtRef, pendingExternalFormulaCommitRef, workbookRef])
+    },
+    [
+      buildLiveExternalFormulaContext,
+      commitCellInputAt,
+      commitCellInputAtRef,
+      pendingExternalFormulaCommitRef,
+      workbookRef,
+    ],
+  )
 }
 
 function useExternalFormulaEditorCommit(
@@ -344,7 +387,8 @@ function useExternalFormulaEditorCommit(
   markSheetTextInputCommitted: (input: HTMLInputElement | HTMLTextAreaElement | null) => void,
   sheetTextInputTarget: (input: HTMLInputElement | HTMLTextAreaElement | null) => SheetCellInputTarget | null,
 ) {
-  return useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
+  return useCallback(
+    (input: HTMLInputElement | HTMLTextAreaElement | null) => {
     if (!input || !isExternalFormulaInput(input.value)) return false
     const committed = commitSelectedCellInput(input.value, {
       allowPendingExternal: true,
@@ -352,13 +396,17 @@ function useExternalFormulaEditorCommit(
     })
     if (committed) markSheetTextInputCommitted(input)
     return committed
-  }, [commitSelectedCellInput, markSheetTextInputCommitted, sheetTextInputTarget])
+    },
+    [commitSelectedCellInput, markSheetTextInputCommitted, sheetTextInputTarget],
+  )
 }
 
 function selectedCellInputSource(current: SheetWorkbookState, target: SheetCellInputTarget): string {
   const address = metadataCellAddress(target.row, target.column)
-  return current.externalFormulaInputs.get(address)?.source
-    ?? current.model.getCellContent(SHEET_INDEX, target.row, target.column)
+  return (
+    current.externalFormulaInputs.get(address)?.source ??
+    current.model.getCellContent(SHEET_INDEX, target.row, target.column)
+  )
 }
 
 function useSheetTextInputCommit({
@@ -371,7 +419,8 @@ function useSheetTextInputCommit({
   markSheetTextInputCommitted: (input: HTMLInputElement | HTMLTextAreaElement | null) => void
   sheetTextInputTarget: (input: HTMLInputElement | HTMLTextAreaElement | null) => SheetCellInputTarget | null
 }) {
-  return useCallback((input: HTMLInputElement | HTMLTextAreaElement | null) => {
+  return useCallback(
+    (input: HTMLInputElement | HTMLTextAreaElement | null) => {
     const current = workbookRef.current
     if (!input || !current) return false
     const target = sheetTextInputTarget(input)
@@ -387,7 +436,9 @@ function useSheetTextInputCommit({
     })
     if (committed) markSheetTextInputCommitted(input)
     return committed
-  }, [commitSelectedCellInput, markSheetTextInputCommitted, sheetTextInputTarget, workbookRef])
+    },
+    [commitSelectedCellInput, markSheetTextInputCommitted, sheetTextInputTarget, workbookRef],
+  )
 }
 
 function useFlushCurrentSheetContent({
@@ -398,17 +449,15 @@ function useFlushCurrentSheetContent({
   serializeCurrentWorkbook,
   sheetElementRef,
   workbookRef,
-}: Pick<UseSheetCellInputCommitOptions,
-  | 'cancelScheduledSerialize'
-  | 'flushContentRef'
-  | 'serializeCurrentWorkbook'
-  | 'sheetElementRef'
-  | 'workbookRef'
+}: Pick<
+  UseSheetCellInputCommitOptions,
+  'cancelScheduledSerialize' | 'flushContentRef' | 'serializeCurrentWorkbook' | 'sheetElementRef' | 'workbookRef'
 > & {
   commitExternalFormulaEditorInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
   commitSheetTextInput: (input: HTMLInputElement | HTMLTextAreaElement | null) => boolean
 }) {
-  const flushCurrentSheetContent = useCallback((targetPath?: string) => {
+  const flushCurrentSheetContent = useCallback(
+    (targetPath?: string) => {
     const current = workbookRef.current
     if (!current) return false
     if (targetPath && !notePathsMatch(targetPath, current.path)) return false
@@ -419,14 +468,16 @@ function useFlushCurrentSheetContent({
     }
     cancelScheduledSerialize()
     return serializeCurrentWorkbook(current.generation)
-  }, [
+    },
+    [
     cancelScheduledSerialize,
     commitExternalFormulaEditorInput,
     commitSheetTextInput,
     serializeCurrentWorkbook,
     sheetElementRef,
     workbookRef,
-  ])
+    ],
+  )
 
   useEffect(() => {
     if (!flushContentRef) return
@@ -440,25 +491,22 @@ function useFlushCurrentSheetContent({
   return flushCurrentSheetContent
 }
 
-export function useSheetCellInputCommit({
-  buildLiveExternalFormulaContext,
-  cancelScheduledSerialize,
-  flushContentRef,
-  pendingExternalFormulaCommitRef,
-  refreshWorkbook,
-  scheduleSelectionChromePatch,
-  scheduleSerialize,
-  serializeCurrentWorkbook,
-  sheetElementRef,
-  workbookRef,
-}: UseSheetCellInputCommitOptions) {
-  const writeCellInputAt = useCellInputWriter(buildLiveExternalFormulaContext)
+export function useSheetCellInputCommit(options: UseSheetCellInputCommitOptions) {
   const {
-    markSheetTextInputCommitted,
-    releaseSheetTextInputTarget,
-    sheetTextInputTarget,
-    trackSheetTextInputEdit,
-  } = useSheetTextInputTargetTracker(workbookRef)
+    buildLiveExternalFormulaContext,
+    cancelScheduledSerialize,
+    flushContentRef,
+    pendingExternalFormulaCommitRef,
+    refreshWorkbook,
+    scheduleSelectionChromePatch,
+    scheduleSerialize,
+    serializeCurrentWorkbook,
+    sheetElementRef,
+    workbookRef,
+  } = options
+  const writeCellInputAt = useCellInputWriter(buildLiveExternalFormulaContext)
+  const { markSheetTextInputCommitted, releaseSheetTextInputTarget, sheetTextInputTarget, trackSheetTextInputEdit } =
+    useSheetTextInputTargetTracker(workbookRef)
   const { commitCellInputAt, commitCellInputAtRef } = useCommitCellInputAt({
     pendingExternalFormulaCommitRef,
     refreshWorkbook,

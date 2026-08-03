@@ -81,7 +81,8 @@ class RelationshipArrayField {
   }
 
   equals(targetValue: ConditionText): boolean {
-    return this.links.length === 1 && this.links[0]?.equals(new WikilinkValue(targetValue)) === true
+    const [onlyLink] = this.links
+    return this.links.length === 1 && Boolean(onlyLink.equals(new WikilinkValue(targetValue)))
   }
 
   matchesAny(targets: ConditionText[] | null): boolean {

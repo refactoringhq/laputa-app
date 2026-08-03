@@ -92,7 +92,9 @@ function nearestParent(stack: TocItem[], level: TocLevel): TocItem {
     const item = stack.at(index)
     if (item && item.level < level) return item
   }
-  return stack.at(0)!
+  const root = stack.at(0)
+  if (!root) throw new Error('Table of contents stack must contain a root item')
+  return root
 }
 
 function appendTocHeading(stack: TocItem[], item: TocItem) {
@@ -116,7 +118,8 @@ function visibleHeadingsForEntry(entryTitle: string, headings: MarkdownHeading[]
       level: heading.level,
       headingIndex: index,
     })) {
-      return { ...result, titleBlockId: heading.blockId }
+      result.titleBlockId = heading.blockId
+      return result
     }
     result.headings.push(heading)
     return result
@@ -192,9 +195,12 @@ function closesCodeFence(line: string, codeFence: MarkdownCodeFence): boolean {
 function parseMarkdownHeading(line: string): MarkdownHeading | null {
   const match = line.match(/^(#{1,3})\s+(.+?)\s*#*\s*$/)
   if (!match) return null
-  const title = stripInlineMarkdown({ text: match.at(2)! })
+  const marker = match.at(1)
+  const headingText = match.at(2)
+  if (!marker || !headingText) return null
+  const title = stripInlineMarkdown({ text: headingText })
   return title.length > 0
-    ? { level: match.at(1)!.length as TocLevel, title }
+    ? { level: marker.length as TocLevel, title }
     : null
 }
 

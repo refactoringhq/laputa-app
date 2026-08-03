@@ -33,7 +33,7 @@ interface PointerMenuEvent {
 interface SidebarInlineRenameInputOptions {
   initialValue: string
   onCancel: () => void
-  onSubmit: (value: string) => Promise<boolean> | boolean | void
+  onSubmit: (value: string) => Promise<boolean> | boolean | undefined
   selectTextOnFocus?: boolean
 }
 

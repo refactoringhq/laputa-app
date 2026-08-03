@@ -382,8 +382,7 @@ export function useCodeMirror(
     const view = new EditorView({ state, parent })
     viewRef.current = view
     // Expose EditorView on the parent DOM for Playwright test access
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(parent as any).__cmView = view
+    Reflect.set(parent, '__cmView', view)
 
     // When CSS zoom changes on the document, CodeMirror's cached measurements
     // (scaleX/scaleY, line heights, character widths) become stale because
@@ -394,8 +393,7 @@ export function useCodeMirror(
 
     return () => {
       window.removeEventListener('laputa-zoom-change', handleZoomChange)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (parent as any).__cmView
+      Reflect.deleteProperty(parent, '__cmView')
       view.destroy()
       viewRef.current = null
     }

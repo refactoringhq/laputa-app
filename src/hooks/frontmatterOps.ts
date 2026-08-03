@@ -216,10 +216,13 @@ async function loadMockContent(path: VaultPath): Promise<MarkdownContent> {
 async function persistMockContent(path: VaultPath, content: MarkdownContent): Promise<void> {
   try {
     await mockInvoke('save_note_content', { path, content })
-  } finally {
+  } catch (error) {
     updateMockContent(path, content)
     trackMockChange(path)
+    throw error
   }
+  updateMockContent(path, content)
+  trackMockChange(path)
 }
 
 function applyMockFrontmatterUpdate(path: VaultPath, key: FrontmatterKey, value: FrontmatterValue): MarkdownContent {
@@ -239,9 +242,13 @@ async function executeMockFrontmatterOp(
   value?: FrontmatterValue,
 ): Promise<MarkdownContent> {
   seedMockContent(path, await loadMockContent(path))
-  const content = op === 'update'
-    ? applyMockFrontmatterUpdate(path, key, value!)
-    : applyMockFrontmatterDelete(path, key)
+  let content: MarkdownContent
+  if (op === 'update') {
+    if (value === undefined) throw new Error('A frontmatter update requires a value')
+    content = applyMockFrontmatterUpdate(path, key, value)
+  } else {
+    content = applyMockFrontmatterDelete(path, key)
+  }
   await persistMockContent(path, content)
   return content
 }

@@ -12,11 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { AiAgentId } from '../lib/aiAgents'
-import {
-  modelOptionsForAgent,
-  type AiAgentModelCatalog,
-  type AiAgentModelOption,
-} from '../lib/aiAgentModels'
+import { modelOptionsForAgent, type AiAgentModelCatalog, type AiAgentModelOption } from '../lib/aiAgentModels'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AiWorkspaceTargetGroups } from './aiWorkspaceTargetGroups'
 import { AiAgentIcon } from './AiAgentIcon'
@@ -80,7 +76,9 @@ function DirectTargetGroup({ label, targets }: { label: string; targets: AiTarge
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {targets.map((target) => (
         <DropdownMenuRadioItem key={target.id} value={choiceValue(target.id, null)}>
-          <span className="truncate" title={target.label}>{target.label}</span>
+          <span className="truncate" title={target.label}>
+            {target.label}
+          </span>
         </DropdownMenuRadioItem>
       ))}
     </>
@@ -103,7 +101,7 @@ function selectedModelPresentation(
   const modelLabel = selectedModel?.label ?? translate(locale, 'ai.workspace.modelDefault')
   return {
     accessibleLabel: `${translate(locale, 'ai.workspace.targetLabel')}: ${selectedTarget.label}, ${translate(locale, 'ai.workspace.modelLabel')}: ${modelLabel}`,
-    label: selectedModelId ? selectedModel?.label ?? selectedTarget.shortLabel : selectedTarget.shortLabel,
+    label: selectedModelId ? (selectedModel?.label ?? selectedTarget.shortLabel) : selectedTarget.shortLabel,
   }
 }
 
@@ -148,7 +146,9 @@ function AgentTargetGroups({
   defaultLabel: string
   targets: AiTarget[]
 }) {
-  return targets.map((target, index) => target.kind === 'agent' && (
+  return targets.map(
+    (target, index) =>
+      target.kind === 'agent' && (
     <Fragment key={target.id}>
       {index > 0 && <DropdownMenuSeparator />}
       <DropdownMenuLabel className="flex items-center gap-2">
@@ -161,11 +161,14 @@ function AgentTargetGroups({
           value={choiceValue(target.id, model.id)}
           aria-label={`${target.label}, ${model.label}`}
         >
-          <span className="truncate" title={model.label}>{model.label}</span>
+              <span className="truncate" title={model.label}>
+                {model.label}
+              </span>
         </DropdownMenuRadioItem>
       ))}
     </Fragment>
-  ))
+      ),
+  )
 }
 
 function selectTargetModelChoice({
@@ -196,30 +199,33 @@ function selectedChoiceValue(selectedTarget: AiTarget, selectedModelId: string):
   return choiceValue(selectedTarget.id, modelId)
 }
 
-export function AiTargetModelPicker({
-  catalog,
-  catalogReady,
-  disabled,
-  groups,
-  locale,
-  modelOptions,
-  onSelectAgentModel,
-  onSelectTarget,
-  selectedModelId,
-  selectedTarget,
-  side,
-}: AiTargetModelPickerProps) {
+export function AiTargetModelPicker(options: AiTargetModelPickerProps) {
+  const {
+    catalog,
+    catalogReady,
+    disabled,
+    groups,
+    locale,
+    modelOptions,
+    onSelectAgentModel,
+    onSelectTarget,
+    selectedModelId,
+    selectedTarget,
+    side,
+  } = options
   const defaultLabel = translate(locale, 'ai.workspace.modelDefault')
   const choices = targetModelChoices(groups, catalog, defaultLabel)
   const presentation = selectedModelPresentation(locale, modelOptions, selectedModelId, selectedTarget)
   const selectedValue = selectedChoiceValue(selectedTarget, selectedModelId)
-  const handleChange = (value: string) => selectTargetModelChoice({
+  const handleChange = (value: string) => {
+    selectTargetModelChoice({
     choices,
     onSelectAgentModel,
     onSelectTarget,
     selectedTargetId: selectedTarget.id,
     value,
   })
+  }
 
   return (
     <DropdownMenu>

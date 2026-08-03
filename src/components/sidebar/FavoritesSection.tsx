@@ -1,11 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import type { VaultEntry, SidebarSelection } from '../../types'
-import {
-  DndContext, PointerSensor, closestCenter, type DragEndEvent, useSensor, useSensors,
-} from '@dnd-kit/core'
-import {
-  SortableContext, arrayMove, useSortable, verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { DndContext, PointerSensor, closestCenter, type DragEndEvent, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { buildTypeEntryMap, getTypeColor, getTypeLightColor } from '../../utils/typeColors'
 import { NoteTitleIcon } from '../NoteTitleIcon'
@@ -58,19 +54,31 @@ function SortableFavoriteItem({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
       {...attributes}
       {...listeners}
     >
       <button
         type="button"
         className={`group/section flex cursor-pointer select-none items-center justify-between rounded transition-colors ${isActive ? '' : 'hover:bg-accent'} w-full`}
-        style={{ padding: SIDEBAR_ITEM_PADDING.withCount, borderRadius: 4, gap: 4, ...(isActive ? { background: typeLightColor } : {}) }}
+        style={{
+          padding: SIDEBAR_ITEM_PADDING.withCount,
+          borderRadius: 4,
+          gap: 4,
+          ...(isActive ? { background: typeLightColor } : {}),
+        }}
         onClick={onSelect}
       >
         <div className="flex min-w-0 flex-1 items-center" style={{ gap: 4 }}>
           <NoteTitleIcon icon={icon} size={16} color={typeColor} />
-          <span className="min-w-0 truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium" style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}>
+          <span
+            className="min-w-0 truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium"
+            style={{ marginLeft: 4, color: isActive ? typeColor : undefined }}
+          >
             {entry.title}
           </span>
         </div>
@@ -105,49 +113,62 @@ interface FavoritesSectionProps {
   onToggle: () => void
 }
 
-export function FavoritesSection({
-  entries,
-  selection,
-  onSelect,
-  onSelectNote,
-  onReorder,
-  collapsed,
-  locale = 'en',
-  onToggle,
-}: FavoritesSectionProps) {
+export function FavoritesSection(options: FavoritesSectionProps) {
+  const { entries, selection, onSelect, onSelectNote, onReorder, collapsed, locale = 'en', onToggle } = options
   const favorites = useMemo(() => sortFavorites(entries), [entries])
   const favoriteIds = useMemo(() => favorites.map((entry) => entry.path), [favorites])
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
     const reordered = reorderFavoriteIds(favoriteIds, event)
     if (reordered) onReorder?.(reordered)
-  }, [favoriteIds, onReorder])
+    },
+    [favoriteIds, onReorder],
+  )
 
-  const handleFavoriteSelect = useCallback((entry: VaultEntry) => {
+  const handleFavoriteSelect = useCallback(
+    (entry: VaultEntry) => {
     if (onSelectNote) {
       void onSelectNote(entry)
       return
     }
 
     onSelect({ kind: 'filter', filter: 'favorites' })
-  }, [onSelect, onSelectNote])
+    },
+    [onSelect, onSelectNote],
+  )
 
   if (favorites.length === 0) return null
 
   return (
     <div style={{ padding: '0 6px' }}>
-      <SidebarGroupHeader label={translate(locale, 'sidebar.group.favorites')} collapsed={collapsed} onToggle={onToggle} count={favorites.length} />
+      <SidebarGroupHeader
+        label={translate(locale, 'sidebar.group.favorites')}
+        collapsed={collapsed}
+        onToggle={onToggle}
+        count={favorites.length}
+      />
       {!collapsed && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={favoriteIds} strategy={verticalListSortingStrategy}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingBottom: SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                paddingBottom: SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM,
+              }}
+            >
               {favorites.map((entry) => (
                 <SortableFavoriteItem
                   key={entry.path}
                   entry={entry}
-                  isActive={isSelectionActive(selection, { kind: 'entity', entry })}
+                  isActive={isSelectionActive(selection, {
+                    kind: 'entity',
+                    entry,
+                  })}
                   typeEntryMap={typeEntryMap}
                   onSelect={() => handleFavoriteSelect(entry)}
                 />

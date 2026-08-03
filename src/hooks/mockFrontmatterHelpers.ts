@@ -21,7 +21,7 @@ function canonicalWriteKey(key: FrontmatterKey): FrontmatterKey {
 }
 
 function formatYamlValue(value: FrontmatterValue): YamlValue {
-  if (Array.isArray(value)) return '\n' + value.map(v => `  - "${v}"`).join('\n')
+  if (Array.isArray(value)) return `\n${value.map(v => `  - "${v}"`).join('\n')}`
   if (typeof value === 'boolean') return value ? 'true' : 'false'
   if (value === null) return 'null'
   return String(value)

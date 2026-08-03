@@ -1,17 +1,5 @@
-import {
-  useBlockNoteEditor,
-  useComponentsContext,
-  useDictionary,
-  type SuggestionMenuProps,
-} from '@blocknote/react'
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react'
+import { useBlockNoteEditor, useComponentsContext, useDictionary, type SuggestionMenuProps } from '@blocknote/react'
+import { useCallback, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './ui/button'
 import type { TolariaSlashMenuItem } from './tolariaEditorFormattingConfig'
@@ -22,11 +10,7 @@ interface OpenSubmenu {
   top: number
 }
 
-type SubmenuKeyboardAction =
-  | { kind: 'close' }
-  | { kind: 'move'; delta: number }
-  | { kind: 'open' }
-  | { kind: 'select' }
+type SubmenuKeyboardAction = { kind: 'close' } | { kind: 'move'; delta: number } | { kind: 'open' } | { kind: 'select' }
 
 function stopMenuKeyboardEvent(event: KeyboardEvent) {
   event.preventDefault()
@@ -55,7 +39,7 @@ function selectSubmenuAction(key: string): SubmenuKeyboardAction | null {
 }
 
 function submenuForKey(items: TolariaSlashMenuItem[], key?: string) {
-  return items.find(item => item.key === key)?.submenuItems ?? []
+  return items.find((item) => item.key === key)?.submenuItems ?? []
 }
 
 function submenuKeyboardAction({
@@ -70,20 +54,13 @@ function submenuKeyboardAction({
   const openAction = openSubmenuAction(key, canOpen)
   if (openAction) return openAction
   if (!isOpen) return null
-  return [closeSubmenuAction(key), moveSubmenuAction(key), selectSubmenuAction(key)]
-    .find((action) => action !== null) ?? null
+  return (
+    [closeSubmenuAction(key), moveSubmenuAction(key), selectSubmenuAction(key)].find((action) => action !== null) ??
+    null
+  )
 }
 
-function applySubmenuKeyboardAction({
-  action,
-  onItemClick,
-  openItemSubmenu,
-  selectedItem,
-  setOpenSubmenu,
-  setSubmenuIndex,
-  submenuIndex,
-  submenuItems,
-}: {
+function applySubmenuKeyboardAction(options: {
   action: SubmenuKeyboardAction
   onItemClick: SuggestionMenuProps<TolariaSlashMenuItem>['onItemClick']
   openItemSubmenu: (item: TolariaSlashMenuItem) => void
@@ -93,12 +70,22 @@ function applySubmenuKeyboardAction({
   submenuIndex: number
   submenuItems: TolariaSlashMenuItem[]
 }) {
+  const {
+    action,
+    onItemClick,
+    openItemSubmenu,
+    selectedItem,
+    setOpenSubmenu,
+    setSubmenuIndex,
+    submenuIndex,
+    submenuItems,
+  } = options
   switch (action.kind) {
     case 'close':
       setOpenSubmenu(null)
       break
     case 'move':
-      setSubmenuIndex(current => nextWrappedIndex(current, action.delta, submenuItems.length))
+      setSubmenuIndex((current) => nextWrappedIndex(current, action.delta, submenuItems.length))
       break
     case 'open':
       if (selectedItem) openItemSubmenu(selectedItem)
@@ -179,8 +166,10 @@ export function TolariaSlashMenu({
     nodes.push(
       <div
         key={item.key}
-        onMouseEnter={() => openItemSubmenu(item)}
-        ref={element => {
+        onMouseEnter={() => {
+          openItemSubmenu(item)
+        }}
+        ref={(element) => {
           if (element) itemElements.current.set(item.key, element)
           else itemElements.current.delete(item.key)
         }}
@@ -190,16 +179,18 @@ export function TolariaSlashMenu({
           id={`bn-suggestion-menu-item-${index}`}
           isSelected={index === selectedIndex}
           item={item}
-          onClick={() => item.submenuItems?.length ? openItemSubmenu(item) : onItemClick?.(item)}
+          onClick={() => {
+            if (item.submenuItems?.length) openItemSubmenu(item)
+            else onItemClick?.(item)
+          }}
         />
       </div>,
     )
     return nodes
   })
 
-  const loader = loadingState === 'loaded'
-    ? null
-    : <Components.SuggestionMenu.Loader className="bn-suggestion-menu-loader" />
+  const loader =
+    loadingState === 'loaded' ? null : <Components.SuggestionMenu.Loader className="bn-suggestion-menu-loader" />
 
   return (
     <>
@@ -212,31 +203,37 @@ export function TolariaSlashMenu({
         )}
         {loader}
       </Components.SuggestionMenu.Root>
-      {openSubmenu && submenuItems.length > 0 && createPortal(
-        <div
-          aria-label={items.find(item => item.key === openSubmenu.key)?.title}
-          className="tolaria-slash-menu__submenu"
-          role="menu"
-          style={{ left: openSubmenu.left, top: openSubmenu.top }}
-        >
-          {submenuItems.map((item, index) => (
-            <Button
-              aria-selected={index === submenuIndex}
-              className="tolaria-slash-menu__submenu-item"
-              key={item.key}
-              onClick={() => onItemClick?.(item)}
-              onMouseDown={event => event.preventDefault()}
-              onMouseEnter={() => setSubmenuIndex(index)}
-              role="menuitem"
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              {item.icon}
-              <span>{item.title}</span>
-            </Button>
-          ))}
-        </div>,
+      {openSubmenu &&
+        submenuItems.length > 0 &&
+        createPortal(
+          <div
+            aria-label={items.find((item) => item.key === openSubmenu.key)?.title}
+            className="tolaria-slash-menu__submenu"
+            role="menu"
+            style={{ left: openSubmenu.left, top: openSubmenu.top }}
+          >
+            {submenuItems.map((item, index) => (
+              <Button
+                aria-selected={index === submenuIndex}
+                className="tolaria-slash-menu__submenu-item"
+                key={item.key}
+                onClick={() => onItemClick?.(item)}
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                }}
+                onMouseEnter={() => {
+                  setSubmenuIndex(index)
+                }}
+                role="menuitem"
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                {item.icon}
+                <span>{item.title}</span>
+              </Button>
+            ))}
+          </div>,
         document.body,
       )}
     </>

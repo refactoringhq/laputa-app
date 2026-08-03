@@ -82,7 +82,7 @@ function openWindowItem(
   return [{
     icon: ArrowSquareOut,
     label: translate(locale, 'command.note.openNewWindow'),
-    onSelect: () => selectAction('open_new_window', () => onOpenInNewWindow(entry)),
+    onSelect: () => { selectAction('open_new_window', () => { onOpenInNewWindow(entry); }); },
     shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteOpenInNewWindow),
   }]
 }
@@ -98,7 +98,7 @@ function favoriteItem(
     icon: Star,
     iconWeight: entry.favorite ? 'fill' as const : 'regular' as const,
     label: translate(locale, entry.favorite ? 'command.note.removeFavorite' : 'command.note.addFavorite'),
-    onSelect: () => selectAction('toggle_favorite', () => onToggleFavorite(entry.path)),
+    onSelect: () => { selectAction('toggle_favorite', () => { onToggleFavorite(entry.path); }); },
     shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleFavorite),
   }]
 }
@@ -114,7 +114,7 @@ function organizedItem(
     icon: CheckCircle,
     iconWeight: entry.organized ? 'fill' as const : 'regular' as const,
     label: translate(locale, entry.organized ? 'command.note.markUnorganized' : 'command.note.markOrganized'),
-    onSelect: () => selectAction('toggle_organized', () => onToggleOrganized(entry.path)),
+    onSelect: () => { selectAction('toggle_organized', () => { onToggleOrganized(entry.path); }); },
     shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteToggleOrganized),
   }]
 }
@@ -129,7 +129,7 @@ function renameItem(
   return [{
     icon: PencilSimple,
     label: translate(locale, 'noteList.context.renameNote'),
-    onSelect: () => selectAction('rename_filename', () => onRequestRename(entry)),
+    onSelect: () => { selectAction('rename_filename', () => { onRequestRename(entry); }); },
   }]
 }
 
@@ -143,7 +143,7 @@ function neighborhoodItem(
   return [{
     icon: MapTrifold,
     label: translate(locale, 'editor.toolbar.openNeighborhood'),
-    onSelect: () => selectAction('open_neighborhood', () => onEnterNeighborhood(entry)),
+    onSelect: () => { selectAction('open_neighborhood', () => { onEnterNeighborhood(entry); }); },
   }]
 }
 
@@ -157,7 +157,7 @@ function revealFileItem(
   return [{
     icon: FolderOpen,
     label: translate(locale, 'editor.toolbar.revealFile'),
-    onSelect: () => selectAction('reveal_file', () => onRevealFile(entry.path)),
+    onSelect: () => { selectAction('reveal_file', () => { onRevealFile(entry.path); }); },
   }]
 }
 
@@ -171,7 +171,7 @@ function copyFilePathItem(
   return [{
     icon: ClipboardText,
     label: translate(locale, 'editor.toolbar.copyFilePath'),
-    onSelect: () => selectAction('copy_file_path', () => onCopyFilePath(entry.path)),
+    onSelect: () => { selectAction('copy_file_path', () => { onCopyFilePath(entry.path); }); },
   }]
 }
 
@@ -186,7 +186,7 @@ function copyGitUrlItem(
   return [{
     icon: GitBranch,
     label: translate(locale, 'editor.toolbar.copyNoteGitUrl'),
-    onSelect: () => selectAction('copy_git_url', () => onCopyGitUrl(entry)),
+    onSelect: () => { selectAction('copy_git_url', () => { onCopyGitUrl(entry); }); },
   }]
 }
 
@@ -200,7 +200,7 @@ function exportPdfItem(
   return [{
     icon: FilePdf,
     label: translate(locale, 'editor.toolbar.exportPdf'),
-    onSelect: () => selectAction('export_pdf', () => onExportPdf(entry)),
+    onSelect: () => { selectAction('export_pdf', () => { onExportPdf(entry); }); },
     shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteExportPdf),
   }]
 }
@@ -215,7 +215,7 @@ function archiveItem(
   return [{
     icon: Archive,
     label: translate(locale, 'editor.toolbar.archive'),
-    onSelect: () => selectAction('archive', () => onArchivePaths([entry.path])),
+    onSelect: () => { selectAction('archive', () => { onArchivePaths([entry.path]); }); },
   }]
 }
 
@@ -230,7 +230,7 @@ function deleteItem(
     destructive: true,
     icon: Trash,
     label: translate(locale, 'editor.toolbar.delete'),
-    onSelect: () => selectAction('delete', () => onDeletePaths([entry.path])),
+    onSelect: () => { selectAction('delete', () => { onDeletePaths([entry.path]); }); },
     shortcut: getAppCommandShortcutDisplay(APP_COMMAND_IDS.noteDelete),
   }]
 }
@@ -364,7 +364,7 @@ function NoteListRenameForm({
       inputRef.current?.select()
     }, 50)
 
-    return () => window.clearTimeout(focusTimer)
+    return () => { window.clearTimeout(focusTimer); }
   }, [])
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -389,7 +389,7 @@ function NoteListRenameForm({
           id={inputId}
           ref={inputRef}
           value={draftFilenameStem}
-          onChange={(event) => setDraftFilenameStem(event.target.value)}
+          onChange={(event) => { setDraftFilenameStem(event.target.value); }}
           data-testid="note-list-rename-input"
         />
       </div>

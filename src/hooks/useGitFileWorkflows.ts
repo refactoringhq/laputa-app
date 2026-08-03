@@ -104,9 +104,7 @@ function useQueuedDiffRequest(): QueuedDiffRequest {
   }, [])
 
   const handlePendingDiffHandled = useCallback((requestId: number) => {
-    setPendingDiffRequest((current) =>
-      current?.requestId === requestId ? null : current,
-    )
+    setPendingDiffRequest((current) => (current?.requestId === requestId ? null : current))
   }, [])
 
   return {
@@ -123,7 +121,8 @@ function useVaultPathResolver({
   vaultEntries,
   visibleEntries,
 }: Pick<GitFileWorkflowParams, 'allGitModifiedFiles' | 'resolvedPath' | 'tabs' | 'vaultEntries' | 'visibleEntries'>) {
-  const findEntryForPath = useCallback((path: string) => {
+  const findEntryForPath = useCallback(
+    (path: string) => {
     const openTabEntry = tabs.find((tab) => tab.entry.path === path)?.entry
     if (openTabEntry) return openTabEntry
 
@@ -131,21 +130,27 @@ function useVaultPathResolver({
     if (visibleEntry) return visibleEntry
 
     return vaultEntries.find((entry) => entry.path === path) ?? null
-  }, [tabs, vaultEntries, visibleEntries])
+    },
+    [tabs, vaultEntries, visibleEntries],
+  )
 
-  return useCallback((path: string) => {
+  return useCallback(
+    (path: string) => {
     const entry = findEntryForPath(path)
     if (entry) return vaultPathForEntry(entry, resolvedPath)
 
-    const modifiedFile = allGitModifiedFiles.find((file) =>
-      file.path === path || file.relativePath === path || path.endsWith('/' + file.relativePath),
+      const modifiedFile = allGitModifiedFiles.find(
+        (file) => file.path === path || file.relativePath === path || path.endsWith(`/${file.relativePath}`),
     )
     return modifiedFile?.vaultPath ?? resolvedPath
-  }, [allGitModifiedFiles, findEntryForPath, resolvedPath])
+    },
+    [allGitModifiedFiles, findEntryForPath, resolvedPath],
+  )
 }
 
 function useGitDiffLoaders(vaultPathForNotePath: (path: string) => string) {
-  const loadGitHistoryForPath = useCallback(async (path: string): Promise<GitCommit[]> => {
+  const loadGitHistoryForPath = useCallback(
+    async (path: string): Promise<GitCommit[]> => {
     try {
       return await appTauriCall<GitCommit[]>('get_file_history', {
         vaultPath: vaultPathForNotePath(path),
@@ -155,20 +160,28 @@ function useGitDiffLoaders(vaultPathForNotePath: (path: string) => string) {
       console.warn('Failed to load git history:', err)
       return []
     }
-  }, [vaultPathForNotePath])
+    },
+    [vaultPathForNotePath],
+  )
 
-  const loadDiffForPath = useCallback((path: string): Promise<string> =>
+  const loadDiffForPath = useCallback(
+    (path: string): Promise<string> =>
     appTauriCall<string>('get_file_diff', {
       vaultPath: vaultPathForNotePath(path),
       path,
-    }), [vaultPathForNotePath])
+      }),
+    [vaultPathForNotePath],
+  )
 
-  const loadDiffAtCommitForPath = useCallback((path: string, commitHash: string): Promise<string> =>
+  const loadDiffAtCommitForPath = useCallback(
+    (path: string, commitHash: string): Promise<string> =>
     appTauriCall<string>('get_file_diff_at_commit', {
       vaultPath: vaultPathForNotePath(path),
       path,
       commitHash,
-    }), [vaultPathForNotePath])
+      }),
+    [vaultPathForNotePath],
+  )
 
   return {
     loadGitHistoryForPath,
@@ -186,7 +199,8 @@ function usePulseNoteOpen({
 }: Pick<GitFileWorkflowParams, 'entriesByPath' | 'historyRepositoryPath' | 'onOpenTabWithContent' | 'onSelectNote'> & {
   queuePendingDiff: (path: string, commitHash?: string) => void
 }) {
-  return useCallback((relativePath: string, commitHash?: string) => {
+  return useCallback(
+    (relativePath: string, commitHash?: string) => {
     const fullPath = `${historyRepositoryPath}/${relativePath}`
     const entry = entriesByPath.get(fullPath) ?? entriesByPath.get(relativePath)
 
@@ -204,32 +218,17 @@ function usePulseNoteOpen({
     if (entry) {
       void onSelectNote(entry)
     }
-  }, [
-    entriesByPath,
-    historyRepositoryPath,
-    onOpenTabWithContent,
-    onSelectNote,
-    queuePendingDiff,
-  ])
-}
-
-function isDiscardedFileActive(
-  activePath: string | null,
-  targetFile: ModifiedFile | undefined,
-  relativePath: string,
-) {
-  return !!activePath
-    && (activePath === targetFile?.path || activePath.endsWith('/' + relativePath))
-}
-
-function findReloadedDiscardTarget(
-  entries: VaultEntry[],
-  targetFile: ModifiedFile | undefined,
-  relativePath: string,
-) {
-  return entries.find((entry) =>
-    entry.path === targetFile?.path || entry.path.endsWith('/' + relativePath),
+    },
+    [entriesByPath, historyRepositoryPath, onOpenTabWithContent, onSelectNote, queuePendingDiff],
   )
+}
+
+function isDiscardedFileActive(activePath: string | null, targetFile: ModifiedFile | undefined, relativePath: string) {
+  return !!activePath && (activePath === targetFile?.path || activePath.endsWith(`/${relativePath}`))
+}
+
+function findReloadedDiscardTarget(entries: VaultEntry[], targetFile: ModifiedFile | undefined, relativePath: string) {
+  return entries.find((entry) => entry.path === targetFile?.path || entry.path.endsWith(`/${relativePath}`))
 }
 
 async function syncActiveTabAfterDiscard({
@@ -257,21 +256,40 @@ async function syncActiveTabAfterDiscard({
   }
 }
 
-function useDiscardFileAction({
-  activeTabPath,
-  changesRepositoryPath,
-  loadModifiedFilesForRepository,
-  onCloseAllTabs,
-  onReplaceActiveTab,
-  reloadVault,
-  selectedChangesModifiedFiles,
-  setToastMessage,
-}: Pick<GitFileWorkflowParams, 'activeTabPath' | 'changesRepositoryPath' | 'loadModifiedFilesForRepository' | 'onCloseAllTabs' | 'onReplaceActiveTab' | 'reloadVault' | 'selectedChangesModifiedFiles' | 'setToastMessage'>) {
-  return useCallback(async (relativePath: string) => {
+function useDiscardFileAction(
+  options: Pick<
+    GitFileWorkflowParams,
+    | 'activeTabPath'
+    | 'changesRepositoryPath'
+    | 'loadModifiedFilesForRepository'
+    | 'onCloseAllTabs'
+    | 'onReplaceActiveTab'
+    | 'reloadVault'
+    | 'selectedChangesModifiedFiles'
+    | 'setToastMessage'
+  >,
+) {
+  const {
+    activeTabPath,
+    changesRepositoryPath,
+    loadModifiedFilesForRepository,
+    onCloseAllTabs,
+    onReplaceActiveTab,
+    reloadVault,
+    selectedChangesModifiedFiles,
+    setToastMessage,
+  } = options
+  return useCallback(
+    async (relativePath: string) => {
     const targetFile = selectedChangesModifiedFiles.find((file) => file.relativePath === relativePath)
     try {
-      await appTauriCall('git_discard_file', { vaultPath: changesRepositoryPath, relativePath })
-      await loadModifiedFilesForRepository(changesRepositoryPath, { includeStats: true })
+        await appTauriCall('git_discard_file', {
+          vaultPath: changesRepositoryPath,
+          relativePath,
+        })
+        await loadModifiedFilesForRepository(changesRepositoryPath, {
+          includeStats: true,
+        })
       await syncActiveTabAfterDiscard({
         activePathBefore: activeTabPath,
         onCloseAllTabs,
@@ -283,7 +301,8 @@ function useDiscardFileAction({
     } catch (err) {
       setToastMessage(typeof err === 'string' ? err : 'Failed to discard changes')
     }
-  }, [
+    },
+    [
     activeTabPath,
     changesRepositoryPath,
     loadModifiedFilesForRepository,
@@ -292,7 +311,8 @@ function useDiscardFileAction({
     reloadVault,
     selectedChangesModifiedFiles,
     setToastMessage,
-  ])
+    ],
+  )
 }
 
 function useOpenDeletedNoteAction({
@@ -304,7 +324,8 @@ function useOpenDeletedNoteAction({
   loadDiffForPath: (path: string) => Promise<string>
   queuePendingDiff: (path: string, commitHash?: string) => void
 }) {
-  return useCallback(async (entry: DeletedNoteEntry) => {
+  return useCallback(
+    async (entry: DeletedNoteEntry) => {
     let previewContent = 'Content not available (untracked)'
     let hasDiff = false
     try {
@@ -320,25 +341,41 @@ function useOpenDeletedNoteAction({
     } else {
       setToastMessage('Content not available (untracked)')
     }
-  }, [loadDiffForPath, onOpenTabWithContent, queuePendingDiff, setToastMessage])
+    },
+    [loadDiffForPath, onOpenTabWithContent, queuePendingDiff, setToastMessage],
+  )
 }
 
-function useDeletedNoteWorkflow({
-  activeTabPath,
-  changesRepositoryPath,
-  loadDiffForPath,
-  loadModifiedFilesForRepository,
-  onCloseAllTabs,
-  onOpenTabWithContent,
-  onReplaceActiveTab,
-  queuePendingDiff,
-  reloadVault,
-  selectedChangesModifiedFiles,
-  setToastMessage,
-}: Pick<GitFileWorkflowParams, 'activeTabPath' | 'changesRepositoryPath' | 'loadModifiedFilesForRepository' | 'onCloseAllTabs' | 'onOpenTabWithContent' | 'onReplaceActiveTab' | 'reloadVault' | 'selectedChangesModifiedFiles' | 'setToastMessage'> & {
-  loadDiffForPath: (path: string) => Promise<string>
-  queuePendingDiff: (path: string, commitHash?: string) => void
-}) {
+function useDeletedNoteWorkflow(
+  options: Pick<
+    GitFileWorkflowParams,
+    | 'activeTabPath'
+    | 'changesRepositoryPath'
+    | 'loadModifiedFilesForRepository'
+    | 'onCloseAllTabs'
+    | 'onOpenTabWithContent'
+    | 'onReplaceActiveTab'
+    | 'reloadVault'
+    | 'selectedChangesModifiedFiles'
+    | 'setToastMessage'
+  > & {
+    loadDiffForPath: (path: string) => Promise<string>
+    queuePendingDiff: (path: string, commitHash?: string) => void
+  },
+) {
+  const {
+    activeTabPath,
+    changesRepositoryPath,
+    loadDiffForPath,
+    loadModifiedFilesForRepository,
+    onCloseAllTabs,
+    onOpenTabWithContent,
+    onReplaceActiveTab,
+    queuePendingDiff,
+    reloadVault,
+    selectedChangesModifiedFiles,
+    setToastMessage,
+  } = options
   const handleDiscardFile = useDiscardFileAction({
     activeTabPath,
     changesRepositoryPath,
@@ -369,21 +406,26 @@ function useReplaceActiveTabWithQueuedDiff({
 }: Pick<GitFileWorkflowParams, 'effectiveSelection' | 'onReplaceActiveTab'> & {
   queuePendingDiff: (path: string, commitHash?: string) => void
 }) {
-  return useCallback((entry: VaultEntry) => {
+  return useCallback(
+    (entry: VaultEntry) => {
     onReplaceActiveTab(entry)
     if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes') {
       queuePendingDiff(entry.path)
     }
-  }, [effectiveSelection, onReplaceActiveTab, queuePendingDiff])
+    },
+    [effectiveSelection, onReplaceActiveTab, queuePendingDiff],
+  )
 }
 
 function useActiveDeletedFile(activeTabPath: string | null, allGitModifiedFiles: ModifiedFile[]) {
   return useMemo(() => {
     if (!activeTabPath) return null
-    return allGitModifiedFiles.find((file) =>
-      file.status === 'deleted'
-      && (file.path === activeTabPath || activeTabPath.endsWith('/' + file.relativePath)),
+    return (
+      allGitModifiedFiles.find(
+        (file) =>
+          file.status === 'deleted' && (file.path === activeTabPath || activeTabPath.endsWith(`/${file.relativePath}`)),
     ) ?? null
+    )
   }, [activeTabPath, allGitModifiedFiles])
 }
 
@@ -415,17 +457,9 @@ function useDeletedWorkflowForParams(
 }
 
 export function useGitFileWorkflows(params: GitFileWorkflowParams) {
-  const {
-    pendingDiffRequest,
-    queuePendingDiff,
-    handlePendingDiffHandled,
-  } = useQueuedDiffRequest()
+  const { pendingDiffRequest, queuePendingDiff, handlePendingDiffHandled } = useQueuedDiffRequest()
   const vaultPathForNotePath = useVaultPathResolver(params)
-  const {
-    loadGitHistoryForPath,
-    loadDiffForPath,
-    loadDiffAtCommitForPath,
-  } = useGitDiffLoaders(vaultPathForNotePath)
+  const { loadGitHistoryForPath, loadDiffForPath, loadDiffAtCommitForPath } = useGitDiffLoaders(vaultPathForNotePath)
   const handlePulseOpenNote = usePulseNoteOpen({
     entriesByPath: params.entriesByPath,
     historyRepositoryPath: params.historyRepositoryPath,
@@ -433,10 +467,11 @@ export function useGitFileWorkflows(params: GitFileWorkflowParams) {
     onSelectNote: params.onSelectNote,
     queuePendingDiff,
   })
-  const {
-    handleDiscardFile,
-    handleOpenDeletedNote,
-  } = useDeletedWorkflowForParams(params, loadDiffForPath, queuePendingDiff)
+  const { handleDiscardFile, handleOpenDeletedNote } = useDeletedWorkflowForParams(
+    params,
+    loadDiffForPath,
+    queuePendingDiff,
+  )
   const handleReplaceActiveTabWithQueuedDiff = useReplaceActiveTabWithQueuedDiff({
     effectiveSelection: params.effectiveSelection,
     onReplaceActiveTab: params.onReplaceActiveTab,

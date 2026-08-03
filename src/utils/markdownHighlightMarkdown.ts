@@ -44,7 +44,7 @@ interface TableCellLike {
 
 type MarkdownSerializer = DirectMarkdownCapableSerializer
 
-type BlockContent = InlineItem[] | TableContentLike | unknown
+type BlockContent = unknown
 type TableCellValue = TableCellLike | string
 type InlineContentTransform = (content: InlineItem[]) => InlineItem[]
 type InlineSegment = { kind: 'delimiter' } | { kind: 'item'; item: InlineItem }
@@ -115,12 +115,12 @@ function injectMarkdownHighlights(content: InlineItem[]): InlineItem[] {
 
 function withoutHighlightStyle(styles: TextStyles | undefined): TextStyles {
   const rest = { ...(styles ?? {}) }
-  delete rest[MARKDOWN_HIGHLIGHT_STYLE]
+  delete rest.highlight
   return rest
 }
 
 function isHighlightedTextItem(item: InlineItem): boolean {
-  return isTextItem(item) && item.styles?.[MARKDOWN_HIGHLIGHT_STYLE] === true
+  return isTextItem(item) && item.styles?.highlight === true
 }
 
 function highlightMarker(): InlineItem {
@@ -177,24 +177,21 @@ function transformTableContent(
   content: TableContentLike,
   transform: InlineContentTransform,
 ): TableContentLike {
-  let changed = false
-  const rows = content.rows?.map(row => {
-    let rowChanged = false
-    const cells = row.cells?.map(cell => {
-      const nextCell = transformTableCell(cell, transform)
-      if (nextCell !== cell) rowChanged = true
-      return nextCell
-    })
-    if (!rowChanged) return row
-    changed = true
-    return { ...row, cells }
-  })
-
-  if (!changed) return content
+  const rows = content.rows?.map((row) => transformTableRow(row, transform))
+  if (!rows || !content.rows || rows.every((row, index) => row === content.rows?.at(index))) return content
   return {
     ...content,
     rows,
   }
+}
+
+function transformTableRow(
+  row: TableRowLike,
+  transform: InlineContentTransform,
+): TableRowLike {
+  const cells = row.cells?.map((cell) => transformTableCell(cell, transform))
+  if (!cells || !row.cells || cells.every((cell, index) => cell === row.cells?.at(index))) return row
+  return { ...row, cells }
 }
 
 function transformBlockContent(
@@ -223,13 +220,8 @@ function transformChildBlocks(
   transform: (block: BlockLike) => BlockLike,
 ): BlockLike[] | undefined {
   if (!Array.isArray(children)) return children
-  let changed = false
-  const nextChildren = children.map(child => {
-    const nextChild = transform(child)
-    if (nextChild !== child) changed = true
-    return nextChild
-  })
-  return changed ? nextChildren : children
+  const nextChildren = children.map(transform)
+  return nextChildren.some((child, index) => child !== children.at(index)) ? nextChildren : children
 }
 
 export function injectMarkdownHighlightsInBlocks(blocks: unknown[]): unknown[] {

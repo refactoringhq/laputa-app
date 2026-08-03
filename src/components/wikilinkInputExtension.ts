@@ -1,6 +1,9 @@
-import type { useCreateBlockNote } from '@blocknote/react'
 import { trackEvent } from '../lib/telemetry'
-import { createRichEditorInputTransformExtension, type RichEditorInputTransform } from './richEditorInputTransform'
+import {
+  createRichEditorInputTransformExtension,
+  type RichEditorInputTransform,
+  type RichEditorInputView,
+} from './richEditorInputTransform'
 
 const WIKILINK_NODE_TYPE = 'wikilink'
 const CLOSING_WIKILINK_INPUT = ']'
@@ -9,12 +12,10 @@ const WIKILINK_CLOSE = ']]'
 const CODE_BLOCK_NODE_TYPE = 'codeBlock'
 const CODE_MARK_TYPE = 'code'
 
-type EditorViewLike = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
+type EditorViewLike = RichEditorInputView
 type TextblockParent = EditorViewLike['state']['selection']['$from']['parent']
 type MarkLike = { type: { name: string } }
-type WikilinkNodeType = {
-  createChecked: (attrs: { target: string }) => unknown
-}
+type WikilinkNodeType = EditorViewLike['state']['schema']['nodes'][string]
 
 interface WikilinkCursorText {
   beforeText: string
@@ -42,7 +43,10 @@ function selectionHasCodeMark(view: EditorViewLike): boolean {
 }
 
 function isCodeBlockTextblock(parent: TextblockParent): boolean {
-  return parent.type?.name === CODE_BLOCK_NODE_TYPE
+  const type = Reflect.get(parent, 'type') as unknown
+  return typeof type === 'object'
+    && type !== null
+    && Reflect.get(type, 'name') === CODE_BLOCK_NODE_TYPE
 }
 
 function readCursorText(view: EditorViewLike): WikilinkCursorText | null {

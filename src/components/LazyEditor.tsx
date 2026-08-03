@@ -22,18 +22,26 @@ function LoadedEditor(props: EditorProps & { Editor: ComponentType<EditorProps> 
   return <Editor {...editorProps} />
 }
 
+function commitLoadedEditor(
+  lifecycle: AbortController,
+  setEditor: (value: ComponentType<EditorProps>) => void,
+  Editor: ComponentType<EditorProps>,
+): void {
+  if (!lifecycle.signal.aborted) setEditor(Editor)
+}
+
 export function LazyEditor(props: EditorProps) {
   const [Editor, setEditor] = useState<ComponentType<EditorProps> | null>(null)
 
   useEffect(() => {
-    let active = true
+    const lifecycle = new AbortController()
     void (async () => {
       if (!props.activeTabPath) await waitForStartupPhase('react_shell')
-      if (!active) return
+      if (lifecycle.signal.aborted) return
       const module = await loadEditorModule()
-      if (active) setEditor(() => module.Editor)
+      commitLoadedEditor(lifecycle, (Editor) => { setEditor(() => Editor) }, module.Editor)
     })()
-    return () => { active = false }
+    return () => { lifecycle.abort() }
   }, [props.activeTabPath])
 
   return Editor ? <LoadedEditor Editor={Editor} {...props} /> : <EditorStartupFallback {...props} />

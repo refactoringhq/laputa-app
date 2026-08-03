@@ -23,7 +23,7 @@ export function TelemetryConsentDialog({ onAccept, onDecline }: TelemetryConsent
       }}
       testId="telemetry-consent-shell"
     >
-      <>
+
         <ShieldCheck size={40} weight="duotone" style={{ color: 'var(--primary)' }} />
 
         <div style={{ textAlign: 'center' }}>
@@ -73,7 +73,7 @@ export function TelemetryConsentDialog({ onAccept, onDecline }: TelemetryConsent
         <p style={{ fontSize: 11, color: 'var(--muted-foreground)', margin: 0, textAlign: 'center' }}>
           You can change this anytime in Settings.
         </p>
-      </>
+
     </OnboardingShell>
   )
 }

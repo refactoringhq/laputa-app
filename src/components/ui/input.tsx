@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 
 import { nativeTextAssistanceDisabledProps } from "@/lib/nativeTextAssistance"
 import { cn } from "@/lib/utils"

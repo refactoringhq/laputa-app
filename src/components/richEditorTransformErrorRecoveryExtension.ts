@@ -64,6 +64,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+function recoveryViewFromEditor(editor: unknown): RichEditorRecoveryView | null {
+  if (!isRecord(editor)) return null
+  const tiptapEditor = editor._tiptapEditor
+  const view = isRecord(tiptapEditor) ? tiptapEditor.view : editor.prosemirrorView
+  if (!isRecord(view) || typeof view.dispatch !== 'function') return null
+  return view as unknown as RichEditorRecoveryView
+}
+
 function isDispatchRecoveryState(value: unknown): value is DispatchRecoveryState {
   return isRecord(value)
     && typeof value.originalDispatch === 'function'
@@ -134,7 +142,7 @@ function retainRecoveryState(
 ): () => void {
   recoveryState.refCount += 1
   if (recoverDocument) recoveryState.recoverDocuments.push({ recoverDocument, token })
-  return () => releaseRecoveryState(view, recoveryState, recoveryState.originalDispatch, token)
+  return () => { releaseRecoveryState(view, recoveryState, recoveryState.originalDispatch, token); }
 }
 
 function activeRecoverDocument(recoveryState: { recoverDocuments: RecoveryDocumentEntry[] }): RecoverEditorDocument | undefined {
@@ -268,18 +276,18 @@ export function installRichEditorTransformErrorRecovery(
   const originalDispatch = view.dispatch
   const recoveryState = installRecoveryState(view, originalDispatch, token, options.recoverDocument)
 
-  return () => releaseRecoveryState(view, recoveryState, originalDispatch, token)
+  return () => { releaseRecoveryState(view, recoveryState, originalDispatch, token); }
 }
 
 export const createRichEditorTransformErrorRecoveryExtension = createExtension(({ editor }) => ({
   key: 'richEditorTransformErrorRecovery',
   mount: ({ signal }) => {
-    const view = editor._tiptapEditor?.view ?? editor.prosemirrorView
-    if (!view || typeof view.dispatch !== 'function') return
+    const view = recoveryViewFromEditor(editor)
+    if (!view) return
 
     const uninstall = installRichEditorTransformErrorRecovery(
-      view as unknown as RichEditorRecoveryView,
-      { recoverDocument: () => repairEditorDocumentAfterInvalidContentError(editor as RepairableBlockNoteEditor) },
+      view,
+      { recoverDocument: () => { repairEditorDocumentAfterInvalidContentError(editor as RepairableBlockNoteEditor); } },
     )
     signal.addEventListener('abort', uninstall, { once: true })
   },

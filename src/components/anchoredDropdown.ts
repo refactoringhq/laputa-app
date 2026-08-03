@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useLayoutEffect,
-  type CSSProperties,
-  type RefObject,
-} from 'react'
+import { useCallback, useLayoutEffect, type CSSProperties, type RefObject } from 'react'
 
 const DEFAULT_DROPDOWN_MARGIN = 8
 const DEFAULT_DROPDOWN_OFFSET = 4
@@ -54,9 +49,7 @@ function getViewport(): AnchoredDropdownViewport {
 
 function parseZoomValue(source: string | undefined): number | null {
   if (!source || source === 'normal') return null
-  const value = source.endsWith('%')
-    ? Number.parseFloat(source) / 100
-    : Number.parseFloat(source)
+  const value = source.endsWith('%') ? Number.parseFloat(source) / 100 : Number.parseFloat(source)
   return Number.isFinite(value) && value > 0 ? value : null
 }
 
@@ -64,9 +57,11 @@ function getRootZoom(): number {
   const style = getComputedStyle(document.documentElement)
   const overlayZoom = parseZoomValue(style.getPropertyValue('--tolaria-overlay-zoom-factor').trim())
   if (overlayZoom !== null) return overlayZoom
-  return parseZoomValue(style.getPropertyValue('zoom')) ??
+  return (
+    parseZoomValue(style.getPropertyValue('zoom')) ??
     parseZoomValue(document.documentElement.style.getPropertyValue('zoom')) ??
     1
+  )
 }
 
 function zoomAdjustedViewport({ height, width, zoom = 1 }: AnchoredDropdownViewport): AnchoredDropdownViewport {
@@ -118,10 +113,7 @@ export function resolveAnchoredDropdownPosition(
   const availableAbove = adjustedRect.top - viewportPadding - offset
   const openAbove = minHeight !== undefined && availableBelow < minHeight && availableAbove > availableBelow
   const availableHeight = openAbove ? availableAbove : availableBelow
-  const viewportBoundedMinHeight = Math.min(
-    minHeight ?? 0,
-    Math.max(0, adjustedViewport.height - (viewportPadding * 2)),
-  )
+  const viewportBoundedMinHeight = Math.min(minHeight ?? 0, Math.max(0, adjustedViewport.height - viewportPadding * 2))
   const resolvedMaxHeight = Math.max(viewportBoundedMinHeight, Math.min(maxHeight, availableHeight))
   const top = openAbove
     ? Math.max(viewportPadding, adjustedRect.top - offset - resolvedMaxHeight)
@@ -130,19 +122,13 @@ export function resolveAnchoredDropdownPosition(
   return { left, top, maxHeight: resolvedMaxHeight }
 }
 
-function getAnchorElement(
-  anchorRef: RefObject<HTMLElement | null>,
-  anchorElement: AnchoredDropdownAnchorElement,
-) {
+function getAnchorElement(anchorRef: RefObject<HTMLElement | null>, anchorElement: AnchoredDropdownAnchorElement) {
   const current = anchorRef.current
   if (!current) return null
   return anchorElement === 'parent' ? current.parentElement : current
 }
 
-export function getAnchoredDropdownStyle(
-  position: AnchoredDropdownPosition | null,
-  width: number,
-): CSSProperties {
+export function getAnchoredDropdownStyle(position: AnchoredDropdownPosition | null, width: number): CSSProperties {
   return {
     left: position?.left ?? 0,
     top: position?.top ?? 0,
@@ -152,22 +138,25 @@ export function getAnchoredDropdownStyle(
   }
 }
 
-export function useAnchoredDropdownPosition({
-  anchorRef,
-  dropdownRef,
-  anchorElement = 'self',
-  open = true,
-  width,
-  maxHeight,
-  minHeight,
-  offset,
-  viewportPadding,
-}: AnchoredDropdownOptions & {
-  anchorRef: RefObject<HTMLElement | null>
-  dropdownRef: RefObject<HTMLElement | null>
-  anchorElement?: AnchoredDropdownAnchorElement
-  open?: boolean
-}) {
+export function useAnchoredDropdownPosition(
+  options: AnchoredDropdownOptions & {
+    anchorRef: RefObject<HTMLElement | null>
+    dropdownRef: RefObject<HTMLElement | null>
+    anchorElement?: AnchoredDropdownAnchorElement
+    open?: boolean
+  },
+) {
+  const {
+    anchorRef,
+    dropdownRef,
+    anchorElement = 'self',
+    open = true,
+    width,
+    maxHeight,
+    minHeight,
+    offset,
+    viewportPadding,
+  } = options
   const updatePosition = useCallback(() => {
     const anchor = getAnchorElement(anchorRef, anchorElement)
     const dropdown = dropdownRef.current

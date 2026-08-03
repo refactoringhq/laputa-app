@@ -22,29 +22,23 @@ interface UseFolderDeleteInput {
   vaultPath: string
 }
 
-export function useFolderDelete({
-  activeTabPathRef,
-  clearFolderRename,
-  closeAllTabs,
-  reloadFolders,
-  reloadVault,
-  selection,
-  setSelection,
-  setTabs,
-  setToastMessage,
-  vaultPath,
-}: UseFolderDeleteInput) {
+export function useFolderDelete(options: UseFolderDeleteInput) {
+  const { activeTabPathRef, clearFolderRename, closeAllTabs, reloadFolders, reloadVault, selection, setSelection, setTabs, setToastMessage, vaultPath } = options
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<ConfirmFolderDeleteState | null>(null)
 
-  const requestDeleteFolder = useCallback((folderPath: string) => {
+  const requestDeleteFolder = useCallback(
+    (folderPath: string) => {
     clearFolderRename()
     setConfirmDeleteFolder({
       path: folderPath,
       title: `Delete "${folderLabel({ folderPath })}" and everything inside it?`,
-      message: 'This permanently removes the folder, all nested folders, and every note or file inside it. This cannot be undone.',
+        message:
+          'This permanently removes the folder, all nested folders, and every note or file inside it. This cannot be undone.',
       confirmLabel: 'Delete folder',
     })
-  }, [clearFolderRename])
+    },
+    [clearFolderRename],
+  )
 
   const cancelDeleteFolder = useCallback(() => setConfirmDeleteFolder(null), [])
 
@@ -75,7 +69,18 @@ export function useFolderDelete({
     } catch (error) {
       setToastMessage(`Failed to delete folder: ${error}`)
     }
-  }, [activeTabPathRef, closeAllTabs, confirmDeleteFolder, reloadFolders, reloadVault, selection, setSelection, setTabs, setToastMessage, vaultPath])
+  }, [
+    activeTabPathRef,
+    closeAllTabs,
+    confirmDeleteFolder,
+    reloadFolders,
+    reloadVault,
+    selection,
+    setSelection,
+    setTabs,
+    setToastMessage,
+    vaultPath,
+  ])
 
   const deleteSelectedFolder = useCallback(() => {
     if (selection.kind !== 'folder' || !selection.path) return

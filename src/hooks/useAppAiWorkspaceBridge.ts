@@ -1,10 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { trackEvent } from '../lib/telemetry'
 import { SETTINGS_SECTION_IDS } from '../components/settingsSectionIds'
-import {
-  AI_WORKSPACE_DOCK_REQUESTED_EVENT,
-  OPEN_AI_CHAT_EVENT,
-} from '../utils/aiPromptBridge'
+import { AI_WORKSPACE_DOCK_REQUESTED_EVENT, OPEN_AI_CHAT_EVENT } from '../utils/aiPromptBridge'
 
 interface UseAppAiWorkspaceBridgeOptions {
   aiFeaturesEnabled: boolean
@@ -59,16 +56,17 @@ function useCloseDisabledAiWorkspace(aiFeaturesEnabled: boolean, closeAIChat: ()
   }, [aiFeaturesEnabled, closeAIChat, showAIChat])
 }
 
-export function useAppAiWorkspaceBridge({
-  aiFeaturesEnabled,
-  aiWorkspaceWindow,
-  closeAIChat,
-  modelSelectorAvailable,
-  openAIChat,
-  openSettings,
-  setSettingsInitialSectionId,
-  showAIChat,
-}: UseAppAiWorkspaceBridgeOptions): AppAiWorkspaceBridge {
+export function useAppAiWorkspaceBridge(options: UseAppAiWorkspaceBridgeOptions): AppAiWorkspaceBridge {
+  const {
+    aiFeaturesEnabled,
+    aiWorkspaceWindow,
+    closeAIChat,
+    modelSelectorAvailable,
+    openAIChat,
+    openSettings,
+    setSettingsInitialSectionId,
+    showAIChat,
+  } = options
   useCloseDisabledAiWorkspace(aiFeaturesEnabled, closeAIChat, showAIChat)
   useDockRequestEvent(aiFeaturesEnabled, aiWorkspaceWindow, openAIChat)
 

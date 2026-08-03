@@ -4,10 +4,7 @@ import type { VaultEntry } from '../types'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { getTypeIcon } from './note-item/typeIcon'
-import type {
-  InlineWikilinkChip,
-  InlineWikilinkSegment,
-} from './inlineWikilinkText'
+import type { InlineWikilinkChip, InlineWikilinkSegment } from './inlineWikilinkText'
 import type { InlineWikilinkSuggestion } from './inlineWikilinkSuggestions'
 import { cn } from '@/lib/utils'
 
@@ -111,9 +108,7 @@ function InlineSuggestionRow({
         </span>
         <span className="truncate text-sm text-foreground">{suggestion.title}</span>
       </span>
-      <span className="ml-3 shrink-0 text-[11px] text-muted-foreground">
-        {suggestion.entry.isA ?? 'Note'}
-      </span>
+      <span className="ml-3 shrink-0 text-[11px] text-muted-foreground">{suggestion.entry.isA ?? 'Note'}</span>
     </button>
   )
 }
@@ -136,18 +131,16 @@ export function InlineWikilinkSuggestionList({
   emptyLabel?: string
 }) {
   if (suggestions.length === 0) {
-    return (
-      <div className="px-4 py-5 text-center text-[13px] text-muted-foreground">
-        {emptyLabel}
-      </div>
-    )
+    return <div className="px-4 py-5 text-center text-[13px] text-muted-foreground">{emptyLabel}</div>
   }
 
   return (
     <div
-      className={variant === 'floating'
+      className={
+        variant === 'floating'
         ? 'absolute bottom-full left-0 right-0 z-10 mb-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg'
-        : 'py-1'}
+          : 'py-1'
+      }
       data-testid="wikilink-menu"
     >
       {suggestions.map((suggestion, index) => (
@@ -164,27 +157,7 @@ export function InlineWikilinkSuggestionList({
   )
 }
 
-export function InlineWikilinkEditorField({
-  value,
-  placeholder,
-  disabled,
-  inputRef,
-  dataTestId,
-  placeholderClassName,
-  editorClassName,
-  editorStyle,
-  onCompositionEnd,
-  onCompositionStart,
-  onCompositionUpdate,
-  onInput,
-  onKeyDown,
-  onCut,
-  onDrop,
-  onPaste,
-  onSelectionChange,
-  segments,
-  typeEntryMap,
-}: {
+export function InlineWikilinkEditorField(options: {
   value: string
   placeholder?: string
   disabled: boolean
@@ -205,6 +178,27 @@ export function InlineWikilinkEditorField({
   segments: InlineWikilinkSegment[]
   typeEntryMap: Record<string, VaultEntry>
 }) {
+  const {
+    value,
+    placeholder,
+    disabled,
+    inputRef,
+    dataTestId,
+    placeholderClassName,
+    editorClassName,
+    editorStyle,
+    onCompositionEnd,
+    onCompositionStart,
+    onCompositionUpdate,
+    onInput,
+    onKeyDown,
+    onCut,
+    onDrop,
+    onPaste,
+    onSelectionChange,
+    segments,
+    typeEntryMap,
+  } = options
   const editorRef = useRef<HTMLDivElement | null>(null)
   const needsTrailingCaretAnchor = segments[segments.length - 1]?.kind === 'chip'
   useImperativeHandle(inputRef, () => editorRef.current as HTMLDivElement, [])
@@ -245,7 +239,11 @@ export function InlineWikilinkEditorField({
           disabled && 'cursor-not-allowed opacity-60',
           editorClassName,
         )}
-        style={{ ...editorStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        style={{
+          ...editorStyle,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
       >
         {segments.map((segment) => renderInlineWikilinkSegment(segment, typeEntryMap))}
         {needsTrailingCaretAnchor ? '\u200B' : null}
@@ -299,17 +297,20 @@ function useInlineWikilinkEditorEvents(
   }, [editorRef, handlers])
 }
 
-function inlineWikilinkEditorListenerMap({
-  onCompositionEnd,
-  onCompositionStart,
-  onCompositionUpdate,
-  onCut,
-  onDrop,
-  onInput,
-  onKeyDown,
-  onPaste,
-  onSelectionChange,
-}: InlineWikilinkEditorHandlers): Array<[keyof HTMLElementEventMap, EventListener]> {
+function inlineWikilinkEditorListenerMap(
+  options: InlineWikilinkEditorHandlers,
+): Array<[keyof HTMLElementEventMap, EventListener]> {
+  const {
+    onCompositionEnd,
+    onCompositionStart,
+    onCompositionUpdate,
+    onCut,
+    onDrop,
+    onInput,
+    onKeyDown,
+    onPaste,
+    onSelectionChange,
+  } = options
   const handleSelectionChange = () => onSelectionChange()
   return [
     ['compositionstart', () => onCompositionStart()],
@@ -356,9 +357,7 @@ export function InlineWikilinkPaletteLayout({
         {header}
         {editor}
       </div>
-      <div className="flex-1 overflow-y-auto py-1">
-        {suggestionList ?? emptyState}
-      </div>
+      <div className="flex-1 overflow-y-auto py-1">{suggestionList ?? emptyState}</div>
       {footer}
     </>
   )

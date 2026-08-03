@@ -17,19 +17,20 @@ interface WikilinkChatInputProps {
   editorStyle?: CSSProperties
 }
 
-export function WikilinkChatInput({
-  entries,
-  value,
-  onChange,
-  onSend,
-  onUnsupportedPaste,
-  disabled,
-  placeholder,
-  placeholderClassName,
-  inputRef,
-  editorClassName,
-  editorStyle,
-}: WikilinkChatInputProps) {
+export function WikilinkChatInput(options: WikilinkChatInputProps) {
+  const {
+    entries,
+    value,
+    onChange,
+    onSend,
+    onUnsupportedPaste,
+    disabled,
+    placeholder,
+    placeholderClassName,
+    inputRef,
+    editorClassName,
+    editorStyle,
+  } = options
   return (
     <InlineWikilinkInput
       entries={entries}

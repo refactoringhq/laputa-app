@@ -20,21 +20,12 @@ interface NoteRetargetingInput {
   setSelection: (selection: SidebarSelection) => void
   setToastMessage: (message: string | null) => void
   vaultPath: string
-  updateFrontmatter: (
-    path: string,
-    key: string,
-    value: string,
-    options?: FrontmatterOpOptions,
-  ) => Promise<void>
+  updateFrontmatter: (path: string, key: string, value: string, options?: FrontmatterOpOptions) => Promise<void>
   moveNoteToFolder: (
     path: string,
     folderPath: string,
     vaultPath: string,
-    onEntryRenamed: (
-      oldPath: string,
-      newEntry: Partial<VaultEntry> & { path: string },
-      newContent: string,
-    ) => void,
+    onEntryRenamed: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void,
   ) => Promise<{ new_path: string } | null>
 }
 
@@ -46,16 +37,18 @@ function canRetargetEntryToType(params: { entry: VaultEntry | undefined; type: s
   return !!params.entry && params.entry.isA !== params.type
 }
 
-function canRetargetEntryToFolder(
-  params: {
+function canRetargetEntryToFolder(params: {
     entry: VaultEntry | undefined
     folderPath: string
     vaultPath: string
-  },
-): boolean {
+}): boolean {
   if (!params.entry) return false
-  return folderPathForRetargetEntry({ entry: params.entry, vaultPath: params.vaultPath })
-    !== normalizeRetargetFolderPath(params.folderPath)
+  return (
+    folderPathForRetargetEntry({
+      entry: params.entry,
+      vaultPath: params.vaultPath,
+    }) !== normalizeRetargetFolderPath(params.folderPath)
+  )
 }
 
 function updateEntitySelection(
@@ -89,12 +82,7 @@ async function changeEntryType({
   selection: SidebarSelection
   setSelection: (selection: SidebarSelection) => void
   setToastMessage: (message: string | null) => void
-  updateFrontmatter: (
-    path: string,
-    key: string,
-    value: string,
-    options?: FrontmatterOpOptions,
-  ) => Promise<void>
+  updateFrontmatter: (path: string, key: string, value: string, options?: FrontmatterOpOptions) => Promise<void>
 }): Promise<RetargetResult> {
   const normalizedType = nextType.trim()
   if (!entry || !normalizedType) return 'error'
@@ -102,7 +90,10 @@ async function changeEntryType({
 
   try {
     await updateFrontmatter(notePath, 'type', normalizedType, { silent: true })
-    updateEntitySelection(selection, setSelection, notePath, { path: notePath, isA: normalizedType })
+    updateEntitySelection(selection, setSelection, notePath, {
+      path: notePath,
+      isA: normalizedType,
+    })
     trackNoteRetargeted({ targetKind: 'type' })
     setToastMessage(`Type set to "${normalizedType}"`)
     return 'updated'
@@ -132,22 +123,15 @@ async function moveEntryToFolder({
     path: string,
     folderPath: string,
     vaultPath: string,
-    onEntryRenamed: (
-      oldPath: string,
-      newEntry: Partial<VaultEntry> & { path: string },
-      newContent: string,
-    ) => void,
+    onEntryRenamed: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void,
   ) => Promise<{ new_path: string } | null>
 }): Promise<RetargetResult> {
   const normalizedFolderPath = normalizeRetargetFolderPath(folderPath)
   if (!entry) return 'error'
   if (folderPathForRetargetEntry({ entry, vaultPath }) === normalizedFolderPath) return 'noop'
 
-  const result = await moveNoteToFolder(
-    notePath,
-    normalizedFolderPath,
-    vaultPath,
-    (oldPath, newEntry) => updateEntitySelection(selection, setSelection, oldPath, newEntry),
+  const result = await moveNoteToFolder(notePath, normalizedFolderPath, vaultPath, (oldPath, newEntry) =>
+    updateEntitySelection(selection, setSelection, oldPath, newEntry),
   )
   if (!result) return 'error'
   if (result.new_path === notePath) return 'noop'
@@ -158,41 +142,38 @@ async function moveEntryToFolder({
   return 'updated'
 }
 
-export function useNoteRetargeting({
-  entries,
-  folders,
-  selection,
-  setSelection,
-  setToastMessage,
-  vaultPath,
-  updateFrontmatter,
-  moveNoteToFolder,
-}: NoteRetargetingInput) {
+export function useNoteRetargeting(options: NoteRetargetingInput) {
+  const { entries, folders, selection, setSelection, setToastMessage, vaultPath, updateFrontmatter, moveNoteToFolder } =
+    options
   const availableTypes = useMemo(
     () => extractVaultTypes(entries).sort((left, right) => left.localeCompare(right)),
     [entries],
   )
   const availableFolders = useMemo(() => flattenRetargetFolders(folders), [folders])
 
-  const canDropNoteOnType = useCallback((notePath: string, type: string) => {
+  const canDropNoteOnType = useCallback(
+    (notePath: string, type: string) => {
     return canRetargetEntryToType({
       entry: entryByPath({ entries, notePath }),
       type,
     })
-  }, [entries])
+    },
+    [entries],
+  )
 
-  const canDropNoteOnFolder = useCallback((notePath: string, folderPath: string) => {
+  const canDropNoteOnFolder = useCallback(
+    (notePath: string, folderPath: string) => {
     return canRetargetEntryToFolder({
       entry: entryByPath({ entries, notePath }),
       folderPath,
       vaultPath,
     })
-  }, [entries, vaultPath])
+    },
+    [entries, vaultPath],
+  )
 
-  const changeNoteType = useCallback(async (
-    notePath: string,
-    nextType: string,
-  ): Promise<RetargetResult> => {
+  const changeNoteType = useCallback(
+    async (notePath: string, nextType: string): Promise<RetargetResult> => {
     return changeEntryType({
       entry: entryByPath({ entries, notePath }),
       notePath,
@@ -202,12 +183,12 @@ export function useNoteRetargeting({
       setToastMessage,
       updateFrontmatter,
     })
-  }, [entries, selection, setSelection, setToastMessage, updateFrontmatter])
+    },
+    [entries, selection, setSelection, setToastMessage, updateFrontmatter],
+  )
 
-  const moveIntoFolder = useCallback(async (
-    notePath: string,
-    folderPath: string,
-  ): Promise<RetargetResult> => {
+  const moveIntoFolder = useCallback(
+    async (notePath: string, folderPath: string): Promise<RetargetResult> => {
     return moveEntryToFolder({
       entry: entryByPath({ entries, notePath }),
       notePath,
@@ -217,7 +198,9 @@ export function useNoteRetargeting({
       setSelection,
       moveNoteToFolder,
     })
-  }, [entries, moveNoteToFolder, selection, setSelection, vaultPath])
+    },
+    [entries, moveNoteToFolder, selection, setSelection, vaultPath],
+  )
 
   return {
     availableTypes,

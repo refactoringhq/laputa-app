@@ -1,25 +1,22 @@
-import {
-  type CSSProperties, type Dispatch, type ReactNode, type Ref, type RefObject, type SetStateAction,
-} from 'react'
-import type {
-  VaultEntry, SidebarSelection, ViewDefinition, ViewFile,
-} from '../../types'
-import {
-  DndContext, closestCenter, useSensors, type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext, useSortable, verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import type { CSSProperties, Dispatch, ReactNode, Ref, RefObject, SetStateAction } from 'react'
+import type { VaultEntry, SidebarSelection, ViewDefinition, ViewFile } from '../../types'
+import { DndContext, closestCenter, type useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  ArrowLeft, ArrowRight, Palette, PencilSimple, Plus, SidebarSimple, SlidersHorizontal, Trash,
+  ArrowLeft,
+  ArrowRight,
+  Palette,
+  PencilSimple,
+  Plus,
+  SidebarSimple,
+  SlidersHorizontal,
+  Trash,
 } from '@phosphor-icons/react'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
-import {
-  type SectionGroup, isSelectionActive, SectionContent, VisibilityPopover,
-} from '../SidebarParts'
+import { type SectionGroup, isSelectionActive, SectionContent, VisibilityPopover } from '../SidebarParts'
 import { TypeCustomizePopover } from '../TypeCustomizePopover'
 import { useDragRegion } from '../../hooks/useDragRegion'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
@@ -37,8 +34,7 @@ export { FavoritesSection } from './FavoritesSection'
 
 const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
   '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'
-const SIDEBAR_TITLE_BAR_LEFT_PADDING =
-  `var(--tolaria-macos-traffic-light-padding, ${MACOS_TRAFFIC_LIGHT_SAFE_PADDING}px)`
+const SIDEBAR_TITLE_BAR_LEFT_PADDING = `var(--tolaria-macos-traffic-light-padding, ${MACOS_TRAFFIC_LIGHT_SAFE_PADDING}px)`
 
 const SIDEBAR_COLLAPSE_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewEditorList)
 const HISTORY_BACK_SHORTCUT = getAppCommandShortcutDisplay(APP_COMMAND_IDS.viewGoBack)
@@ -62,21 +58,7 @@ export interface SidebarSectionProps {
   locale?: AppLocale
 }
 
-export function ViewsSection({
-  views,
-  selection,
-  onSelect,
-  collapsed,
-  onToggle,
-  onCreateView,
-  onEditView,
-  onDeleteView,
-  onUpdateViewDefinition,
-  onReorderViews,
-  sensors,
-  entries,
-  locale = 'en',
-}: {
+export function ViewsSection(options: {
   views: ViewFile[]
   selection: SidebarSelection
   onSelect: (selection: SidebarSelection) => void
@@ -91,6 +73,21 @@ export function ViewsSection({
   entries: VaultEntry[]
   locale?: AppLocale
 }) {
+  const {
+    views,
+    selection,
+    onSelect,
+    collapsed,
+    onToggle,
+    onCreateView,
+    onEditView,
+    onDeleteView,
+    onUpdateViewDefinition,
+    onReorderViews,
+    sensors,
+    entries,
+    locale = 'en',
+  } = options
   const viewIds = views.map((view) => view.filename)
   const handleViewDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -123,7 +120,10 @@ export function ViewsSection({
             className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
             aria-label={translate(locale, 'sidebar.action.createView')}
             title={translate(locale, 'sidebar.action.createView')}
-            onClick={(event) => { event.stopPropagation(); onCreateView() }}
+            onClick={(event) => {
+              event.stopPropagation()
+              onCreateView()
+            }}
           >
             <Plus size={12} className="text-muted-foreground hover:text-foreground" />
           </Button>
@@ -149,23 +149,16 @@ export function ViewsSection({
                 ))}
               </SortableContext>
             </DndContext>
-          ) : views.map(renderViewItem)}
+          ) : (
+            views.map(renderViewItem)
+          )}
         </div>
       )}
     </div>
   )
 }
 
-function SortableViewItem({
-  view,
-  selection,
-  onSelect,
-  onEditView,
-  onDeleteView,
-  onUpdateViewDefinition,
-  entries,
-  locale,
-}: {
+function SortableViewItem(options: {
   view: ViewFile
   selection: SidebarSelection
   onSelect: (selection: SidebarSelection) => void
@@ -175,6 +168,7 @@ function SortableViewItem({
   entries: VaultEntry[]
   locale?: AppLocale
 }) {
+  const { view, selection, onSelect, onEditView, onDeleteView, onUpdateViewDefinition, entries, locale } = options
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: view.filename })
 
   return (
@@ -202,13 +196,7 @@ function SortableViewItem({
   )
 }
 
-function SortableSection({
-  group,
-  sectionProps,
-}: {
-  group: SectionGroup
-  sectionProps: SidebarSectionProps
-}) {
+function SortableSection({ group, sectionProps }: { group: SectionGroup; sectionProps: SidebarSectionProps }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.type })
   const itemCount = countByFilter(sectionProps.entries, group.type).open
   const isRenaming = sectionProps.renamingType === group.type
@@ -246,25 +234,7 @@ function SortableSection({
   )
 }
 
-export function TypesSection({
-  entries,
-  visibleSections,
-  allSectionGroups,
-  sectionIds,
-  sensors,
-  handleDragEnd,
-  sectionProps,
-  collapsed,
-  onToggle,
-  showCustomize,
-  setShowCustomize,
-  isSectionVisible,
-  toggleVisibility,
-  onCreateNewType,
-  customizeRef,
-  workspaceOrder,
-  locale = 'en',
-}: {
+export function TypesSection(options: {
   entries: VaultEntry[]
   visibleSections: SectionGroup[]
   allSectionGroups: SectionGroup[]
@@ -283,6 +253,25 @@ export function TypesSection({
   workspaceOrder?: readonly string[]
   locale?: AppLocale
 }) {
+  const {
+    entries,
+    visibleSections,
+    allSectionGroups,
+    sectionIds,
+    sensors,
+    handleDragEnd,
+    sectionProps,
+    collapsed,
+    onToggle,
+    showCustomize,
+    setShowCustomize,
+    isSectionVisible,
+    toggleVisibility,
+    onCreateNewType,
+    customizeRef,
+    workspaceOrder,
+    locale = 'en',
+  } = options
   return (
     <div className="border-b border-border">
       <div ref={customizeRef} style={{ position: 'relative', padding: '0 6px' }}>
@@ -295,7 +284,10 @@ export function TypesSection({
               title={translate(locale, 'sidebar.action.customizeSections')}
               aria-label={translate(locale, 'sidebar.action.customizeSections')}
               className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={(event) => { event.stopPropagation(); setShowCustomize((value) => !value) }}
+              onClick={(event) => {
+                event.stopPropagation()
+                setShowCustomize((value) => !value)
+              }}
             >
               <SlidersHorizontal size={12} className="text-muted-foreground hover:text-foreground" />
             </Button>
@@ -308,7 +300,10 @@ export function TypesSection({
                 data-testid="create-type-btn"
                 title={translate(locale, 'sidebar.action.createType')}
                 aria-label={translate(locale, 'sidebar.action.createType')}
-                onClick={(event) => { event.stopPropagation(); onCreateNewType() }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCreateNewType()
+                }}
               >
                 <Plus size={12} className="text-muted-foreground hover:text-foreground" />
               </Button>
@@ -368,7 +363,10 @@ function SidebarTitleBarAction({
           variant="ghost"
           size="icon-xs"
           className={SIDEBAR_TITLE_BAR_ACTION_CLASSNAME}
-          onClick={(event) => { event.stopPropagation(); onClick?.() }}
+          onClick={(event) => {
+            event.stopPropagation()
+            onClick?.()
+          }}
           disabled={disabled}
           aria-label={label}
           title={title}
@@ -405,7 +403,13 @@ export function SidebarTitleBar({
     <div
       ref={dragRegionRef}
       className="shrink-0 flex items-center border-b border-border"
-      style={{ height: 52, padding: '0 8px', paddingLeft: SIDEBAR_TITLE_BAR_LEFT_PADDING, cursor: 'default', justifyContent: 'flex-start' }}
+      style={{
+        height: 52,
+        padding: '0 8px',
+        paddingLeft: SIDEBAR_TITLE_BAR_LEFT_PADDING,
+        cursor: 'default',
+        justifyContent: 'flex-start',
+      }}
     >
       <div className="flex items-center gap-5" style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}>
         {onCollapse && (

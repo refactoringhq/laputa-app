@@ -10,7 +10,18 @@ import { tryVaultApi } from './vault-api'
 
 export { addMockEntry, updateMockContent, trackMockChange }
 
-type MockHandler = (args: Record<string, unknown> | undefined) => unknown
+type MockHandler = (args?: unknown) => unknown
+
+function registerMockHandlers(): Record<string, MockHandler> {
+  return Object.fromEntries(
+    Object.entries(mockHandlers).map(([command, handler]) => [
+      command,
+      (args?: unknown) => Reflect.apply(handler, undefined, [args]),
+    ]),
+  )
+}
+
+const registeredMockHandlers = registerMockHandlers()
 
 export function isTauri(): boolean {
   if (typeof globalThis !== 'undefined' && typeof (globalThis as { isTauri?: unknown }).isTauri === 'boolean') {
@@ -23,14 +34,14 @@ export function isTauri(): boolean {
 // Initialize window globals for browser testing and Playwright overrides
 if (typeof window !== 'undefined') {
   window.__mockContent = MOCK_CONTENT
-  window.__mockHandlers = mockHandlers
+  window.__mockHandlers = registeredMockHandlers
 }
 
 function resolveMockHandler(command: string) {
   const windowHandler = typeof window === 'undefined' || !window.__mockHandlers
     ? undefined
     : Reflect.get(window.__mockHandlers, command) as MockHandler | undefined
-  return windowHandler ?? Reflect.get(mockHandlers, command) as MockHandler | undefined
+  return windowHandler ?? Reflect.get(registeredMockHandlers, command) as MockHandler | undefined
 }
 
 export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {

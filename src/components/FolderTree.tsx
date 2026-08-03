@@ -1,13 +1,5 @@
-import {
-  memo,
-  type MouseEvent as ReactMouseEvent,
-  useCallback,
-  useMemo,
-  useState,
-} from 'react'
-import {
-  Plus,
-} from '@phosphor-icons/react'
+import { memo, type MouseEvent as ReactMouseEvent, useCallback, useMemo, useState } from 'react'
+import { Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import type { FolderCreationParent, FolderNode, SidebarSelection } from '../types'
 import { FolderContextMenu } from './folder-tree/FolderContextMenu'
@@ -39,7 +31,8 @@ interface FolderTreeProps {
   vaultRootPath?: string
 }
 
-interface FolderTreeBodyProps extends Pick<
+interface FolderTreeBodyProps
+  extends Pick<
   FolderTreeProps,
   | 'locale'
   | 'onCancelRenameFolder'
@@ -79,7 +72,12 @@ function buildRootNode(folders: FolderNode[], vaultRootPath: string | undefined,
   }
 }
 
-function useDisplayedFolders(folders: FolderNode[], expanded: Record<string, boolean>, vaultRootPath: string | undefined, locale: AppLocale) {
+function useDisplayedFolders(
+  folders: FolderNode[],
+  expanded: Record<string, boolean>,
+  vaultRootPath: string | undefined,
+  locale: AppLocale,
+) {
   return useMemo(() => {
     if (folders.some((folder) => folder.rootPath)) {
       const expandedRoots = Object.fromEntries(
@@ -122,7 +120,8 @@ function useCreateFolderSubmit({
   onCreateFolder?: (name: string, parent?: FolderCreationParent) => Promise<boolean> | boolean
   selection: SidebarSelection
 }) {
-  return useCallback(async (value: string) => {
+  return useCallback(
+    async (value: string) => {
     const nextName = value.trim()
     if (!nextName || !onCreateFolder) {
       closeCreateForm()
@@ -136,154 +135,125 @@ function useCreateFolderSubmit({
     closeCreateForm()
     if (parent?.path) expandFolder(folderNodeKey(parent))
     return created
-  }, [closeCreateForm, creationParent, expandFolder, onCreateFolder, selection])
+    },
+    [closeCreateForm, creationParent, expandFolder, onCreateFolder, selection],
+  )
 }
 
-export const FolderTree = memo(function FolderTree({
-  folders,
-  selection,
-  onSelect,
-  onCreateFolder,
-  onRenameFolder,
-  onDeleteFolder,
-  folderFileActions,
-  renamingFolderPath,
-  onStartRenameFolder,
-  onCancelRenameFolder,
-  onCanDropNote,
-  onMoveNoteToFolder,
-  collapsed: externalCollapsed,
-  locale = 'en',
-  onToggle,
-  vaultRootPath,
-}: FolderTreeProps) {
+export const FolderTree = memo(function FolderTree(options: FolderTreeProps) {
+  const { folders, selection, onSelect, onCreateFolder, onRenameFolder, onDeleteFolder, folderFileActions, renamingFolderPath, onStartRenameFolder, onCancelRenameFolder, onCanDropNote, onMoveNoteToFolder, collapsed: externalCollapsed, locale = 'en', onToggle, vaultRootPath } = options
   const [creationParent, setCreationParent] = useState<FolderCreationParent | undefined>(undefined)
   const {
-    closeCreateForm,
-    expanded,
-    expandFolder,
-    handleToggleSection,
-    isCreating,
-    openCreateForm,
-    sectionCollapsed,
-    toggleFolder,
-  } = useFolderTreeDisclosure({
-    collapsed: externalCollapsed,
-    onToggle,
-    renamingFolderPath,
-    selection,
-  })
-  const openCreateFormForParent = useCallback((folderPath: string, rootPath?: string) => {
-    setCreationParent(folderCreationParent(folderPath, rootPath))
-    openCreateForm()
-  }, [openCreateForm])
-  const {
-    closeContextMenu,
-    contextMenu,
-    handleCopyPathFromMenu,
-    handleCreateNoteFromMenu,
-    handleCreateFolderFromMenu,
-    handleDeleteFromMenu,
-    handleOpenMenu,
-    handleRevealFromMenu,
-    handleRenameFromMenu,
-    menuRef,
-  } = useFolderContextMenu({
-    onDeleteFolder,
-    folderFileActions,
-    onCreateFolder: onCreateFolder ? openCreateFormForParent : undefined,
-    onStartRenameFolder,
-  })
+        closeCreateForm,
+        expanded,
+        expandFolder,
+        handleToggleSection,
+        isCreating,
+        openCreateForm,
+        sectionCollapsed,
+        toggleFolder,
+      } = useFolderTreeDisclosure({
+        collapsed: externalCollapsed,
+        onToggle,
+        renamingFolderPath,
+        selection,
+      })
+      const openCreateFormForParent = useCallback(
+        (folderPath: string, rootPath?: string) => {
+        setCreationParent(folderCreationParent(folderPath, rootPath))
+        openCreateForm()
+        },
+        [openCreateForm],
+      )
+      const {
+        closeContextMenu,
+        contextMenu,
+        handleCopyPathFromMenu,
+        handleCreateNoteFromMenu,
+        handleCreateFolderFromMenu,
+        handleDeleteFromMenu,
+        handleOpenMenu,
+        handleRevealFromMenu,
+        handleRenameFromMenu,
+        menuRef,
+      } = useFolderContextMenu({
+        onDeleteFolder,
+        folderFileActions,
+        onCreateFolder: onCreateFolder ? openCreateFormForParent : undefined,
+        onStartRenameFolder,
+      })
 
-  const handleCloseCreateForm = useCallback(() => {
-    closeCreateForm()
-    setCreationParent(undefined)
-  }, [closeCreateForm])
+      const handleCloseCreateForm = useCallback(() => {
+        closeCreateForm()
+        setCreationParent(undefined)
+      }, [closeCreateForm])
 
-  const handleCreateFolderSubmit = useCreateFolderSubmit({
-    closeCreateForm: handleCloseCreateForm,
-    creationParent,
-    expandFolder,
-    onCreateFolder,
-    selection,
-  })
+      const handleCreateFolderSubmit = useCreateFolderSubmit({
+        closeCreateForm: handleCloseCreateForm,
+        creationParent,
+        expandFolder,
+        onCreateFolder,
+        selection,
+      })
 
-  const handleCreateFolderClick = useCallback(() => {
-    closeContextMenu()
-    setCreationParent(undefined)
-    openCreateForm()
-  }, [closeContextMenu, openCreateForm])
+      const handleCreateFolderClick = useCallback(() => {
+        closeContextMenu()
+        setCreationParent(undefined)
+        openCreateForm()
+      }, [closeContextMenu, openCreateForm])
 
-  const { displayedExpanded, displayedFolders } = useDisplayedFolders(folders, expanded, vaultRootPath, locale)
+      const { displayedExpanded, displayedFolders } = useDisplayedFolders(folders, expanded, vaultRootPath, locale)
 
-  if (displayedFolders.length === 0 && !isCreating) return null
+      if (displayedFolders.length === 0 && !isCreating) return null
 
-  return (
-    <div className="border-b border-border" style={{ padding: '0 6px' }}>
-      <SidebarGroupHeader label={translate(locale, 'sidebar.group.folders')} collapsed={sectionCollapsed} onToggle={handleToggleSection}>
-        {onCreateFolder && (
-          <CreateFolderButton locale={locale} onCreate={handleCreateFolderClick} />
-        )}
-      </SidebarGroupHeader>
-      <FolderTreeBody
-        displayedExpanded={displayedExpanded}
-        displayedFolders={displayedFolders}
-        isCreating={isCreating}
-        locale={locale}
-        creationParent={creationParent}
-        onCancelCreateFolder={handleCloseCreateForm}
-        onCancelRenameFolder={onCancelRenameFolder}
-        onCreateFolderSubmit={handleCreateFolderSubmit}
-        onDeleteFolder={onDeleteFolder}
-        onOpenMenu={handleOpenMenu}
-        onRenameFolder={onRenameFolder}
-        onSelect={onSelect}
-        onStartRenameFolder={onStartRenameFolder}
-        renamingFolderPath={renamingFolderPath}
-        onCanDropNote={onCanDropNote}
-        onMoveNoteToFolder={onMoveNoteToFolder}
-        rootPath={vaultRootPath}
-        sectionCollapsed={sectionCollapsed}
-        selection={selection}
-        toggleFolder={toggleFolder}
-      />
-      <FolderContextMenu
-        menu={contextMenu}
-        menuRef={menuRef}
-        onDelete={handleDeleteFromMenu}
-        onReveal={handleRevealFromMenu}
-        onCopyPath={handleCopyPathFromMenu}
-        onCreateFolder={handleCreateFolderFromMenu}
-        onCreateNote={handleCreateNoteFromMenu}
-        onRename={handleRenameFromMenu}
-        locale={locale}
-      />
-    </div>
-  )
-})
+      return (
+        <div className="border-b border-border" style={{ padding: '0 6px' }}>
+          <SidebarGroupHeader
+            label={translate(locale, 'sidebar.group.folders')}
+            collapsed={sectionCollapsed}
+            onToggle={handleToggleSection}
+          >
+            {onCreateFolder && <CreateFolderButton locale={locale} onCreate={handleCreateFolderClick} />}
+          </SidebarGroupHeader>
+          <FolderTreeBody
+            displayedExpanded={displayedExpanded}
+            displayedFolders={displayedFolders}
+            isCreating={isCreating}
+            locale={locale}
+            creationParent={creationParent}
+            onCancelCreateFolder={handleCloseCreateForm}
+            onCancelRenameFolder={onCancelRenameFolder}
+            onCreateFolderSubmit={handleCreateFolderSubmit}
+            onDeleteFolder={onDeleteFolder}
+            onOpenMenu={handleOpenMenu}
+            onRenameFolder={onRenameFolder}
+            onSelect={onSelect}
+            onStartRenameFolder={onStartRenameFolder}
+            renamingFolderPath={renamingFolderPath}
+            onCanDropNote={onCanDropNote}
+            onMoveNoteToFolder={onMoveNoteToFolder}
+            rootPath={vaultRootPath}
+            sectionCollapsed={sectionCollapsed}
+            selection={selection}
+            toggleFolder={toggleFolder}
+          />
+          <FolderContextMenu
+            menu={contextMenu}
+            menuRef={menuRef}
+            onDelete={handleDeleteFromMenu}
+            onReveal={handleRevealFromMenu}
+            onCopyPath={handleCopyPathFromMenu}
+            onCreateFolder={handleCreateFolderFromMenu}
+            onCreateNote={handleCreateNoteFromMenu}
+            onRename={handleRenameFromMenu}
+            locale={locale}
+          />
+        </div>
+      )
+    })
 
-function FolderTreeBody({
-  displayedExpanded,
-  displayedFolders,
-  isCreating,
-  locale = 'en',
-  creationParent,
-  onCancelCreateFolder,
-  onCancelRenameFolder,
-  onCreateFolderSubmit,
-  onDeleteFolder,
-  onOpenMenu,
-  onRenameFolder,
-  onSelect,
-  onStartRenameFolder,
-  onCanDropNote,
-  onMoveNoteToFolder,
-  renamingFolderPath,
-  rootPath,
-  sectionCollapsed,
-  selection,
-  toggleFolder,
-}: FolderTreeBodyProps) {
+    function FolderTreeBody(options: FolderTreeBodyProps) {
+      const { displayedExpanded, displayedFolders, isCreating, locale = 'en', creationParent, onCancelCreateFolder, onCancelRenameFolder, onCreateFolderSubmit, onDeleteFolder, onOpenMenu, onRenameFolder, onSelect, onStartRenameFolder, onCanDropNote, onMoveNoteToFolder, renamingFolderPath, rootPath, sectionCollapsed, selection, toggleFolder } = options
   if (sectionCollapsed) return null
 
   return (
@@ -330,13 +300,7 @@ function FolderTreeBody({
   )
 }
 
-function CreateFolderButton({
-  locale,
-  onCreate,
-}: {
-  locale: AppLocale
-  onCreate: () => void
-}) {
+function CreateFolderButton({ locale, onCreate }: { locale: AppLocale; onCreate: () => void }) {
   return (
     <Button
       type="button"

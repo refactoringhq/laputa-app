@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
-import { type AiAgentId } from '../lib/aiAgents'
+import type { AiAgentId } from '../lib/aiAgents'
 import { agentTargets, type AiTarget } from '../lib/aiTargets'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { AiWorkspaceConversationSetting } from '../types'

@@ -1,12 +1,5 @@
 import { useRef, useState } from 'react'
-import {
-  Archive,
-  ArrowSquareIn,
-  Check,
-  CircleNotch,
-  Plus,
-  SidebarSimple,
-} from '@phosphor-icons/react'
+import { Archive, ArrowSquareIn, Check, CircleNotch, Plus, SidebarSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -200,28 +193,14 @@ function ConversationArchiveButton({
       aria-label={label}
       title={label}
       disabled={disabled}
-      onClick={() => showArchived ? onRestore(conversationId) : onArchive(conversationId)}
+      onClick={() => (showArchived ? onRestore(conversationId) : onArchive(conversationId))}
     >
       {showArchived ? <ArrowSquareIn size={16} /> : <Archive size={16} />}
     </Button>
   )
 }
 
-function ConversationRow({
-  active,
-  conversation,
-  editing,
-  locale,
-  onCanArchive,
-  onArchive,
-  onRename,
-  onRestore,
-  onSelect,
-  onStartEditing,
-  showArchived,
-  status,
-  stopEditing,
-}: {
+function ConversationRow(options: {
   active: boolean
   conversation: AiConversation
   editing: boolean
@@ -236,6 +215,21 @@ function ConversationRow({
   status: AgentStatus
   stopEditing: () => void
 }) {
+  const {
+    active,
+    conversation,
+    editing,
+    locale,
+    onCanArchive,
+    onArchive,
+    onRename,
+    onRestore,
+    onSelect,
+    onStartEditing,
+    showArchived,
+    status,
+    stopEditing,
+  } = options
   return (
     <div className="group relative flex min-w-0 items-center">
       {editing ? (
@@ -276,25 +270,38 @@ function ConversationRow({
   )
 }
 
-function ConversationList({
-  activeId,
-  conversations,
-  editingId,
-  locale,
-  onCanArchive,
-  onArchive,
-  onRename,
-  onRestore,
-  onSelect,
-  setEditingId,
-  showArchived,
-  statuses,
-}: Pick<ConversationSidebarProps,
-  'activeId' | 'conversations' | 'locale' | 'onCanArchive' | 'onArchive' | 'onRename' | 'onRestore' | 'onSelect' | 'showArchived' | 'statuses'
-> & {
-  editingId: string | null
-  setEditingId: (id: string | null) => void
-}) {
+function ConversationList(
+  options: Pick<
+    ConversationSidebarProps,
+    | 'activeId'
+    | 'conversations'
+    | 'locale'
+    | 'onCanArchive'
+    | 'onArchive'
+    | 'onRename'
+    | 'onRestore'
+    | 'onSelect'
+    | 'showArchived'
+    | 'statuses'
+  > & {
+    editingId: string | null
+    setEditingId: (id: string | null) => void
+  },
+) {
+  const {
+    activeId,
+    conversations,
+    editingId,
+    locale,
+    onCanArchive,
+    onArchive,
+    onRename,
+    onRestore,
+    onSelect,
+    setEditingId,
+    showArchived,
+    statuses,
+  } = options
   const visibleConversations = conversations.filter((conversation) => conversation.archived === showArchived)
   const emptyLabel = showArchived
     ? translate(locale, 'ai.workspace.noArchivedChats')
@@ -345,19 +352,22 @@ function ArchivedConversationsToggle({
   )
 }
 
-function ExpandedConversationSidebar({
-  activeId,
-  conversations,
-  locale,
-  onCanArchive,
-  onArchive,
-  onRename,
-  onRestore,
-  onSelect,
-  setShowArchived,
-  showArchived,
-  statuses,
-}: Omit<ConversationSidebarProps, 'collapsed' | 'onNewChat' | 'onToggleCollapsed' | 'sidebarWidth'>) {
+function ExpandedConversationSidebar(
+  options: Omit<ConversationSidebarProps, 'collapsed' | 'onNewChat' | 'onToggleCollapsed' | 'sidebarWidth'>,
+) {
+  const {
+    activeId,
+    conversations,
+    locale,
+    onCanArchive,
+    onArchive,
+    onRename,
+    onRestore,
+    onSelect,
+    setShowArchived,
+    showArchived,
+    statuses,
+  } = options
   const [editingId, setEditingId] = useState<string | null>(null)
 
   return (
@@ -378,32 +388,29 @@ function ExpandedConversationSidebar({
           statuses={statuses}
         />
       </div>
-      <ArchivedConversationsToggle
-        locale={locale}
-        setShowArchived={setShowArchived}
-        showArchived={showArchived}
-      />
+      <ArchivedConversationsToggle locale={locale} setShowArchived={setShowArchived} showArchived={showArchived} />
     </>
   )
 }
 
-export function ConversationSidebar({
-  activeId,
-  collapsed,
-  conversations,
-  locale,
-  onCanArchive,
-  onArchive,
-  onNewChat,
-  onRename,
-  onRestore,
-  onSelect,
-  onToggleCollapsed,
-  setShowArchived,
-  showArchived,
-  sidebarWidth,
-  statuses,
-}: ConversationSidebarProps) {
+export function ConversationSidebar(options: ConversationSidebarProps) {
+  const {
+    activeId,
+    collapsed,
+    conversations,
+    locale,
+    onCanArchive,
+    onArchive,
+    onNewChat,
+    onRename,
+    onRestore,
+    onSelect,
+    onToggleCollapsed,
+    setShowArchived,
+    showArchived,
+    sidebarWidth,
+    statuses,
+  } = options
   return (
     <div
       className="flex shrink-0 flex-col border-r border-border bg-sidebar transition-[width]"

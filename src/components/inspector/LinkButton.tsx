@@ -7,7 +7,7 @@ export function StatusSuffix({ isArchived }: { isArchived: boolean }) {
   return null
 }
 
-export function LinkButton({ label, noteIcon, typeColor, bgColor, isArchived, onClick, onRemove, title, TypeIcon }: {
+export function LinkButton(options: {
   label: string
   noteIcon?: string | null
   typeColor: string
@@ -18,6 +18,7 @@ export function LinkButton({ label, noteIcon, typeColor, bgColor, isArchived, on
   title?: string
   TypeIcon: ComponentType<SVGAttributes<SVGSVGElement>>
 }) {
+  const { label, noteIcon, typeColor, bgColor, isArchived, onClick, onRemove, title, TypeIcon } = options
   const isDimmed = isArchived
   const color = isDimmed ? 'var(--muted-foreground)' : typeColor
   return (
@@ -25,8 +26,12 @@ export function LinkButton({ label, noteIcon, typeColor, bgColor, isArchived, on
       className={`group/link flex w-full min-w-0 items-center justify-between gap-2${bgColor ? ' ring-inset hover:ring-1 hover:ring-current' : ' hover:opacity-80'}`}
       style={{
         background: isDimmed ? 'var(--muted)' : (bgColor ?? 'transparent'),
-        color, borderRadius: 6, padding: bgColor ? '6px 10px' : '4px 0',
-        fontSize: 12, fontWeight: 500, opacity: isDimmed ? 0.7 : 1,
+        color,
+        borderRadius: 6,
+        padding: bgColor ? '6px 10px' : '4px 0',
+        fontSize: 12,
+        fontWeight: 500,
+        opacity: isDimmed ? 0.7 : 1,
       }}
     >
       <button

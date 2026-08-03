@@ -47,11 +47,7 @@ function isWelcomeNavigationKey(event: globalThis.KeyboardEvent): boolean {
   return event.key === 'Tab' || event.key === 'ArrowDown' || event.key === 'ArrowUp'
 }
 
-function nextWelcomeActionIndex(
-  currentIndex: number,
-  event: globalThis.KeyboardEvent,
-  actionCount: number,
-): number {
+function nextWelcomeActionIndex(currentIndex: number, event: globalThis.KeyboardEvent, actionCount: number): number {
   const direction = event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey) ? -1 : 1
   return (currentIndex + direction + actionCount) % actionCount
 }
@@ -60,8 +56,7 @@ function focusBelongsToWelcomeActions(
   activeElement: Element | null,
   actionButtonRefs: WelcomeActionButtonRef[],
 ): boolean {
-  return activeElement === document.body
-    || actionButtonRefs.some(({ current }) => current === activeElement)
+  return activeElement === document.body || actionButtonRefs.some(({ current }) => current === activeElement)
 }
 
 function getFocusedWelcomeActionIndex(
@@ -74,17 +69,11 @@ function getFocusedWelcomeActionIndex(
   )
 }
 
-function focusWelcomeAction(
-  actionButtonRefs: WelcomeActionButtonRef[],
-  actionIndex: number,
-): void {
+function focusWelcomeAction(actionButtonRefs: WelcomeActionButtonRef[], actionIndex: number): void {
   actionButtonRefs.at(actionIndex)?.current?.focus()
 }
 
-function triggerWelcomeAction(
-  actionIndex: number,
-  actions: WelcomeAction[],
-): void {
+function triggerWelcomeAction(actionIndex: number, actions: WelcomeAction[]): void {
   const action = actions.at(actionIndex)
   if (action && !action.disabled) action.run()
 }
@@ -245,20 +234,21 @@ interface OptionButtonProps {
   buttonRef?: React.RefObject<HTMLButtonElement | null>
 }
 
-function OptionButton({
-  icon,
-  iconBg,
-  label,
-  description,
-  loadingLabel,
-  loadingDescription,
-  onClick,
-  disabled,
-  loading,
-  testId,
-  autoFocus = false,
-  buttonRef,
-}: OptionButtonProps) {
+function OptionButton(options: OptionButtonProps) {
+  const {
+    icon,
+    iconBg,
+    label,
+    description,
+    loadingLabel,
+    loadingDescription,
+    onClick,
+    disabled,
+    loading,
+    testId,
+    autoFocus = false,
+    buttonRef,
+  } = options
   const [hover, setHover] = useState(false)
 
   return (
@@ -304,7 +294,9 @@ function getWelcomeScreenPresentation(
       openFolderLabel: translate(locale, 'onboarding.welcome.openExisting'),
       subtitle: translate(locale, 'onboarding.welcome.subtitle'),
       templateDescription: isOffline
-        ? translate(locale, 'onboarding.welcome.templateOffline', { path: defaultVaultPath })
+        ? translate(locale, 'onboarding.welcome.templateOffline', {
+            path: defaultVaultPath,
+          })
         : translate(locale, 'onboarding.welcome.templateDescription'),
       title: translate(locale, 'onboarding.welcome.title'),
     }
@@ -316,7 +308,9 @@ function getWelcomeScreenPresentation(
     openFolderLabel: translate(locale, 'onboarding.welcome.openExisting'),
     subtitle: translate(locale, 'onboarding.welcome.missingSubtitle'),
     templateDescription: isOffline
-      ? translate(locale, 'onboarding.welcome.templateOffline', { path: defaultVaultPath })
+      ? translate(locale, 'onboarding.welcome.templateOffline', {
+          path: defaultVaultPath,
+        })
       : translate(locale, 'onboarding.welcome.templateDescription'),
     title: translate(locale, 'onboarding.welcome.title'),
   }
@@ -329,25 +323,19 @@ function useWelcomeActionButtons({
   onCreateEmptyVault,
   onOpenFolder,
   onCreateVault,
-}: Pick<
-  WelcomeScreenProps,
-  'mode' | 'isOffline' | 'onCreateEmptyVault' | 'onOpenFolder' | 'onCreateVault'
-> & {
+}: Pick<WelcomeScreenProps, 'mode' | 'isOffline' | 'onCreateEmptyVault' | 'onOpenFolder' | 'onCreateVault'> & {
   busy: boolean
 }) {
   const templateActionRef = useRef<HTMLButtonElement>(null)
   const createEmptyActionRef = useRef<HTMLButtonElement>(null)
   const openFolderActionRef = useRef<HTMLButtonElement>(null)
-  const actionButtonRefs = useMemo(
-    () => [templateActionRef, createEmptyActionRef, openFolderActionRef],
-    [],
-  )
+  const actionButtonRefs = useMemo(() => [templateActionRef, createEmptyActionRef, openFolderActionRef], [])
   const actions = useMemo<WelcomeAction[]>(
-    () => ([
+    () => [
       { disabled: isOffline, run: onCreateVault },
       { disabled: false, run: onCreateEmptyVault },
       { disabled: false, run: onOpenFolder },
-    ]),
+    ],
     [isOffline, onCreateEmptyVault, onCreateVault, onOpenFolder],
   )
 
@@ -370,10 +358,7 @@ function useWelcomeActionButtons({
       const actionIndex = getFocusedWelcomeActionIndex(activeElement, actionButtonRefs)
       if (isWelcomeNavigationKey(event)) {
         event.preventDefault()
-        focusWelcomeAction(
-          actionButtonRefs,
-          nextWelcomeActionIndex(actionIndex, event, actionButtonRefs.length),
-        )
+        focusWelcomeAction(actionButtonRefs, nextWelcomeActionIndex(actionIndex, event, actionButtonRefs.length))
         return
       }
 
@@ -394,11 +379,7 @@ function useWelcomeActionButtons({
   }
 }
 
-function WelcomeHeader({
-  presentation,
-}: {
-  presentation: WelcomeScreenPresentation
-}) {
+function WelcomeHeader({ presentation }: { presentation: WelcomeScreenPresentation }) {
   return (
     <>
       <div
@@ -412,39 +393,47 @@ function WelcomeHeader({
 
       <div style={{ textAlign: 'center' }}>
         <h1 style={TITLE_STYLE}>{presentation.title}</h1>
-        <p style={{ ...SUBTITLE_STYLE, marginTop: 8 }}>
-          {presentation.subtitle}
-        </p>
+        <p style={{ ...SUBTITLE_STYLE, marginTop: 8 }}>{presentation.subtitle}</p>
       </div>
     </>
   )
 }
 
-function WelcomeActions({
-  busy,
-  createEmptyActionRef,
-  creatingAction,
-  isOffline,
-  locale,
-  onCreateEmptyVault,
-  onCreateVault,
-  onOpenFolder,
-  openFolderActionRef,
-  presentation,
-  templateActionRef,
-}: Pick<
-  WelcomeScreenProps,
-  'creatingAction' | 'isOffline' | 'onCreateEmptyVault' | 'onCreateVault' | 'onOpenFolder'
-> & {
-  busy: boolean
-  createEmptyActionRef: WelcomeActionButtonRef
-  locale: AppLocale
-  openFolderActionRef: WelcomeActionButtonRef
-  presentation: WelcomeScreenPresentation
-  templateActionRef: WelcomeActionButtonRef
-}) {
+function WelcomeActions(
+  options: Pick<
+    WelcomeScreenProps,
+    'creatingAction' | 'isOffline' | 'onCreateEmptyVault' | 'onCreateVault' | 'onOpenFolder'
+  > & {
+    busy: boolean
+    createEmptyActionRef: WelcomeActionButtonRef
+    locale: AppLocale
+    openFolderActionRef: WelcomeActionButtonRef
+    presentation: WelcomeScreenPresentation
+    templateActionRef: WelcomeActionButtonRef
+  },
+) {
+  const {
+    busy,
+    createEmptyActionRef,
+    creatingAction,
+    isOffline,
+    locale,
+    onCreateEmptyVault,
+    onCreateVault,
+    onOpenFolder,
+    openFolderActionRef,
+    presentation,
+    templateActionRef,
+  } = options
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
       <OptionButton
         icon={<Rocket size={18} style={{ color: 'var(--accent-purple)' }} />}
         iconBg="var(--accent-purple-light)"
@@ -551,19 +540,20 @@ function WelcomeDocsLink({ locale }: { locale: AppLocale }) {
   )
 }
 
-export function WelcomeScreen({
-  mode,
-  locale = 'en',
-  defaultVaultPath,
-  onCreateVault,
-  onRetryCreateVault,
-  onCreateEmptyVault,
-  onOpenFolder,
-  isOffline,
-  creatingAction,
-  error,
-  canRetryTemplate,
-}: WelcomeScreenProps) {
+export function WelcomeScreen(options: WelcomeScreenProps) {
+  const {
+    mode,
+    locale = 'en',
+    defaultVaultPath,
+    onCreateVault,
+    onRetryCreateVault,
+    onCreateEmptyVault,
+    onOpenFolder,
+    isOffline,
+    creatingAction,
+    error,
+    canRetryTemplate,
+  } = options
   const busy = creatingAction !== null
   const presentation = getWelcomeScreenPresentation(mode, defaultVaultPath, isOffline, locale)
   const { templateActionRef, createEmptyActionRef, openFolderActionRef } = useWelcomeActionButtons({
@@ -576,12 +566,7 @@ export function WelcomeScreen({
   })
 
   return (
-    <OnboardingShell
-      style={{ background: 'var(--sidebar)' }}
-      contentStyle={CARD_STYLE}
-      testId="welcome-screen"
-    >
-      <>
+    <OnboardingShell style={{ background: 'var(--sidebar)' }} contentStyle={CARD_STYLE} testId="welcome-screen">
         <WelcomeHeader presentation={presentation} />
         <div style={DIVIDER_STYLE} />
         <WelcomeActions
@@ -605,7 +590,6 @@ export function WelcomeScreen({
           onRetryCreateVault={onRetryCreateVault}
         />
         <WelcomeDocsLink locale={locale} />
-      </>
     </OnboardingShell>
   )
 }

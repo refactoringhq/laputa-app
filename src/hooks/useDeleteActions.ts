@@ -16,8 +16,8 @@ interface UseDeleteActionsInput {
   removeEntry: (path: string) => void
   removeEntries?: (paths: string[]) => void
   resolveVaultPathForPath?: (path: string) => string | null | undefined
-  refreshModifiedFiles: () => Promise<unknown> | void
-  reloadVault: () => Promise<unknown> | void
+  refreshModifiedFiles: () => Promise<unknown> | undefined
+  reloadVault: () => Promise<unknown> | undefined
   setToastMessage: (msg: string | null) => void
 }
 

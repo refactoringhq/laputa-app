@@ -57,7 +57,7 @@ export function useNoteGitUrls({
           trackEvent('note_git_url_copied', { outcome: 'success' })
         })
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         setToastMessage(translate(locale, 'noteGitUrls.error.copyFailed', { detail: errorDetail(error) }))
         trackEvent('note_git_url_copied', { outcome: 'failed', reason: 'copy_failed' })
       })

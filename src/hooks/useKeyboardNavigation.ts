@@ -15,7 +15,7 @@ function navigateNote(
   onSelect: React.RefObject<(entry: VaultEntry) => void>,
   direction: 1 | -1,
 ) {
-  const notes = visibleNotesRef.current!
+  const notes = visibleNotesRef.current
   if (notes.length === 0) return
 
   const currentPath = activeTabPathRef.current
@@ -31,9 +31,9 @@ function navigateNote(
   const nextNote = notes.at(nextIndex)
   if (!nextNote) return
   if (currentPath) {
-    onReplace.current!(nextNote)
+    onReplace.current(nextNote)
   } else {
-    onSelect.current!(nextNote)
+    onSelect.current(nextNote)
   }
 }
 

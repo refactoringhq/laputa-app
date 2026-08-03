@@ -1,8 +1,19 @@
 import { type KeyboardEvent, type ReactNode, useCallback } from 'react'
 import {
-  PencilSimple, MagnifyingGlass, Trash, ChartBar, Eye,
-  CircleNotch, CheckCircle, XCircle, CaretRight, CaretDown,
-  Terminal, File, FolderOpen, NotePencil,
+  PencilSimple,
+  MagnifyingGlass,
+  Trash,
+  ChartBar,
+  Eye,
+  CircleNotch,
+  CheckCircle,
+  XCircle,
+  CaretRight,
+  CaretDown,
+  Terminal,
+  File,
+  FolderOpen,
+  NotePencil,
 } from '@phosphor-icons/react'
 
 export type AiActionStatus = 'pending' | 'done' | 'error'
@@ -143,16 +154,11 @@ function ActionIcon({
   return expanded ? <CaretDown size={12} /> : <CaretRight size={12} />
 }
 
-function DetailBlock({ label, content, isError }: {
-  label: string; content: string; isError?: boolean
-}) {
+function DetailBlock({ label, content, isError }: { label: string; content: string; isError?: boolean }) {
   const { text, truncated } = truncateText(content)
   return (
     <div style={{ marginTop: 6 }}>
-      <div
-        className="text-muted-foreground"
-        style={{ fontSize: 10, fontWeight: 600, marginBottom: 2 }}
-      >
+      <div className="text-muted-foreground" style={{ fontSize: 10, fontWeight: 600, marginBottom: 2 }}>
         {label}
       </div>
       <pre
@@ -171,7 +177,8 @@ function DetailBlock({ label, content, isError }: {
           overflow: 'auto',
         }}
       >
-        {text}{truncated && <span className="text-muted-foreground">{'…'}</span>}
+        {text}
+        {truncated && <span className="text-muted-foreground">{'…'}</span>}
       </pre>
     </div>
   )
@@ -194,26 +201,25 @@ function ActionCardDetails({
 
   const formattedInput = input ? formatInputForDisplay(input) : undefined
   return (
-    <div
-      data-testid="action-card-details"
-      style={{ padding: '0 10px 8px 10px' }}
-    >
+    <div data-testid="action-card-details" style={{ padding: '0 10px 8px 10px' }}>
       {formattedInput && <DetailBlock label="Input" content={formattedInput} />}
-      {output && (
-        <DetailBlock label="Output" content={output} isError={status === 'error'} />
-      )}
+      {output && <DetailBlock label="Output" content={output} isError={status === 'error'} />}
     </div>
   )
 }
 
-export function AiActionCard({
-  tool, label, path, status, input, output, expanded, onToggle, onOpenNote,
-}: AiActionCardProps) {
+export function AiActionCard(options: AiActionCardProps) {
+  const { tool, label, path, status, input, output, expanded, onToggle, onOpenNote } = options
   const renderIcon = TOOL_ICON_BY_NAME.get(tool) ?? DEFAULT_ICON
   const hasDetails = hasActionDetails(input, output)
-  const directOpenPath = resolveDirectOpenPath({ path, onOpenNote, hasDetails })
+  const directOpenPath = resolveDirectOpenPath({
+    path,
+    onOpenNote,
+    hasDetails,
+  })
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onToggle()
@@ -221,7 +227,9 @@ export function AiActionCard({
       e.preventDefault()
       onToggle()
     }
-  }, [onToggle, expanded])
+    },
+    [onToggle, expanded],
+  )
 
   const handleClick = useCallback(() => {
     if (directOpenPath && onOpenNote) {
@@ -250,13 +258,7 @@ export function AiActionCard({
         renderIcon={renderIcon}
         status={status}
       />
-      <ActionCardDetails
-        expanded={expanded}
-        hasDetails={hasDetails}
-        input={input}
-        output={output}
-        status={status}
-      />
+      <ActionCardDetails expanded={expanded} hasDetails={hasDetails} input={input} output={output} status={status} />
     </div>
   )
 }

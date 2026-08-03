@@ -38,7 +38,7 @@ export function useSheetPointerCoordinatePatching({
     }
 
     document.addEventListener('pointerup', scheduleAfterPointerInteraction, true)
-    return () => document.removeEventListener('pointerup', scheduleAfterPointerInteraction, true)
+    return () => { document.removeEventListener('pointerup', scheduleAfterPointerInteraction, true); }
   }, [])
 
   return sheetPointerActiveRef

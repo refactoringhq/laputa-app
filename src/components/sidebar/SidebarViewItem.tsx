@@ -46,50 +46,39 @@ function getViewRowStyle(showCount: boolean, isActive: boolean, accent: ViewAcce
   }
 }
 
-function ViewIcon({
-  icon,
-  isActive,
-  accent,
-}: {
-  icon: string | null
-  isActive: boolean
-  accent: ViewAccent | null
-}) {
+function ViewIcon({ icon, isActive, accent }: { icon: string | null; isActive: boolean; accent: ViewAccent | null }) {
   if (icon) return <NoteTitleIcon icon={icon} size={16} color={accent?.color} />
-  return <Funnel size={16} weight={isActive ? 'fill' : 'regular'} style={accent ? { color: accent.color } : undefined} />
+  return (
+    <Funnel size={16} weight={isActive ? 'fill' : 'regular'} style={accent ? { color: accent.color } : undefined} />
+  )
 }
 
-function ViewCountChip({
-  count,
-  isActive,
-  accent,
-}: {
-  count: number
-  isActive: boolean
-  accent: ViewAccent | null
-}) {
+function ViewCountChip({ count, isActive, accent }: { count: number; isActive: boolean; accent: ViewAccent | null }) {
   if (count <= 0) return null
   return (
     <SidebarCountPill
       count={count}
       className="text-muted-foreground"
-      style={isActive && accent ? { background: accent.color, color: 'var(--text-inverse)' } : { background: 'var(--muted)' }}
+      style={
+        isActive && accent ? { background: accent.color, color: 'var(--text-inverse)' } : { background: 'var(--muted)' }
+      }
       testId="view-count-chip"
     />
   )
 }
 
-export function SidebarViewItem({
-  view,
-  isActive,
-  onSelect,
-  onEditView,
-  onDeleteView,
-  onUpdateViewDefinition,
-  dragHandleProps,
-  entries,
-  locale = 'en',
-}: SidebarViewItemProps) {
+export function SidebarViewItem(options: SidebarViewItemProps) {
+  const {
+    view,
+    isActive,
+    onSelect,
+    onEditView,
+    onDeleteView,
+    onUpdateViewDefinition,
+    dragHandleProps,
+    entries,
+    locale = 'en',
+  } = options
   const count = useMemo(() => filterEntriesForViewFile(entries, view).length, [entries, view])
   const showCount = count > 0
   const accent = resolveViewAccent(view.definition.color)
@@ -124,11 +113,7 @@ export function SidebarViewItem({
   return (
     <div className="relative">
       {isRenaming ? (
-        <div
-          ref={rowRef as RefObject<HTMLDivElement>}
-          className={rowClassName}
-          style={rowStyle}
-        >
+        <div ref={rowRef as RefObject<HTMLDivElement>} className={rowClassName} style={rowStyle}>
           <ViewIcon icon={view.definition.icon} isActive={isActive} accent={accent} />
           <ViewRenameInput
             initialValue={view.definition.name}
@@ -139,7 +124,9 @@ export function SidebarViewItem({
         </div>
       ) : (
         <button
-          ref={(node) => { rowRef.current = node }}
+          ref={(node) => {
+            rowRef.current = node
+          }}
           type="button"
           className={`${rowClassName} w-full border-0 bg-transparent text-left`}
           style={rowStyle}

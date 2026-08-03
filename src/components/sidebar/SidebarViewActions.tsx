@@ -1,9 +1,5 @@
-import {
-  type ReactNode, type RefObject,
-} from 'react'
-import {
-  Palette, PencilSimple, Trash,
-} from '@phosphor-icons/react'
+import type { ReactNode, RefObject } from 'react'
+import { Palette, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ViewDefinition, ViewFile } from '../../types'
@@ -44,13 +40,14 @@ export function ViewRenameInput({
   onCancel: () => void
   onSubmit: (value: string) => void
 }) {
-  const {
-    handleKeyDown,
-    inputRef,
-    setValue,
-    submitValue,
-    value,
-  } = useSidebarInlineRenameInput({ initialValue, onCancel, onSubmit })
+  const { handleKeyDown, inputRef, setValue, submitValue, value } = useSidebarInlineRenameInput({
+    initialValue,
+    onCancel,
+    onSubmit: (value) => {
+      onSubmit(value)
+      return true
+    },
+  })
 
   return (
     <Input
@@ -58,7 +55,9 @@ export function ViewRenameInput({
       aria-label={translate(locale, 'sidebar.view.name')}
       className="h-6 min-w-0 flex-1 rounded border-primary bg-background px-1.5 py-0 text-[13px] font-medium"
       value={value}
-      onBlur={() => { void submitValue() }}
+      onBlur={() => {
+        void submitValue()
+      }}
       onChange={(event) => setValue(event.target.value)}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
@@ -84,17 +83,7 @@ function ViewMenuButton({
   )
 }
 
-export function ViewContextMenu({
-  pos,
-  canCustomize,
-  canDelete,
-  canEdit,
-  locale,
-  innerRef,
-  onCustomize,
-  onDelete,
-  onEdit,
-}: {
+export function ViewContextMenu(options: {
   pos: MenuPosition | null
   canCustomize: boolean
   canDelete: boolean
@@ -105,6 +94,7 @@ export function ViewContextMenu({
   onDelete: () => void
   onEdit: () => void
 }) {
+  const { pos, canCustomize, canDelete, canEdit, locale, innerRef, onCustomize, onDelete, onEdit } = options
   if (!pos || (!canEdit && !canCustomize && !canDelete)) return null
 
   return (

@@ -20,23 +20,15 @@ interface UseFolderRenameInput {
   vaultPath: string
 }
 
-export function useFolderRename({
-  activeTabPathRef,
-  handleSwitchTab,
-  reloadFolders,
-  reloadVault,
-  selection,
-  setSelection,
-  setTabs,
-  setToastMessage,
-  vaultPath,
-}: UseFolderRenameInput) {
+export function useFolderRename(options: UseFolderRenameInput) {
+  const { activeTabPathRef, handleSwitchTab, reloadFolders, reloadVault, selection, setSelection, setTabs, setToastMessage, vaultPath } = options
   const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
 
   const cancelFolderRename = useCallback(() => setRenamingFolderPath(null), [])
   const startFolderRename = useCallback((folderPath: string) => setRenamingFolderPath(folderPath), [])
 
-  const renameFolder = useCallback(async (folderPath: string, nextName: string) => {
+  const renameFolder = useCallback(
+    async (folderPath: string, nextName: string) => {
     const trimmedName = nextName.trim()
     if (trimmedName === folderLabel({ folderPath })) {
       setRenamingFolderPath(null)
@@ -44,7 +36,11 @@ export function useFolderRename({
     }
 
     try {
-      const renameResult = await invokeRenameFolder({ vaultPath, folderPath, newName: trimmedName })
+        const renameResult = await invokeRenameFolder({
+          vaultPath,
+          folderPath,
+          newName: trimmedName,
+        })
       setRenamingFolderPath(null)
       await reloadFolders()
       const refreshedEntries = await reloadVault()
@@ -69,7 +65,19 @@ export function useFolderRename({
       setToastMessage(`Failed to rename folder: ${error}`)
       return false
     }
-  }, [activeTabPathRef, handleSwitchTab, reloadFolders, reloadVault, selection, setSelection, setTabs, setToastMessage, vaultPath])
+    },
+    [
+      activeTabPathRef,
+      handleSwitchTab,
+      reloadFolders,
+      reloadVault,
+      selection,
+      setSelection,
+      setTabs,
+      setToastMessage,
+      vaultPath,
+    ],
+  )
 
   const renameSelectedFolder = useCallback(() => {
     if (selection.kind !== 'folder' || !selection.path) return

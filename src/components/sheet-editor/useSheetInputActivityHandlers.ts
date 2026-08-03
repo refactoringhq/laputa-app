@@ -46,27 +46,26 @@ function selectedRowsOrAll(workbookRef: MutableRefObject<SheetWorkbookState | nu
   }
 }
 
-function visibleAutocompleteInput(
-  eventTarget: EventTarget,
-  sheetElementRef: MutableRefObject<HTMLDivElement | null>,
-) {
+function visibleAutocompleteInput(eventTarget: EventTarget, sheetElementRef: MutableRefObject<HTMLDivElement | null>) {
   return formulaInputFromTarget(eventTarget) ?? visibleSheetTextInput(sheetElementRef.current)
 }
 
-export function useSheetInputActivityHandlers({
-  commitExternalFormulaEditorInput,
-  commitSheetTextInput,
-  releaseSheetTextInputTarget,
-  scheduleSelectionChromePatch,
-  scheduleSerialize,
-  setFormulaAutocomplete,
-  setWikilinkAutocomplete,
-  sheetElementRef,
-  trackSheetTextInputEdit,
-  updateSheetInlineAutocompletes,
-  workbookRef,
-}: UseSheetInputActivityHandlersOptions) {
-  const handleBlurCapture = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+export function useSheetInputActivityHandlers(options: UseSheetInputActivityHandlersOptions) {
+  const {
+    commitExternalFormulaEditorInput,
+    commitSheetTextInput,
+    releaseSheetTextInputTarget,
+    scheduleSelectionChromePatch,
+    scheduleSerialize,
+    setFormulaAutocomplete,
+    setWikilinkAutocomplete,
+    sheetElementRef,
+    trackSheetTextInputEdit,
+    updateSheetInlineAutocompletes,
+    workbookRef,
+  } = options
+  const handleBlurCapture = useCallback(
+    (event: ReactFocusEvent<HTMLDivElement>) => {
     const input = formulaInputFromTarget(event.target)
     if (!commitSheetTextInput(input)) {
       commitExternalFormulaEditorInput(input)
@@ -79,7 +78,8 @@ export function useSheetInputActivityHandlers({
         setWikilinkAutocomplete(null)
       }
     }, 0)
-  }, [
+    },
+    [
     commitExternalFormulaEditorInput,
     commitSheetTextInput,
     releaseSheetTextInputTarget,
@@ -87,27 +87,28 @@ export function useSheetInputActivityHandlers({
     setFormulaAutocomplete,
     setWikilinkAutocomplete,
     sheetElementRef,
-  ])
+    ],
+  )
 
-  const handleInputCapture = useCallback((event: ReactFormEvent<HTMLDivElement>) => {
+  const handleInputCapture = useCallback(
+    (event: ReactFormEvent<HTMLDivElement>) => {
     trackSheetTextInputEdit(formulaInputFromTarget(event.target))
     scheduleSerialize({ bodyRows: selectedRowsOrAll(workbookRef) })
     updateSheetInlineAutocompletes(visibleAutocompleteInput(event.target, sheetElementRef))
-  }, [scheduleSerialize, sheetElementRef, trackSheetTextInputEdit, updateSheetInlineAutocompletes, workbookRef])
+    },
+    [scheduleSerialize, sheetElementRef, trackSheetTextInputEdit, updateSheetInlineAutocompletes, workbookRef],
+  )
 
-  const handleKeyUpCapture = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const handleKeyUpCapture = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (isEditableTarget(event.target) && shouldScheduleSerializeForKey(event)) {
       scheduleSerialize({ bodyRows: selectedRowsOrAll(workbookRef) })
     }
     scheduleSelectionChromePatch()
     updateSheetInlineAutocompletes(visibleAutocompleteInput(event.target, sheetElementRef))
-  }, [
-    scheduleSelectionChromePatch,
-    scheduleSerialize,
-    sheetElementRef,
-    updateSheetInlineAutocompletes,
-    workbookRef,
-  ])
+    },
+    [scheduleSelectionChromePatch, scheduleSerialize, sheetElementRef, updateSheetInlineAutocompletes, workbookRef],
+  )
 
   return { handleBlurCapture, handleInputCapture, handleKeyUpCapture }
 }

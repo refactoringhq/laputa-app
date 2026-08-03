@@ -30,7 +30,7 @@
   transition: border-color 0.2s ease;
 }
 
-body.mac-chrome .app:not(:has(.app__sidebar)):not(:has(.app__note-list)) .breadcrumb-bar {
+body.mac-chrome .app:not(:has(.app__sidebar), :has(.app__note-list)) .breadcrumb-bar {
   --breadcrumb-bar-left-padding: var(--tolaria-macos-traffic-light-padding, 90px);
 }
 

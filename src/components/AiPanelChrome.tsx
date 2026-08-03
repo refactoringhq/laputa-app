@@ -6,10 +6,7 @@ import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
-import {
-  aiAgentPermissionModeLabels,
-  type AiAgentPermissionMode,
-} from '../lib/aiAgentPermissionMode'
+import { aiAgentPermissionModeLabels, type AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { AiAgentMessage } from '../hooks/useCliAiAgent'
 import type { AiAgentReadiness } from '../lib/aiAgents'
@@ -102,17 +99,7 @@ function composerStopButtonStyle(): CSSProperties {
   }
 }
 
-function ComposerInput({
-  disabled,
-  entries,
-  hasControls,
-  input,
-  inputRef,
-  onChange,
-  onSend,
-  onUnsupportedAiPaste,
-  placeholder,
-}: {
+function ComposerInput(options: {
   disabled: boolean
   entries: VaultEntry[]
   hasControls: boolean
@@ -123,6 +110,8 @@ function ComposerInput({
   onUnsupportedAiPaste?: (message: string) => void
   placeholder: string
 }) {
+  const { disabled, entries, hasControls, input, inputRef, onChange, onSend, onUnsupportedAiPaste, placeholder } =
+    options
   return (
     <WikilinkChatInput
       entries={entries}
@@ -138,7 +127,11 @@ function ComposerInput({
         'max-h-[120px] overflow-y-auto overscroll-contain',
         hasControls && 'min-h-[34px] border-0 px-2 py-1.5 leading-5',
       )}
-      editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
+      editorStyle={{
+        maxHeight: 120,
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
+      }}
     />
   )
 }
@@ -174,13 +167,7 @@ function ComposerSendButton({
   )
 }
 
-function ComposerStopButton({
-  label,
-  onStop,
-}: {
-  label: string
-  onStop: () => void
-}) {
+function ComposerStopButton({ label, onStop }: { label: string; onStop: () => void }) {
   return (
     <Button
       type="button"
@@ -211,22 +198,15 @@ function ComposerControlsRow({
 
   return (
     <div className="mt-0.5 flex items-center justify-between gap-2">
-      <div className="flex min-w-0 flex-1 items-center gap-1">
-        {children}
-      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-1">{children}</div>
       {sendButton}
     </div>
   )
 }
 
-function permissionModeTooltip(
-  mode: AiAgentPermissionMode,
-  t: ReturnType<typeof createTranslator>,
-): { label: string } {
+function permissionModeTooltip(mode: AiAgentPermissionMode, t: ReturnType<typeof createTranslator>): { label: string } {
   return {
-    label: t(mode === 'power_user'
-      ? 'ai.permission.powerUser.tooltip'
-      : 'ai.permission.safe.tooltip'),
+    label: t(mode === 'power_user' ? 'ai.permission.powerUser.tooltip' : 'ai.permission.safe.tooltip'),
   }
 }
 
@@ -261,12 +241,8 @@ function AiPanelEmptyState({
         style={{ paddingTop: 40 }}
       >
         <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
-        <p style={{ fontSize: 13, margin: '0 0 4px' }}>
-          {t('ai.panel.empty.checkingTitle')}
-        </p>
-        <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-          {t('ai.panel.empty.checkingDescription')}
-        </p>
+        <p style={{ fontSize: 13, margin: '0 0 4px' }}>{t('ai.panel.empty.checkingTitle')}</p>
+        <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>{t('ai.panel.empty.checkingDescription')}</p>
       </div>
     )
   }
@@ -278,12 +254,8 @@ function AiPanelEmptyState({
         style={{ paddingTop: 40 }}
       >
         <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
-        <p style={{ fontSize: 13, margin: '0 0 4px' }}>
-          {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
-        </p>
-        <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-          {t('ai.panel.empty.missingDescription')}
-        </p>
+        <p style={{ fontSize: 13, margin: '0 0 4px' }}>{t('ai.panel.empty.missingTitle', { agent: agentLabel })}</p>
+        <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>{t('ai.panel.empty.missingDescription')}</p>
       </div>
     )
   }
@@ -297,40 +269,33 @@ function AiPanelEmptyState({
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
         {hasContext
           ? t('ai.panel.empty.withContextTitle', { agent: agentLabel })
-          : t('ai.panel.empty.noContextTitle', { agent: agentLabel })
-        }
+          : t('ai.panel.empty.noContextTitle', { agent: agentLabel })}
       </p>
       <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-        {hasContext
-          ? t('ai.panel.empty.withContextDescription')
-          : t('ai.panel.empty.noContextDescription')
-        }
+        {hasContext ? t('ai.panel.empty.withContextDescription') : t('ai.panel.empty.noContextDescription')}
       </p>
     </div>
   )
 }
 
-export const AiPanelHeader = memo(function AiPanelHeader({
-  agentLabel,
-  agentReadiness,
-  targetKind = 'agent',
-  locale = 'en',
-  permissionMode,
-  permissionModeDisabled,
-  onPermissionModeChange,
-  onClose,
-  onNewChat,
-}: AiPanelHeaderProps) {
+export const AiPanelHeader = memo(function AiPanelHeader(options: AiPanelHeaderProps) {
+  const {
+    agentLabel,
+    agentReadiness,
+    targetKind = 'agent',
+    locale = 'en',
+    permissionMode,
+    permissionModeDisabled,
+    onPermissionModeChange,
+    onClose,
+    onNewChat,
+  } = options
   const t = createTranslator(locale)
-  const modeLabel = targetKind === 'api_model'
-    ? t('ai.panel.mode.chat')
-    : aiAgentPermissionModeLabels(permissionMode, locale).short
+  const modeLabel =
+    targetKind === 'api_model' ? t('ai.panel.mode.chat') : aiAgentPermissionModeLabels(permissionMode, locale).short
 
   return (
-    <div
-      className="flex shrink-0 flex-col border-b border-border"
-      style={{ padding: '8px 12px', gap: 8 }}
-    >
+    <div className="flex shrink-0 flex-col border-b border-border" style={{ padding: '8px 12px', gap: 8 }}>
       <div className="flex items-center" style={{ gap: 8 }}>
         <Sparkle size={16} className="shrink-0 text-muted-foreground" />
         <div className="flex flex-1 flex-col overflow-hidden">
@@ -448,27 +413,28 @@ export const AiPanelContextBar = memo(function AiPanelContextBar({
       data-testid="context-bar"
     >
       <Link size={12} className="shrink-0" />
-      <span className="truncate" style={{ fontWeight: 500 }}>{activeEntry.title}</span>
-      {linkedCount > 0 && (
-        <span style={{ opacity: 0.6 }}>{t('ai.panel.linkedCount', { count: linkedCount })}</span>
-      )}
+      <span className="truncate" style={{ fontWeight: 500 }}>
+        {activeEntry.title}
+      </span>
+      {linkedCount > 0 && <span style={{ opacity: 0.6 }}>{t('ai.panel.linkedCount', { count: linkedCount })}</span>}
     </div>
   )
 })
 
-export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
-  agentLabel,
-  agentReadiness,
-  locale = 'en',
-  messages,
-  isActive,
-  onForkMessage,
-  onOpenNote,
-  onNavigateWikilink,
-  onRegenerateMessage,
-  onScrollStateChange,
-  hasContext,
-}: AiPanelMessageHistoryProps) {
+export const AiPanelMessageHistory = memo(function AiPanelMessageHistory(options: AiPanelMessageHistoryProps) {
+  const {
+    agentLabel,
+    agentReadiness,
+    locale = 'en',
+    messages,
+    isActive,
+    onForkMessage,
+    onOpenNote,
+    onNavigateWikilink,
+    onRegenerateMessage,
+    onScrollStateChange,
+    hasContext,
+  } = options
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -512,45 +478,39 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   )
 })
 
-export function AiPanelComposer({
-  entries,
-  agentLabel,
-  agentReadiness,
-  locale = 'en',
-  input,
-  inputRef,
-  isActive,
-  controls,
-  onChange,
-  onSend,
-  onStop,
-  onUnsupportedAiPaste,
-}: AiPanelComposerProps) {
+export function AiPanelComposer(options: AiPanelComposerProps) {
+  const {
+    entries,
+    agentLabel,
+    agentReadiness,
+    locale = 'en',
+    input,
+    inputRef,
+    isActive,
+    controls,
+    onChange,
+    onSend,
+    onStop,
+    onUnsupportedAiPaste,
+  } = options
   const t = createTranslator(locale)
   const composerDisabled = isActive || agentReadiness !== 'ready'
   const canSend = !composerDisabled && input.trim().length > 0
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
   const hasControls = controls !== undefined && controls !== null
-  const sendButton = isActive
-    ? <ComposerStopButton label={t('ai.panel.stop')} onStop={onStop} />
-    : (
-        <ComposerSendButton
-          canSend={canSend}
-          entries={entries}
-          input={input}
-          label={t('ai.panel.send')}
-          onSend={onSend}
-        />
+  const sendButton = isActive ? (
+    <ComposerStopButton label={t('ai.panel.stop')} onStop={onStop} />
+  ) : (
+    <ComposerSendButton canSend={canSend} entries={entries} input={input} label={t('ai.panel.send')} onSend={onSend} />
       )
 
   return (
+    <div className="flex shrink-0 flex-col" style={{ padding: '6px 10px' }}>
     <div
-      className="flex shrink-0 flex-col"
-      style={{ padding: '6px 10px' }}
-    >
-      <div className={cn(
+        className={cn(
         hasControls ? 'rounded-xl border border-border bg-background px-2 py-1.5 shadow-xs' : 'flex items-end gap-2',
-      )}>
+        )}
+      >
         <div className={cn('min-w-0 flex-1', hasControls && 'w-full')}>
           <ComposerInput
             disabled={composerDisabled}

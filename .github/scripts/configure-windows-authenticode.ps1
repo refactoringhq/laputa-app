@@ -116,4 +116,4 @@ if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
   "WINDOWS_CODE_SIGNING_CERTIFICATE_THUMBPRINT=$CertificateThumbprint" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 }
 
-Write-Host "Prepared Windows Authenticode signing config at $ConfigPath."
+Write-Output "Prepared Windows Authenticode signing config at $ConfigPath."

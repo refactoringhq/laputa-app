@@ -17,15 +17,20 @@ const ICON_STYLE: CSSProperties = {
   overflow: 'hidden',
 }
 
-const AI_AGENT_ICON_SOURCES: Record<AiAgentId, string> = {
-  claude_code: '/ai-agent-icons/claude-code.svg',
-  codex: '/ai-agent-icons/codex.svg',
-  copilot: '/ai-agent-icons/copilot.svg',
-  opencode: '/ai-agent-icons/opencode.svg',
-  pi: '/ai-agent-icons/pi.svg',
-  antigravity: '/ai-agent-icons/gemini.svg',
-  kiro: '/ai-agent-icons/kiro.svg',
-  hermes: '/ai-agent-icons/hermes.svg',
+const AI_AGENT_ICON_SOURCES: ReadonlyArray<{ agent: AiAgentId; source: string }> = [
+  { agent: 'claude_code', source: '/ai-agent-icons/claude-code.svg' },
+  { agent: 'codex', source: '/ai-agent-icons/codex.svg' },
+  { agent: 'copilot', source: '/ai-agent-icons/copilot.svg' },
+  { agent: 'opencode', source: '/ai-agent-icons/opencode.svg' },
+  { agent: 'pi', source: '/ai-agent-icons/pi.svg' },
+  { agent: 'antigravity', source: '/ai-agent-icons/gemini.svg' },
+  { agent: 'kiro', source: '/ai-agent-icons/kiro.svg' },
+  { agent: 'hermes', source: '/ai-agent-icons/hermes.svg' },
+]
+
+function aiAgentIconSource(agent: AiAgentId): string {
+  return AI_AGENT_ICON_SOURCES.find((candidate) => candidate.agent === agent)?.source
+    ?? '/ai-agent-icons/codex.svg'
 }
 
 export function AiAgentIcon({
@@ -43,7 +48,7 @@ export function AiAgentIcon({
       aria-hidden={title ? undefined : true}
     >
       <img
-        src={AI_AGENT_ICON_SOURCES[agent]}
+        src={aiAgentIconSource(agent)}
         alt={title ? label : ''}
         draggable={false}
         width={size}

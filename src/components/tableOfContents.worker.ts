@@ -23,5 +23,3 @@ ctx.onmessage = (event: MessageEvent<TocWorkerRequest>) => {
   }
   ctx.postMessage(response)
 }
-
-export {}

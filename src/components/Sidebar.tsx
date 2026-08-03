@@ -1,18 +1,9 @@
 import { useCallback, memo } from 'react'
-import type {
-  FolderCreationParent, FolderNode, SidebarSelection, VaultEntry, ViewDefinition, ViewFile,
-} from '../types'
-import {
-  KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
-} from '@dnd-kit/core'
+import type { FolderCreationParent, FolderNode, SidebarSelection, VaultEntry, ViewDefinition, ViewFile } from '../types'
+import { KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { FolderTree } from './FolderTree'
-import {
-  computeReorder,
-  useEntryCounts,
-  useSidebarCollapsed,
-  useSidebarSections,
-} from './sidebar/sidebarHooks'
+import { computeReorder, useEntryCounts, useSidebarCollapsed, useSidebarSections } from './sidebar/sidebarHooks'
 import {
   ContextMenuOverlay,
   CustomizeOverlay,
@@ -80,7 +71,8 @@ interface SidebarProps {
   loading?: boolean
 }
 
-interface SidebarNavigationProps extends Pick<
+interface SidebarNavigationProps
+  extends Pick<
   SidebarProps,
   | 'entries'
   | 'selection'
@@ -198,17 +190,18 @@ type SidebarFoldersNavigationProps = Pick<
   | 'locale'
 >
 
-function SidebarFavoritesNavigation({
-  loading,
-  entries,
-  selection,
-  onSelect,
-  onSelectFavorite,
-  onReorderFavorites,
-  groupCollapsed,
-  toggleGroup,
-  locale,
-}: SidebarFavoritesNavigationProps) {
+function SidebarFavoritesNavigation(options: SidebarFavoritesNavigationProps) {
+  const {
+    loading,
+    entries,
+    selection,
+    onSelect,
+    onSelectFavorite,
+    onReorderFavorites,
+    groupCollapsed,
+    toggleGroup,
+    locale,
+  } = options
   if (loading) {
     return (
       <SidebarFavoritesLoadingSection
@@ -235,22 +228,23 @@ function SidebarFavoritesNavigation({
   )
 }
 
-function SidebarViewsNavigation({
-  loading,
-  views,
-  selection,
-  onSelect,
-  onCreateView,
-  onEditView,
-  onDeleteView,
-  onUpdateViewDefinition,
-  onReorderViews,
-  groupCollapsed,
-  toggleGroup,
-  sensors,
-  entries,
-  locale,
-}: SidebarViewsNavigationProps) {
+function SidebarViewsNavigation(options: SidebarViewsNavigationProps) {
+  const {
+    loading,
+    views,
+    selection,
+    onSelect,
+    onCreateView,
+    onEditView,
+    onDeleteView,
+    onUpdateViewDefinition,
+    onReorderViews,
+    groupCollapsed,
+    toggleGroup,
+    sensors,
+    entries,
+    locale,
+  } = options
   if (loading) {
     return (
       <SidebarCreatableLoadingSection
@@ -282,23 +276,24 @@ function SidebarViewsNavigation({
   )
 }
 
-function SidebarTypesNavigation({
-  loading,
-  visibleSections,
-  allSectionGroups,
-  sectionIds,
-  sensors,
-  handleDragEnd,
-  sectionProps,
-  groupCollapsed,
-  toggleGroup,
-  typeInteractions,
-  isSectionVisible,
-  toggleVisibility,
-  onCreateNewType,
-  workspaceOrder,
-  locale,
-}: SidebarTypesNavigationProps) {
+function SidebarTypesNavigation(options: SidebarTypesNavigationProps) {
+  const {
+    loading,
+    visibleSections,
+    allSectionGroups,
+    sectionIds,
+    sensors,
+    handleDragEnd,
+    sectionProps,
+    groupCollapsed,
+    toggleGroup,
+    typeInteractions,
+    isSectionVisible,
+    toggleVisibility,
+    onCreateNewType,
+    workspaceOrder,
+    locale,
+  } = options
   if (loading) {
     return (
       <SidebarTypesLoadingSection
@@ -333,25 +328,26 @@ function SidebarTypesNavigation({
   )
 }
 
-function SidebarFoldersNavigation({
-  loading,
-  folders,
-  selection,
-  onSelect,
-  onCreateFolder,
-  onRenameFolder,
-  onDeleteFolder,
-  folderFileActions,
-  renamingFolderPath,
-  onStartRenameFolder,
-  onCancelRenameFolder,
-  onCanDropNoteOnFolder,
-  onMoveNoteToFolder,
-  vaultRootPath,
-  groupCollapsed,
-  toggleGroup,
-  locale,
-}: SidebarFoldersNavigationProps) {
+function SidebarFoldersNavigation(options: SidebarFoldersNavigationProps) {
+  const {
+    loading,
+    folders,
+    selection,
+    onSelect,
+    onCreateFolder,
+    onRenameFolder,
+    onDeleteFolder,
+    folderFileActions,
+    renamingFolderPath,
+    onStartRenameFolder,
+    onCancelRenameFolder,
+    onCanDropNoteOnFolder,
+    onMoveNoteToFolder,
+    vaultRootPath,
+    groupCollapsed,
+    toggleGroup,
+    locale,
+  } = options
   if (loading) {
     return (
       <SidebarCreatableLoadingSection
@@ -492,7 +488,9 @@ function SidebarNavigation(props: SidebarNavigationProps) {
 function useSidebarDndSensors() {
   return useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   )
 }
 
@@ -508,28 +506,26 @@ function invokeTypeVisibilityToggle(
   onToggleTypeVisibility?.(type)
 }
 
-function useSidebarRuntime({
-  entries,
-  selection,
-  onSelect,
-  onSelectNote,
-  onCustomizeType,
-  onUpdateTypeTemplate,
-  onReorderSections,
-  onRenameSection,
-  onDeleteType,
-  onToggleTypeVisibility,
-  allNotesFileVisibility,
-  pluralizeTypeLabels = true,
-  locale = 'en',
-}: SidebarProps) {
+function useSidebarRuntime(options: SidebarProps) {
   const {
-    typeEntryMap,
-    typeVisibility,
-    allSectionGroups,
-    visibleSections,
-    sectionIds,
-  } = useSidebarSections(entries, pluralizeTypeLabels)
+    entries,
+    selection,
+    onSelect,
+    onSelectNote,
+    onCustomizeType,
+    onUpdateTypeTemplate,
+    onReorderSections,
+    onRenameSection,
+    onDeleteType,
+    onToggleTypeVisibility,
+    allNotesFileVisibility,
+    pluralizeTypeLabels = true,
+    locale = 'en',
+  } = options
+  const { typeEntryMap, typeVisibility, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(
+    entries,
+    pluralizeTypeLabels,
+  )
   const { activeCount, archivedCount } = useEntryCounts(entries, allNotesFileVisibility)
   const { collapsed: groupCollapsed, toggle: toggleGroup } = useSidebarCollapsed()
   const typeInteractions = useSidebarTypeInteractions({
@@ -541,26 +537,37 @@ function useSidebarRuntime({
     onDeleteType,
   })
 
-  const isSectionVisible = useCallback((type: string) => (
-    isTypeSectionVisible(entries, type, typeVisibility)
-  ), [entries, typeVisibility])
-  const toggleVisibility = useCallback((type: string, typeEntryPath?: string) => {
+  const isSectionVisible = useCallback(
+    (type: string) => isTypeSectionVisible(entries, type, typeVisibility),
+    [entries, typeVisibility],
+  )
+  const toggleVisibility = useCallback(
+    (type: string, typeEntryPath?: string) => {
     invokeTypeVisibilityToggle(onToggleTypeVisibility, type, typeEntryPath)
-  }, [onToggleTypeVisibility])
-  const selectTypeNote = useCallback((type: string) => {
-    const typeEntry = (Reflect.get(typeEntryMap, type) as VaultEntry | undefined)
-      ?? (Reflect.get(typeEntryMap, type.toLowerCase()) as VaultEntry | undefined)
+    },
+    [onToggleTypeVisibility],
+  )
+  const selectTypeNote = useCallback(
+    (type: string) => {
+      const typeEntry =
+        (Reflect.get(typeEntryMap, type) as VaultEntry | undefined) ??
+        (Reflect.get(typeEntryMap, type.toLowerCase()) as VaultEntry | undefined)
     if (typeEntry) onSelectNote?.(typeEntry)
-  }, [onSelectNote, typeEntryMap])
+    },
+    [onSelectNote, typeEntryMap],
+  )
 
   const sensors = useSidebarDndSensors()
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
     const reordered = computeReorder(sectionIds, active.id as string, over.id as string)
     if (reordered) onReorderSections?.(reordered.map((typeName, order) => ({ typeName, order })))
-  }, [sectionIds, onReorderSections])
+    },
+    [sectionIds, onReorderSections],
+  )
 
   const sectionProps: SidebarSectionProps = {
     entries,

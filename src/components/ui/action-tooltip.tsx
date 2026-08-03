@@ -45,17 +45,18 @@ class ActionTooltipBoundary extends Component<ActionTooltipBoundaryProps, Action
   }
 }
 
-export function ActionTooltip({
-  copy,
-  children,
-  className,
-  contentTestId,
-  side = 'top',
-  align = 'center',
-  sideOffset = 6,
-  open,
-  onOpenChange,
-}: ActionTooltipProps) {
+export function ActionTooltip(options: ActionTooltipProps) {
+  const {
+    copy,
+    children,
+    className,
+    contentTestId,
+    side = 'top',
+    align = 'center',
+    sideOffset = 6,
+    open,
+    onOpenChange,
+  } = options
   return (
     <ActionTooltipBoundary fallback={children}>
       <Tooltip open={open} onOpenChange={onOpenChange}>

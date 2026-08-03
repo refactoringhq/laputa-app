@@ -1,7 +1,7 @@
-import type { useCreateBlockNote } from '@blocknote/react'
 import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
 import {
   createRichEditorInputTransformExtension,
+  type RichEditorInputView,
   type RichEditorInputTransform,
 } from './richEditorInputTransform'
 
@@ -11,7 +11,7 @@ const FINAL_MARKDOWN_HIGHLIGHT_INPUT = '='
 const CODE_BLOCK_NODE_TYPE = 'codeBlock'
 const CODE_MARK_TYPE = 'code'
 
-type EditorViewLike = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
+type EditorViewLike = RichEditorInputView
 type TextblockParent = EditorViewLike['state']['selection']['$from']['parent']
 type MarkLike = { type: { name: string } }
 type EditorMark = Parameters<EditorViewLike['state']['tr']['addMark']>[2]
@@ -60,14 +60,17 @@ function rangeHasCodeMark(
     if (!node.isText) return true
 
     containsCode = hasCodeMark(node.marks)
-    return containsCode ? false : true
+    return !containsCode
   })
 
   return containsCode
 }
 
 function isCodeBlockTextblock(parent: TextblockParent): boolean {
-  return parent.type?.name === CODE_BLOCK_NODE_TYPE
+  const type = Reflect.get(parent, 'type') as unknown
+  return typeof type === 'object'
+    && type !== null
+    && Reflect.get(type, 'name') === CODE_BLOCK_NODE_TYPE
 }
 
 function readCursorText(view: EditorViewLike): MarkdownHighlightCursorText | null {

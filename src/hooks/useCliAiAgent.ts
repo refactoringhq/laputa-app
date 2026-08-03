@@ -5,9 +5,9 @@ import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { getAgentDocsPath } from '../lib/agentDocsPath'
 import type { NoteReference } from '../utils/ai-context'
-import {
-  type AgentStatus,
-  type AiAgentMessage,
+import type {
+  AgentStatus,
+  AiAgentMessage,
 } from '../lib/aiAgentConversation'
 import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {

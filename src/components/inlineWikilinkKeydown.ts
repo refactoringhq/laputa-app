@@ -1,13 +1,7 @@
 import type React from 'react'
 
-function isInlineWikilinkCompositionEvent(
-  event: React.KeyboardEvent<HTMLDivElement>,
-  isComposing: boolean,
-) {
-  return isComposing
-    || event.nativeEvent.isComposing
-    || event.key === 'Process'
-    || event.keyCode === 229
+function isInlineWikilinkCompositionEvent(event: React.KeyboardEvent<HTMLDivElement>, isComposing: boolean) {
+  return isComposing || event.nativeEvent.isComposing || event.key === 'Process' || event.keyCode === 229
 }
 
 interface HandleSuggestionKeysArgs {
@@ -55,11 +49,7 @@ interface HandleDeleteKeysArgs {
   onDeleteContent: (direction: 'backward' | 'forward') => void
 }
 
-function handleDeleteKeys({
-  event,
-  isComposing,
-  onDeleteContent,
-}: HandleDeleteKeysArgs): boolean {
+function handleDeleteKeys({ event, isComposing, onDeleteContent }: HandleDeleteKeysArgs): boolean {
   if (isInlineWikilinkCompositionEvent(event, isComposing)) return false
   if (event.altKey || event.ctrlKey || event.metaKey) return false
 
@@ -85,12 +75,7 @@ interface HandleSubmitKeyArgs {
   onSubmit: () => void
 }
 
-function handleSubmitKey({
-  event,
-  isComposing,
-  canSubmit,
-  onSubmit,
-}: HandleSubmitKeyArgs): boolean {
+function handleSubmitKey({ event, isComposing, canSubmit, onSubmit }: HandleSubmitKeyArgs): boolean {
   if (!canSubmit) return false
   if (isInlineWikilinkCompositionEvent(event, isComposing)) return false
   if (event.key !== 'Enter' || event.shiftKey) return false
@@ -112,26 +97,29 @@ interface HandleInlineWikilinkKeyDownArgs {
   onSubmit: () => void
 }
 
-export function handleInlineWikilinkKeyDown({
-  event,
-  disabled,
-  isComposing,
-  suggestionsOpen,
-  onCycleSuggestions,
-  onSelectSuggestion,
-  onDeleteContent,
-  canSubmit,
-  onSubmit,
-}: HandleInlineWikilinkKeyDownArgs) {
+export function handleInlineWikilinkKeyDown(options: HandleInlineWikilinkKeyDownArgs) {
+  const {
+    event,
+    disabled,
+    isComposing,
+    suggestionsOpen,
+    onCycleSuggestions,
+    onSelectSuggestion,
+    onDeleteContent,
+    canSubmit,
+    onSubmit,
+  } = options
   if (disabled) return
 
-  if (handleSuggestionKeys({
+  if (
+    handleSuggestionKeys({
     event,
     isComposing,
     suggestionsOpen,
     onCycleSuggestions,
     onSelectSuggestion,
-  })) {
+    })
+  ) {
     return
   }
 

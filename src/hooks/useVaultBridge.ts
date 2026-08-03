@@ -39,7 +39,7 @@ function findEntry(entriesByPath: Map<string, VaultEntry>, resolvedPath: string,
 }
 
 function findInFresh(entries: VaultEntry[], resolvedPath: string, path: string): VaultEntry | undefined {
-  return entries.find(e => e.path === path || e.path === `${resolvedPath}/${path}`)
+  return entries.find((e) => e.path === path || e.path === `${resolvedPath}/${path}`)
 }
 
 function refreshAgentChangedFiles(options: RefreshAgentChangesOptions) {
@@ -51,20 +51,10 @@ function refreshAgentChangedFiles(options: RefreshAgentChangesOptions) {
   })
 }
 
-function useRefreshAgentChanges({
-  activeTabPath,
-  closeAllTabs,
-  getActiveTabPath,
-  hasUnsavedChanges,
-  refocusActiveEditor,
-  reloadFolders,
-  reloadVault,
-  reloadViews,
-  replaceActiveTab,
-  resolvedPath,
-  shouldRefocusActiveEditor,
-}: RefreshAgentChangesDeps) {
-  return useCallback((updatedFiles: string[]) => (
+function useRefreshAgentChanges(options: RefreshAgentChangesDeps) {
+  const { activeTabPath, closeAllTabs, getActiveTabPath, hasUnsavedChanges, refocusActiveEditor, reloadFolders, reloadVault, reloadViews, replaceActiveTab, resolvedPath, shouldRefocusActiveEditor } = options
+  return useCallback(
+    (updatedFiles: string[]) =>
     refreshAgentChangedFiles({
       activeTabPath,
       closeAllTabs,
@@ -78,8 +68,8 @@ function useRefreshAgentChanges({
       shouldRefocusActiveEditor,
       updatedFiles,
       resolvedPath,
-    })
-  ), [
+      }),
+    [
     activeTabPath,
     closeAllTabs,
     getActiveTabPath,
@@ -91,30 +81,21 @@ function useRefreshAgentChanges({
     refocusActiveEditor,
     resolvedPath,
     shouldRefocusActiveEditor,
-  ])
+    ],
+  )
 }
 
-export function useVaultBridge({
-  entriesByPath,
-  resolvedPath,
-  reloadVault,
-  reloadFolders,
-  reloadViews,
-  closeAllTabs,
-  replaceActiveTab,
-  refocusActiveEditor,
-  hasUnsavedChanges,
-  shouldRefocusActiveEditor,
-  onSelectNote,
-  activeTabPath,
-  getActiveTabPath,
-}: VaultBridgeDeps) {
-  const reloadAndOpen = useCallback((path: string) => {
-    reloadVault().then(fresh => {
+export function useVaultBridge(options: VaultBridgeDeps) {
+  const { entriesByPath, resolvedPath, reloadVault, reloadFolders, reloadViews, closeAllTabs, replaceActiveTab, refocusActiveEditor, hasUnsavedChanges, shouldRefocusActiveEditor, onSelectNote, activeTabPath, getActiveTabPath } = options
+  const reloadAndOpen = useCallback(
+    (path: string) => {
+      reloadVault().then((fresh) => {
       const entry = findInFresh(fresh, resolvedPath, path)
       if (entry) onSelectNote(entry)
     })
-  }, [reloadVault, onSelectNote, resolvedPath])
+    },
+    [reloadVault, onSelectNote, resolvedPath],
+  )
 
   const refreshAgentChanges = useRefreshAgentChanges({
     activeTabPath,
@@ -130,21 +111,30 @@ export function useVaultBridge({
     shouldRefocusActiveEditor,
   })
 
-  const openNoteByPath = useCallback((path: string) => {
+  const openNoteByPath = useCallback(
+    (path: string) => {
     const entry = findEntry(entriesByPath, resolvedPath, path)
     if (entry) onSelectNote(entry)
     else reloadAndOpen(path)
-  }, [entriesByPath, resolvedPath, onSelectNote, reloadAndOpen])
+    },
+    [entriesByPath, resolvedPath, onSelectNote, reloadAndOpen],
+  )
 
-  const handlePulseOpenNote = useCallback((relativePath: string) => {
-    const entry = findEntry(entriesByPath, resolvedPath, `${resolvedPath}/${relativePath}`)
-      ?? entriesByPath.get(relativePath)
+  const handlePulseOpenNote = useCallback(
+    (relativePath: string) => {
+      const entry =
+        findEntry(entriesByPath, resolvedPath, `${resolvedPath}/${relativePath}`) ?? entriesByPath.get(relativePath)
     if (entry) onSelectNote(entry)
-  }, [entriesByPath, resolvedPath, onSelectNote])
+    },
+    [entriesByPath, resolvedPath, onSelectNote],
+  )
 
-  const handleAgentFileModified = useCallback((relativePath: string) => {
+  const handleAgentFileModified = useCallback(
+    (relativePath: string) => {
     void refreshAgentChanges([relativePath])
-  }, [refreshAgentChanges])
+    },
+    [refreshAgentChanges],
+  )
 
   const handleAgentVaultChanged = useCallback(() => {
     void refreshAgentChanges([])

@@ -24,16 +24,17 @@ function selectedBorder(indicator: AccentColorIndicator, selected: boolean): str
   return selected ? '2px solid var(--foreground)' : '2px solid transparent'
 }
 
-export function AccentColorPicker({
-  className,
-  disabled = false,
-  getOptionTestId,
-  indicator = 'border',
-  onSelectColor,
-  selectedColor,
-  size = DEFAULT_SWATCH_SIZE,
-  stopPropagation = false,
-}: AccentColorPickerProps) {
+export function AccentColorPicker(options: AccentColorPickerProps) {
+  const {
+    className,
+    disabled = false,
+    getOptionTestId,
+    indicator = 'border',
+    onSelectColor,
+    selectedColor,
+    size = DEFAULT_SWATCH_SIZE,
+    stopPropagation = false,
+  } = options
   const handleSelect = (event: MouseEvent<HTMLButtonElement>, key: string) => {
     if (stopPropagation) event.stopPropagation()
     if (!disabled) onSelectColor(key)
@@ -66,7 +67,11 @@ export function AccentColorPicker({
             onClick={(event) => handleSelect(event, color.key)}
           >
             {indicator === 'check' && selected && (
-              <Check size={Math.max(8, Math.round(size * 0.58))} weight="bold" style={{ color: 'var(--text-inverse)' }} />
+              <Check
+                size={Math.max(8, Math.round(size * 0.58))}
+                weight="bold"
+                style={{ color: 'var(--text-inverse)' }}
+              />
             )}
           </Button>
         )

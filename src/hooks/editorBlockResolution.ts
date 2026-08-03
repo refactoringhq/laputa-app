@@ -172,12 +172,7 @@ async function parseMarkdownBlocks(
   editor: ReturnType<typeof useCreateBlockNote>,
   preprocessed: PreprocessedMarkdown,
 ): Promise<EditorBlocks> {
-  const result = editor.tryParseMarkdownToBlocks(preprocessed)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tryParseMarkdownToBlocks returns sync or async BlockNote blocks
-  if (result && typeof (result as any).then === 'function') {
-    return (result as unknown as Promise<EditorBlocks>)
-  }
-  return result as EditorBlocks
+  return await editor.tryParseMarkdownToBlocks(preprocessed) as EditorBlocks
 }
 
 function stripEmptyChecklistFillers(blocks: EditorBlocks): EditorBlocks {

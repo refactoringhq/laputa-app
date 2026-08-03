@@ -3,15 +3,9 @@ import type { RetargetOption } from '../components/note-retargeting/RetargetNote
 import type { FolderNode, SidebarSelection, VaultEntry } from '../types'
 import type { FrontmatterOpOptions } from './frontmatterOps'
 import { useNoteRetargeting, type RetargetFolderOption } from './useNoteRetargeting'
-import {
-  folderPathForRetargetEntry,
-  prependVaultRootFolderDestination,
-} from '../utils/noteRetargetingPaths'
+import { folderPathForRetargetEntry, prependVaultRootFolderDestination } from '../utils/noteRetargetingPaths'
 
-type DialogState =
-  | { kind: 'type'; notePath: string }
-  | { kind: 'folder'; notePath: string }
-  | null
+type DialogState = { kind: 'type'; notePath: string } | { kind: 'folder'; notePath: string } | null
 
 interface NoteRetargetingUiInput {
   activeEntry: VaultEntry | null
@@ -22,21 +16,12 @@ interface NoteRetargetingUiInput {
   setSelection: (selection: SidebarSelection) => void
   setToastMessage: (message: string | null) => void
   vaultPath: string
-  updateFrontmatter: (
-    path: string,
-    key: string,
-    value: string,
-    options?: FrontmatterOpOptions,
-  ) => Promise<void>
+  updateFrontmatter: (path: string, key: string, value: string, options?: FrontmatterOpOptions) => Promise<void>
   moveNoteToFolder: (
     path: string,
     folderPath: string,
     vaultPath: string,
-    onEntryRenamed: (
-      oldPath: string,
-      newEntry: Partial<VaultEntry> & { path: string },
-      newContent: string,
-    ) => void,
+    onEntryRenamed: (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, newContent: string) => void,
   ) => Promise<{ new_path: string } | null>
 }
 
@@ -71,11 +56,17 @@ function resolveDialogEntry(
   activeEntry: VaultEntry | null,
 ): VaultEntry | null {
   if (!dialogState) return null
-  return entries.find((entry) => entry.path === dialogState.notePath)
-    ?? (activeEntry?.path === dialogState.notePath ? activeEntry : null)
+  return (
+    entries.find((entry) => entry.path === dialogState.notePath) ??
+    (activeEntry?.path === dialogState.notePath ? activeEntry : null)
+  )
 }
 
-function hasTypeRetargetDestination(activeEntry: VaultEntry | null, activeNoteBlocked: boolean, types: string[]): boolean {
+function hasTypeRetargetDestination(
+  activeEntry: VaultEntry | null,
+  activeNoteBlocked: boolean,
+  types: string[],
+): boolean {
   return !!activeEntry && !activeNoteBlocked && types.some((type) => type !== activeEntry.isA)
 }
 
@@ -85,9 +76,9 @@ function hasFolderRetargetDestination(
   folders: RetargetFolderOption[],
   canDropNoteOnFolder: (notePath: string, folderPath: string) => boolean,
 ): boolean {
-  return !!activeEntry
-    && !activeNoteBlocked
-    && folders.some((folder) => canDropNoteOnFolder(activeEntry.path, folder.path))
+  return (
+    !!activeEntry && !activeNoteBlocked && folders.some((folder) => canDropNoteOnFolder(activeEntry.path, folder.path))
+  )
 }
 
 function openDialogForActiveEntry(
@@ -138,13 +129,19 @@ function useNoteRetargetDialogState({
     setDialogState(null)
   }, [])
 
-  const selectType = useCallback(async (type: string) => {
+  const selectType = useCallback(
+    async (type: string) => {
     return selectFromDialogState(dialogState, 'type', type, changeNoteType)
-  }, [changeNoteType, dialogState])
+    },
+    [changeNoteType, dialogState],
+  )
 
-  const selectFolder = useCallback(async (folderPath: string) => {
+  const selectFolder = useCallback(
+    async (folderPath: string) => {
     return selectFromDialogState(dialogState, 'folder', folderPath, moveIntoFolder)
-  }, [dialogState, moveIntoFolder])
+    },
+    [dialogState, moveIntoFolder],
+  )
 
   return {
     dialogState,
@@ -201,25 +198,65 @@ function buildNoteRetargetingUiState(params: {
   }
 }
 
-export function useNoteRetargetingUi({
-  activeEntry, activeNoteBlocked, entries, folders, selection, setSelection, setToastMessage, vaultPath, updateFrontmatter, moveNoteToFolder,
-}: NoteRetargetingUiInput) {
+export function useNoteRetargetingUi(options: NoteRetargetingUiInput) {
   const {
-    availableTypes, availableFolders, canDropNoteOnFolder, changeNoteType, moveIntoFolder,
-  } = useNoteRetargeting({ entries, folders, selection, setSelection, setToastMessage, vaultPath, updateFrontmatter, moveNoteToFolder })
+    activeEntry,
+    activeNoteBlocked,
+    entries,
+    folders,
+    selection,
+    setSelection,
+    setToastMessage,
+    vaultPath,
+    updateFrontmatter,
+    moveNoteToFolder,
+  } = options
+  const { availableTypes, availableFolders, canDropNoteOnFolder, changeNoteType, moveIntoFolder } = useNoteRetargeting({
+    entries,
+    folders,
+    selection,
+    setSelection,
+    setToastMessage,
+    vaultPath,
+    updateFrontmatter,
+    moveNoteToFolder,
+  })
   const folderDestinations = useMemo<RetargetFolderOption[]>(() => {
     return prependVaultRootFolderDestination(availableFolders, vaultPath)
   }, [availableFolders, vaultPath])
   const canChangeActiveNoteType = hasTypeRetargetDestination(activeEntry, activeNoteBlocked, availableTypes)
-  const canMoveActiveNoteToFolder = hasFolderRetargetDestination(activeEntry, activeNoteBlocked, folderDestinations, canDropNoteOnFolder)
-  const { dialogState, openChangeNoteTypeDialog, openMoveNoteToFolderDialog, closeDialog, selectType, selectFolder } = useNoteRetargetDialogState({
-    activeEntry, canChangeActiveNoteType, canMoveActiveNoteToFolder, changeNoteType, moveIntoFolder,
+  const canMoveActiveNoteToFolder = hasFolderRetargetDestination(
+    activeEntry,
+    activeNoteBlocked,
+    folderDestinations,
+    canDropNoteOnFolder,
+  )
+  const { dialogState, openChangeNoteTypeDialog, openMoveNoteToFolderDialog, closeDialog, selectType, selectFolder } =
+    useNoteRetargetDialogState({
+      activeEntry,
+      canChangeActiveNoteType,
+      canMoveActiveNoteToFolder,
+      changeNoteType,
+      moveIntoFolder,
   })
-  const dialogEntry = useMemo(() => resolveDialogEntry(dialogState, entries, activeEntry), [activeEntry, dialogState, entries])
+  const dialogEntry = useMemo(
+    () => resolveDialogEntry(dialogState, entries, activeEntry),
+    [activeEntry, dialogState, entries],
+  )
   const { typeOptions, folderOptions } = buildDialogOptions(availableTypes, folderDestinations, dialogEntry, vaultPath)
   return buildNoteRetargetingUiState({
-    dialogState, dialogEntry, canChangeActiveNoteType, canMoveActiveNoteToFolder,
-    openChangeNoteTypeDialog, openMoveNoteToFolderDialog, canDropNoteOnFolder, moveIntoFolder,
-    typeOptions, folderOptions, closeDialog, selectType, selectFolder,
+    dialogState,
+    dialogEntry,
+    canChangeActiveNoteType,
+    canMoveActiveNoteToFolder,
+    openChangeNoteTypeDialog,
+    openMoveNoteToFolderDialog,
+    canDropNoteOnFolder,
+    moveIntoFolder,
+    typeOptions,
+    folderOptions,
+    closeDialog,
+    selectType,
+    selectFolder,
   })
 }

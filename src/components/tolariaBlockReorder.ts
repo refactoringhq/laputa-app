@@ -259,7 +259,7 @@ export function usePointerBlockReorder(
   }, [clearReorderState, editor])
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if ((typeof event.button === 'number' && event.button !== 0) || event.isPrimary === false) return
+    if ((typeof event.button === 'number' && event.button !== 0) || !event.isPrimary) return
 
     runSideMenuAction(() => {
       const liveBlock = liveSideMenuBlock(editor, block)
@@ -297,7 +297,7 @@ export function usePointerBlockReorder(
         updateDropIndicator(state.affordances, state.lastDropTarget ?? null)
         nativeEvent.preventDefault()
       }
-      const handlePointerUp = (nativeEvent: PointerEvent) => finishPointerReorder(nativeEvent)
+      const handlePointerUp = (nativeEvent: PointerEvent) => { finishPointerReorder(nativeEvent); }
       const handlePointerCancel = (nativeEvent: PointerEvent) => {
         if (nativeEvent.pointerId !== pointerId) return
         clearReorderState()

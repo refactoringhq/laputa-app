@@ -69,7 +69,6 @@ interface VaultPathSelection extends VaultMenuInteractionOptions {
   path: string
 }
 
-
 function getVaultTriggerClassName(open: boolean, compact: boolean) {
   if (compact) {
     return open
@@ -88,7 +87,10 @@ function buildVaultActions({
   onCloneGettingStarted,
   onCloneVault,
   onOpenLocalFolder,
-}: Pick<VaultMenuProps, 'multiWorkspaceEnabled' | 'onCreateEmptyVault' | 'onCloneGettingStarted' | 'onCloneVault' | 'onOpenLocalFolder'>): VaultAction[] {
+}: Pick<
+  VaultMenuProps,
+  'multiWorkspaceEnabled' | 'onCreateEmptyVault' | 'onCloneGettingStarted' | 'onCloneVault' | 'onOpenLocalFolder'
+>): VaultAction[] {
   const items: VaultAction[] = []
 
   if (onCreateEmptyVault) {
@@ -151,9 +153,7 @@ function shouldDisableMountToggle({
   isMounted,
   path,
 }: MountToggleRequest): boolean {
-  return path === defaultPath
-    && isMounted
-    && (includedVaultCount <= 1 || !canSetDefaultWorkspace)
+  return path === defaultPath && isMounted && (includedVaultCount <= 1 || !canSetDefaultWorkspace)
 }
 
 function selectVaultPath({
@@ -168,27 +168,31 @@ function selectVaultPath({
   setOpen(false)
 }
 
-function useVaultMenuInteractions({
-  defaultPath,
-  includedVaults,
-  multiWorkspaceEnabled,
-  onSetDefaultWorkspace,
-  onSwitchVault,
-  onUpdateWorkspaceIdentity,
-  setOpen,
-  vaultPath,
-}: VaultMenuInteractionOptions) {
-  const disableMountToggleForPath = useCallback((path: string) => (
+function useVaultMenuInteractions(options: VaultMenuInteractionOptions) {
+  const {
+    defaultPath,
+    includedVaults,
+    multiWorkspaceEnabled,
+    onSetDefaultWorkspace,
+    onSwitchVault,
+    onUpdateWorkspaceIdentity,
+    setOpen,
+    vaultPath,
+  } = options
+  const disableMountToggleForPath = useCallback(
+    (path: string) =>
     shouldDisableMountToggle({
       canSetDefaultWorkspace: !!onSetDefaultWorkspace,
       defaultPath,
       includedVaultCount: includedVaults.length,
       isMounted: includedVaults.find((vault) => vault.path === path)?.mounted !== false,
       path,
-    })
-  ), [defaultPath, includedVaults, onSetDefaultWorkspace])
+      }),
+    [defaultPath, includedVaults, onSetDefaultWorkspace],
+  )
 
-  const handleSelectVault = useCallback((path: string) => {
+  const handleSelectVault = useCallback(
+    (path: string) => {
     selectVaultPath({
       defaultPath,
       includedVaults,
@@ -200,9 +204,21 @@ function useVaultMenuInteractions({
       setOpen,
       vaultPath,
     })
-  }, [defaultPath, includedVaults, multiWorkspaceEnabled, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, setOpen, vaultPath])
+    },
+    [
+      defaultPath,
+      includedVaults,
+      multiWorkspaceEnabled,
+      onSetDefaultWorkspace,
+      onSwitchVault,
+      onUpdateWorkspaceIdentity,
+      setOpen,
+      vaultPath,
+    ],
+  )
 
-  const handleMountedChange = useCallback((path: string, mounted: boolean) => {
+  const handleMountedChange = useCallback(
+    (path: string, mounted: boolean) => {
     applyMountedChange({
       defaultPath,
       vaultPath,
@@ -215,18 +231,14 @@ function useVaultMenuInteractions({
         onUpdateWorkspaceIdentity,
       },
     })
-  }, [defaultPath, includedVaults, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, vaultPath])
+    },
+    [defaultPath, includedVaults, onSetDefaultWorkspace, onSwitchVault, onUpdateWorkspaceIdentity, vaultPath],
+  )
 
   return { disableMountToggleForPath, handleMountedChange, handleSelectVault }
 }
 
-function VaultMenuHeader({
-  locale,
-  onOpenVaultSettings,
-}: {
-  locale: AppLocale
-  onOpenVaultSettings?: () => void
-}) {
+function VaultMenuHeader({ locale, onOpenVaultSettings }: { locale: AppLocale; onOpenVaultSettings?: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 px-2 py-2">
       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -263,7 +275,9 @@ function VaultMenuAction({
       size="xs"
       onClick={onClick}
       className="h-auto w-full justify-start rounded-sm px-2 py-1.5 text-sm font-normal"
-      style={{ color: accent ? 'var(--accent-blue)' : 'var(--muted-foreground)' }}
+      style={{
+        color: accent ? 'var(--accent-blue)' : 'var(--muted-foreground)',
+      }}
       data-testid={testId}
     >
       {icon}
@@ -296,7 +310,9 @@ function VaultMenuRemoveConfirmDialog({
     <ConfirmDeleteDialog
       open={!!vaultPendingRemoval}
       title={translate(locale, 'status.vault.removeConfirmTitle')}
-      message={translate(locale, 'status.vault.removeConfirmMessage', { label: vaultPendingRemoval?.label ?? '' })}
+      message={translate(locale, 'status.vault.removeConfirmMessage', {
+        label: vaultPendingRemoval?.label ?? '',
+      })}
       confirmLabel={translate(locale, 'status.vault.removeConfirmAction')}
       onCancel={closeDialog}
       onConfirm={confirmRemoval}
@@ -304,28 +320,31 @@ function VaultMenuRemoveConfirmDialog({
   )
 }
 
-function VaultMenuPopover({
-  actions,
-  canRemove,
-  defaultPath,
-  disableMountToggleForPath,
-  locale,
-  menuMinWidth,
-  multiWorkspaceEnabled,
-  onMountedChange,
-  onOpenVaultSettings,
-  onRemoveVault,
-  onReorderVaults,
-  onSelectVault,
-  setOpen,
-  setVaultPendingRemoval,
-  vaults,
-}: VaultMenuListProps & {
-  actions: VaultAction[]
-  menuMinWidth: number
-  onOpenVaultSettings?: () => void
-  setOpen: (open: boolean) => void
-}) {
+function VaultMenuPopover(
+  options: VaultMenuListProps & {
+    actions: VaultAction[]
+    menuMinWidth: number
+    onOpenVaultSettings?: () => void
+    setOpen: (open: boolean) => void
+  },
+) {
+  const {
+    actions,
+    canRemove,
+    defaultPath,
+    disableMountToggleForPath,
+    locale,
+    menuMinWidth,
+    multiWorkspaceEnabled,
+    onMountedChange,
+    onOpenVaultSettings,
+    onRemoveVault,
+    onReorderVaults,
+    onSelectVault,
+    setOpen,
+    setVaultPendingRemoval,
+    vaults,
+  } = options
   return (
     <div
       style={{
@@ -347,12 +366,22 @@ function VaultMenuPopover({
         <>
           <VaultMenuHeader
             locale={locale}
-            onOpenVaultSettings={onOpenVaultSettings ? () => {
+            onOpenVaultSettings={
+              onOpenVaultSettings
+                ? () => {
               onOpenVaultSettings()
               setOpen(false)
-            } : undefined}
+                  }
+                : undefined
+            }
           />
-          <div style={{ height: 1, background: 'var(--border)', margin: '2px 0 4px' }} />
+          <div
+            style={{
+              height: 1,
+              background: 'var(--border)',
+              margin: '2px 0 4px',
+            }}
+          />
         </>
       )}
       <VaultMenuList
@@ -389,10 +418,22 @@ function VaultMenuPopover({
 
 export function VaultMenu(props: VaultMenuProps) {
   const {
-    vaults, vaultPath, onSwitchVault, onOpenLocalFolder, onCreateEmptyVault,
-    defaultWorkspacePath, onSetDefaultWorkspace, onOpenVaultSettings,
-    onCloneVault, onCloneGettingStarted, onRemoveVault, multiWorkspaceEnabled = false,
-    onReorderVaults, onUpdateWorkspaceIdentity, compact = false, locale = 'en',
+    vaults,
+    vaultPath,
+    onSwitchVault,
+    onOpenLocalFolder,
+    onCreateEmptyVault,
+    defaultWorkspacePath,
+    onSetDefaultWorkspace,
+    onOpenVaultSettings,
+    onCloneVault,
+    onCloneGettingStarted,
+    onRemoveVault,
+    multiWorkspaceEnabled = false,
+    onReorderVaults,
+    onUpdateWorkspaceIdentity,
+    compact = false,
+    locale = 'en',
   } = props
   const [open, setOpen] = useState(false)
   const [vaultPendingRemoval, setVaultPendingRemoval] = useState<VaultOption | null>(null)

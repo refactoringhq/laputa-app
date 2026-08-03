@@ -89,10 +89,7 @@ function groupResults(
 }
 
 function usePaletteResults(commands: CommandAction[], query: string) {
-  const enabledCommands = useMemo(
-    () => commands.filter((command) => command.enabled),
-    [commands],
-  )
+  const enabledCommands = useMemo(() => commands.filter((command) => command.enabled), [commands])
 
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return enabledCommands
@@ -104,10 +101,7 @@ function usePaletteResults(commands: CommandAction[], query: string) {
   }, [enabledCommands, query])
 
   const hasQuery = query.trim().length > 0
-  const groups = useMemo(
-    () => groupResults(filteredCommands, hasQuery),
-    [filteredCommands, hasQuery],
-  )
+  const groups = useMemo(() => groupResults(filteredCommands, hasQuery), [filteredCommands, hasQuery])
 
   return {
     groups,
@@ -115,10 +109,7 @@ function usePaletteResults(commands: CommandAction[], query: string) {
   }
 }
 
-function rememberCommandOpener(
-  command: CommandAction,
-  target: HTMLInputElement | HTMLDivElement | null,
-) {
+function rememberCommandOpener(command: CommandAction, target: HTMLInputElement | HTMLDivElement | null) {
   if (command.id !== 'open-contribute') return
   rememberFeedbackDialogOpener(target instanceof HTMLElement ? target : null)
 }
@@ -207,9 +198,7 @@ function CommandPaletteResults({
   if (flatList.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto py-1" ref={listRef}>
-        <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
-          {emptyText}
-        </div>
+        <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">{emptyText}</div>
       </div>
     )
   }
@@ -282,17 +271,18 @@ export function CommandPalette({ open, ...props }: CommandPaletteProps) {
   return <OpenCommandPalette {...props} />
 }
 
-function OpenCommandPalette({
-  commands,
-  entries = [],
-  claudeCodeReady = true,
-  aiAgentReady,
-  aiAgentLabel = 'Claude Code',
-  aiModeEnabled = true,
-  aiPromptTargetId,
-  locale = 'en',
-  onClose,
-}: Omit<CommandPaletteProps, 'open'>) {
+function OpenCommandPalette(options: Omit<CommandPaletteProps, 'open'>) {
+  const {
+    commands,
+    entries = [],
+    claudeCodeReady = true,
+    aiAgentReady,
+    aiAgentLabel = 'Claude Code',
+    aiModeEnabled = true,
+    aiPromptTargetId,
+    locale = 'en',
+    onClose,
+  } = options
   const [query, setQuery] = useState('')
   const [aiValue, setAiValue] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -496,9 +486,7 @@ function CommandRow({ command, selected, onHover, onSelect }: CommandRowProps) {
       onMouseMove={onHover}
     >
       <span className="text-sm text-foreground">{command.label}</span>
-      {command.shortcut && (
-        <span className="text-[11px] text-muted-foreground">{command.shortcut}</span>
-      )}
+      {command.shortcut && <span className="text-[11px] text-muted-foreground">{command.shortcut}</span>}
     </button>
   )
 }

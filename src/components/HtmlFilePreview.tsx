@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { trackEvent } from '../lib/telemetry'
 import { htmlFilePreviewSrcDoc } from '../utils/htmlFilePreview'
 import { focusNoteListContainer } from '../utils/neighborhoodHistory'
+import { Button } from './ui/button'
 
 interface HtmlFilePreviewProps {
   content: string
@@ -11,14 +12,14 @@ interface HtmlFilePreviewProps {
   vaultPath: string
 }
 
-function releaseFrameFocus(frame: HTMLIFrameElement | null, container: HTMLElement | null) {
+function releaseFrameFocus(frame: HTMLIFrameElement | null, focusTarget: HTMLButtonElement | null) {
   if (!frame || document.activeElement !== frame) return
   frame.blur()
-  container?.focus()
+  focusTarget?.focus()
 }
 
 export function HtmlFilePreview({ content, path, title, vaultPath }: HtmlFilePreviewProps) {
-  const containerRef = useRef<HTMLElement | null>(null)
+  const focusTargetRef = useRef<HTMLButtonElement | null>(null)
   const frameRef = useRef<HTMLIFrameElement | null>(null)
   const srcDoc = useMemo(() => htmlFilePreviewSrcDoc({
     content,
@@ -32,25 +33,30 @@ export function HtmlFilePreview({ content, path, title, vaultPath }: HtmlFilePre
   }, [])
 
   useEffect(() => {
-    const releaseFocusedFrame = () => releaseFrameFocus(frameRef.current, containerRef.current)
+    const releaseFocusedFrame = () => { releaseFrameFocus(frameRef.current, focusTargetRef.current); }
     window.addEventListener('blur', releaseFocusedFrame)
-    return () => window.removeEventListener('blur', releaseFocusedFrame)
+    return () => { window.removeEventListener('blur', releaseFocusedFrame); }
   }, [])
 
   return (
     <section
-      ref={containerRef}
       className="min-h-0 flex-1 bg-background"
       data-note-pdf-export-root="true"
       role="application"
-      tabIndex={0}
       aria-label={title}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') return
-        event.preventDefault()
-        focusNoteListContainer(document)
-      }}
     >
+      <Button
+        ref={focusTargetRef}
+        type="button"
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={title}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return
+          event.preventDefault()
+          focusNoteListContainer(document)
+        }}
+      />
       <iframe
         ref={frameRef}
         className="h-full min-h-[320px] w-full border-0 bg-white"

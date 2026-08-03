@@ -1,9 +1,5 @@
 import { Component, memo } from 'react'
-import type {
-  ErrorInfo,
-  MutableRefObject,
-  ReactNode,
-} from 'react'
+import type { ErrorInfo, MutableRefObject, ReactNode } from 'react'
 import { IronCalc } from '@ironcalc/workbook'
 import { translate, type AppLocale } from '../lib/i18n'
 import { SheetContextMenu } from './SheetContextMenu'
@@ -66,11 +62,7 @@ class SheetWorkbookBoundary extends Component<SheetWorkbookBoundaryProps, SheetW
   componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {
     if (!isIronCalcWasmBridgeError(error)) return
 
-    console.warn(
-      '[sheet-editor] Recovered IronCalc WASM bridge render failure:',
-      error,
-      errorInfo.componentStack,
-    )
+    console.warn('[sheet-editor] Recovered IronCalc WASM bridge render failure:', error, errorInfo.componentStack)
   }
 
   render(): ReactNode {
@@ -86,16 +78,8 @@ class SheetWorkbookBoundary extends Component<SheetWorkbookBoundaryProps, SheetW
 
 type SheetEditorControllerState = ReturnType<typeof useSheetEditorController>
 
-function SheetFormulaAutocompleteOverlay({
-  controller,
-}: {
-  controller: SheetEditorControllerState
-}) {
-  const {
-    applyAutocompleteSuggestion,
-    formulaAutocomplete,
-    selectFormulaAutocompleteIndex,
-  } = controller
+function SheetFormulaAutocompleteOverlay({ controller }: { controller: SheetEditorControllerState }) {
+  const { applyAutocompleteSuggestion, formulaAutocomplete, selectFormulaAutocompleteIndex } = controller
   if (!formulaAutocomplete) return null
 
   return (
@@ -141,91 +125,87 @@ function SheetContextMenuOverlay({
   locale: AppLocale
 }) {
   const {
-    handleContextBold,
-    handleContextClearFormatting,
-    handleContextDecreaseDecimals,
-    handleContextFreezeColumns,
-    handleContextFreezeRows,
-    handleContextIncreaseDecimals,
-    handleContextItalic,
-    handleContextNumberFormat,
-    handleContextStructureAction,
-    handleContextToggleWrapText,
-    handleContextUnfreezeColumns,
-    handleContextUnfreezeRows,
-    setSheetContextMenu,
-    sheetContextMenu,
-  } = controller
-  if (!sheetContextMenu) return null
+        handleContextBold,
+        handleContextClearFormatting,
+        handleContextDecreaseDecimals,
+        handleContextFreezeColumns,
+        handleContextFreezeRows,
+        handleContextIncreaseDecimals,
+        handleContextItalic,
+        handleContextNumberFormat,
+        handleContextStructureAction,
+        handleContextToggleWrapText,
+        handleContextUnfreezeColumns,
+        handleContextUnfreezeRows,
+        setSheetContextMenu,
+        sheetContextMenu,
+      } = controller
+      if (!sheetContextMenu) return null
 
-  return (
-    <SheetContextMenu
-      locale={locale}
-      onBold={handleContextBold}
-      onClearFormatting={handleContextClearFormatting}
-      onClose={() => setSheetContextMenu(null)}
-      onDeleteColumn={() => handleContextStructureAction('deleteColumn')}
-      onDeleteRow={() => handleContextStructureAction('deleteRow')}
-      onDecreaseDecimals={handleContextDecreaseDecimals}
-      onFreezeColumns={handleContextFreezeColumns}
-      onFreezeRows={handleContextFreezeRows}
-      onIncreaseDecimals={handleContextIncreaseDecimals}
-      onInsertColumnLeft={() => handleContextStructureAction('insertColumnLeft')}
-      onInsertColumnRight={() => handleContextStructureAction('insertColumnRight')}
-      onInsertRowAbove={() => handleContextStructureAction('insertRowAbove')}
-      onInsertRowBelow={() => handleContextStructureAction('insertRowBelow')}
-      onItalic={handleContextItalic}
-      onNumberFormat={handleContextNumberFormat}
-      onToggleWrapText={handleContextToggleWrapText}
-      onUnfreezeColumns={handleContextUnfreezeColumns}
-      onUnfreezeRows={handleContextUnfreezeRows}
-      state={sheetContextMenu}
-    />
-  )
-}
+      return (
+        <SheetContextMenu
+          locale={locale}
+          onBold={handleContextBold}
+          onClearFormatting={handleContextClearFormatting}
+          onClose={() => setSheetContextMenu(null)}
+          onDeleteColumn={() => handleContextStructureAction('deleteColumn')}
+          onDeleteRow={() => handleContextStructureAction('deleteRow')}
+          onDecreaseDecimals={handleContextDecreaseDecimals}
+          onFreezeColumns={handleContextFreezeColumns}
+          onFreezeRows={handleContextFreezeRows}
+          onIncreaseDecimals={handleContextIncreaseDecimals}
+          onInsertColumnLeft={() => handleContextStructureAction('insertColumnLeft')}
+          onInsertColumnRight={() => handleContextStructureAction('insertColumnRight')}
+          onInsertRowAbove={() => handleContextStructureAction('insertRowAbove')}
+          onInsertRowBelow={() => handleContextStructureAction('insertRowBelow')}
+          onItalic={handleContextItalic}
+          onNumberFormat={handleContextNumberFormat}
+          onToggleWrapText={handleContextToggleWrapText}
+          onUnfreezeColumns={handleContextUnfreezeColumns}
+          onUnfreezeRows={handleContextUnfreezeRows}
+          state={sheetContextMenu}
+        />
+      )
+    }
 
-function SheetWorkbookSurface({
-  controller,
-  locale,
-  workbook,
-}: {
-  controller: SheetEditorControllerState
-  locale: AppLocale
-  workbook: NonNullable<SheetEditorControllerState['workbook']>
-}) {
-  const {
-    interactionHandlers,
-    sheetElementRef,
-    sheetKeyboardActive,
-    wikilinkAutocomplete,
-  } = controller
+    function SheetWorkbookSurface({
+      controller,
+      locale,
+      workbook,
+    }: {
+      controller: SheetEditorControllerState
+      locale: AppLocale
+      workbook: NonNullable<SheetEditorControllerState['workbook']>
+    }) {
+      const { interactionHandlers, sheetElementRef, sheetKeyboardActive, wikilinkAutocomplete } = controller
 
-  return (
-    <div
-      ref={sheetElementRef}
-      className={workbookEditorClassName(sheetKeyboardActive)}
-      data-testid="sheet-editor"
-      {...interactionHandlers}
-    >
-      <MemoizedIronCalc model={workbook.model} refreshId={workbook.refreshId} />
-      <SheetFormulaAutocompleteOverlay controller={controller} />
-      <SheetWikilinkAutocompleteOverlay wikilinkAutocomplete={wikilinkAutocomplete} />
-      <SheetContextMenuOverlay controller={controller} locale={locale} />
-    </div>
-  )
-}
+      return (
+        <div
+          ref={sheetElementRef}
+          className={workbookEditorClassName(sheetKeyboardActive)}
+          data-testid="sheet-editor"
+          {...interactionHandlers}
+        >
+          <MemoizedIronCalc model={workbook.model} refreshId={workbook.refreshId} />
+          <SheetFormulaAutocompleteOverlay controller={controller} />
+          <SheetWikilinkAutocompleteOverlay wikilinkAutocomplete={wikilinkAutocomplete} />
+          <SheetContextMenuOverlay controller={controller} locale={locale} />
+        </div>
+      )
+    }
 
-export function SheetEditor({
-  content,
-  entries = EMPTY_VAULT_ENTRIES,
-  locale = 'en',
-  path,
-  onContentChange,
-  onNavigateWikilink,
-  flushContentRef,
-  sourceEntry = null,
-  vaultPath = '',
-}: SheetEditorProps) {
+    export function SheetEditor(options: SheetEditorProps) {
+      const {
+      content,
+      entries = EMPTY_VAULT_ENTRIES,
+      locale = 'en',
+      path,
+      onContentChange,
+      onNavigateWikilink,
+      flushContentRef,
+      sourceEntry = null,
+      vaultPath = '',
+  } = options
   const controller = useSheetEditorController({
     content,
     entries,
@@ -252,10 +232,7 @@ export function SheetEditor({
   }
 
   return (
-    <SheetWorkbookBoundary
-      key={`${workbook.path}:${workbook.generation}`}
-      locale={locale}
-    >
+    <SheetWorkbookBoundary key={`${workbook.path}:${workbook.generation}`} locale={locale}>
       <SheetWorkbookSurface controller={controller} locale={locale} workbook={workbook} />
     </SheetWorkbookBoundary>
   )

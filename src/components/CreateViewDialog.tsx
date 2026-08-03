@@ -1,12 +1,19 @@
 import { useId, useState, useRef, useEffect } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FilterBuilder } from './FilterBuilder'
 import type { FilterGroup, ViewDefinition } from '../types'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
 
-type SaveViewResult = boolean | void
+type SaveViewResult = boolean | undefined
 type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
 type InitialViewFormValues = Pick<ViewDefinition, 'name' | 'icon' | 'color' | 'filters'>
 
@@ -32,17 +39,18 @@ interface CreateViewDialogFormProps {
   onCreate: SaveViewHandler
 }
 
-function CreateViewDialogForm({
-  availableFields,
-  initialName,
-  initialIcon,
-  initialColor,
-  initialFilters,
-  isEditing,
-  locale,
-  onClose,
-  onCreate,
-}: CreateViewDialogFormProps) {
+function CreateViewDialogForm(options: CreateViewDialogFormProps) {
+  const {
+    availableFields,
+    initialName,
+    initialIcon,
+    initialColor,
+    initialFilters,
+    isEditing,
+    locale,
+    onClose,
+    onCreate,
+  } = options
   const [name, setName] = useState(initialName)
   const [filters, setFilters] = useState<FilterGroup>(initialFilters)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -91,7 +99,9 @@ function CreateViewDialogForm({
   return (
     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="space-y-1.5">
-        <label htmlFor={nameInputId} className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.nameLabel')}</label>
+        <label htmlFor={nameInputId} className="text-xs font-medium text-muted-foreground">
+          {translate(locale, 'viewDialog.nameLabel')}
+        </label>
         <Input
           id={nameInputId}
           ref={inputRef}
@@ -104,15 +114,13 @@ function CreateViewDialogForm({
         />
       </div>
       {saveError && (
-        <p role="alert" className="text-xs text-destructive">{saveError}</p>
+        <p role="alert" className="text-xs text-destructive">
+          {saveError}
+        </p>
       )}
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         <div className="text-xs font-medium text-muted-foreground">{translate(locale, 'viewDialog.filtersLabel')}</div>
-        <FilterBuilder
-          group={filters}
-          onChange={setFilters}
-          availableFields={availableFields}
-        />
+        <FilterBuilder group={filters} onChange={setFilters} availableFields={availableFields} />
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
@@ -134,26 +142,40 @@ function getInitialViewFormValues(
     name: editingView?.name ?? '',
     icon: editingView?.icon ?? '',
     color: editingView?.color ?? null,
-    filters: editingView?.filters ?? { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] },
+    filters: editingView?.filters ?? {
+      all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }],
+    },
   }
 }
 
 function getDialogDescription(isEditing: boolean): TranslationKey {
-  return isEditing
-    ? 'viewDialog.description.edit'
-    : 'viewDialog.description.create'
+  return isEditing ? 'viewDialog.description.edit' : 'viewDialog.description.create'
 }
 
-export function CreateViewDialog({ open, onClose, onCreate, availableFields, locale = 'en', editingView }: CreateViewDialogProps) {
+export function CreateViewDialog({
+  open,
+  onClose,
+  onCreate,
+  availableFields,
+  locale = 'en',
+  editingView,
+}: CreateViewDialogProps) {
   const isEditing = !!editingView
   const initialValues = getInitialViewFormValues(editingView, availableFields)
   const formKey = editingView ? `edit:${editingView.name}` : `create:${availableFields[0] ?? 'type'}`
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose()
+      }}
+    >
       <DialogContent showCloseButton={false} className="flex max-h-[80vh] flex-col sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{translate(locale, isEditing ? 'viewDialog.title.edit' : 'viewDialog.title.create')}</DialogTitle>
+          <DialogTitle>
+            {translate(locale, isEditing ? 'viewDialog.title.edit' : 'viewDialog.title.create')}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             {translate(locale, getDialogDescription(isEditing))}
           </DialogDescription>

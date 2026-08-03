@@ -1,39 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CaretDown, GearSix } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import {
-  DEFAULT_AI_AGENT,
-  type AiAgentId,
-  type AiAgentReadiness,
-  type AiAgentsStatus,
-} from '../lib/aiAgents'
-import {
-  resolveAiTargetReadiness,
-  targetAgent,
-  type AiModelProvider,
-  type AiTarget,
-} from '../lib/aiTargets'
-import {
-  aiAgentPermissionModeLabels,
-  type AiAgentPermissionMode,
-} from '../lib/aiAgentPermissionMode'
-import type {
-  VaultAiGuidanceStatus,
-} from '../lib/vaultAiGuidance'
+import { DEFAULT_AI_AGENT, type AiAgentId, type AiAgentReadiness, type AiAgentsStatus } from '../lib/aiAgents'
+import { resolveAiTargetReadiness, targetAgent, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
+import { aiAgentPermissionModeLabels, type AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
+import type { VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
 import { translate, type AppLocale } from '../lib/i18n'
 import { trackAiWorkspaceChatTitled, trackAiWorkspaceSidebarToggled } from '../lib/productAnalytics'
-import {
-  type modelOptionsForAgent,
-  preferredAgentModel,
-  type AiAgentModelCatalog,
-} from '../lib/aiAgentModels'
+import { type modelOptionsForAgent, preferredAgentModel, type AiAgentModelCatalog } from '../lib/aiAgentModels'
 import { useAiAgentModelCatalog } from '../hooks/useAiAgentModelCatalog'
 import { resolveAgentModelSelection, useAiAgentModelActions } from '../hooks/useAiAgentModelSelection'
 import type { AgentStatus, AiAgentMessage } from '../hooks/useCliAiAgent'
@@ -127,7 +103,13 @@ function PermissionPicker({
 }) {
   if (targetKind === 'api_model') {
     return (
-      <Button type="button" variant={compact ? 'ghost' : 'outline'} size={compact ? 'xs' : 'sm'} disabled className="rounded-full px-2 text-[12px] text-muted-foreground">
+      <Button
+        type="button"
+        variant={compact ? 'ghost' : 'outline'}
+        size={compact ? 'xs' : 'sm'}
+        disabled
+        className="rounded-full px-2 text-[12px] text-muted-foreground"
+      >
         {translate(locale, 'ai.panel.mode.chat')}
       </Button>
     )
@@ -205,26 +187,13 @@ type ConversationSessionProps = {
 }
 
 function firstCompletedAssistantMessage(messages: AiAgentMessage[]): AiAgentMessage | undefined {
-  return messages.find((message) => (
-    !message.localMarker
-    && !message.isStreaming
-    && !!message.userMessage.trim()
-    && !!message.response?.trim()
-  ))
+  return messages.find(
+    (message) =>
+      !message.localMarker && !message.isStreaming && !!message.userMessage.trim() && !!message.response?.trim(),
+  )
 }
 
-function useGeneratedConversationTitle({
-  aiAgentsStatus,
-  conversation,
-  defaultAiAgentReady,
-  messages,
-  onTitleFromAnswer,
-  permissionMode,
-  readyFallbackTargetId,
-  target,
-  vaultPath,
-  vaultPaths,
-}: {
+function useGeneratedConversationTitle(options: {
   aiAgentsStatus: AiAgentsStatus
   conversation: AiConversation
   defaultAiAgentReady: boolean
@@ -236,6 +205,18 @@ function useGeneratedConversationTitle({
   vaultPath: string
   vaultPaths?: string[]
 }) {
+  const {
+    aiAgentsStatus,
+    conversation,
+    defaultAiAgentReady,
+    messages,
+    onTitleFromAnswer,
+    permissionMode,
+    readyFallbackTargetId,
+    target,
+    vaultPath,
+    vaultPaths,
+  } = options
   const requestedTitleKeysRef = useRef(new Set<string>())
 
   useEffect(() => {
@@ -295,7 +276,10 @@ function activeContextForSession({
   noteList,
   noteListFilter,
   openTabs,
-}: Pick<ConversationSessionProps, 'active' | 'activeEntry' | 'activeNoteContent' | 'entries' | 'noteList' | 'noteListFilter' | 'openTabs'>): ConversationSessionContext {
+}: Pick<
+  ConversationSessionProps,
+  'active' | 'activeEntry' | 'activeNoteContent' | 'entries' | 'noteList' | 'noteListFilter' | 'openTabs'
+>): ConversationSessionContext {
   if (!active) {
     return {
       activeEntry: null,
@@ -313,22 +297,7 @@ function activeContextForSession({
   }
 }
 
-function ConversationComposerControls({
-  catalog,
-  catalogReady,
-  disabled,
-  groups,
-  locale,
-  onOpenAiSettings,
-  onPermissionModeChange,
-  onSelectModel,
-  onSelectTarget,
-  permissionMode,
-  side,
-  target,
-  modelOptions,
-  selectedModelId,
-}: {
+function ConversationComposerControls(options: {
   catalog: AiAgentModelCatalog
   catalogReady: boolean
   disabled: boolean
@@ -344,8 +313,27 @@ function ConversationComposerControls({
   modelOptions: ReturnType<typeof modelOptionsForAgent>
   selectedModelId: string
 }) {
+  const {
+    catalog,
+    catalogReady,
+    disabled,
+    groups,
+    locale,
+    onOpenAiSettings,
+    onPermissionModeChange,
+    onSelectModel,
+    onSelectTarget,
+    permissionMode,
+    side,
+    target,
+    modelOptions,
+    selectedModelId,
+  } = options
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden" data-testid="ai-workspace-composer-controls">
+    <div
+      className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
+      data-testid="ai-workspace-composer-controls"
+    >
       <AiTargetModelPicker
         catalog={catalog}
         catalogReady={catalogReady}
@@ -388,19 +376,13 @@ function ConversationComposerControls({
   )
 }
 
-function ConversationWorkspaceHeader({
-  conversation,
-  locale,
-  mode,
-  onArchive,
-  onClose,
-  onDock,
-  onOpenAiSettings,
-  onPopOut,
-}: Pick<
+function ConversationWorkspaceHeader(
+  options: Pick<
   ConversationSessionProps,
   'conversation' | 'locale' | 'mode' | 'onArchive' | 'onClose' | 'onDock' | 'onOpenAiSettings' | 'onPopOut'
->) {
+  >,
+) {
+  const { conversation, locale, mode, onArchive, onClose, onDock, onOpenAiSettings, onPopOut } = options
   if (mode === 'side') return null
 
   return (
@@ -443,32 +425,36 @@ interface ConversationSessionViewProps {
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
 }
 
-function ConversationSessionView({
-  active,
-  composerControls,
-  context,
-  controller,
-  conversation,
-  locale,
-  mode,
-  onArchive,
-  onClose,
-  onDock,
-  onForkMessage,
-  onMessageHistoryScrollStateChange,
-  onOpenAiSettings,
-  onOpenNote,
-  onPopOut,
-  onPromptSubmitted,
-  onRestoreVaultAiGuidance,
-  onSelectTarget,
-  onUnsupportedAiPaste,
-  target,
-  targetReadiness,
-  vaultAiGuidanceStatus,
-}: ConversationSessionViewProps) {
+function ConversationSessionView(options: ConversationSessionViewProps) {
+  const {
+    active,
+    composerControls,
+    context,
+    controller,
+    conversation,
+    locale,
+    mode,
+    onArchive,
+    onClose,
+    onDock,
+    onForkMessage,
+    onMessageHistoryScrollStateChange,
+    onOpenAiSettings,
+    onOpenNote,
+    onPopOut,
+    onPromptSubmitted,
+    onRestoreVaultAiGuidance,
+    onSelectTarget,
+    onUnsupportedAiPaste,
+    target,
+    targetReadiness,
+    vaultAiGuidanceStatus,
+  } = options
   return (
-    <div className={active ? 'flex min-h-0 flex-1 flex-col' : 'hidden'} data-testid={`ai-workspace-session-${conversation.id}`}>
+    <div
+      className={active ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}
+      data-testid={`ai-workspace-session-${conversation.id}`}
+    >
       <ConversationWorkspaceHeader
         conversation={conversation}
         locale={locale}
@@ -509,46 +495,47 @@ function ConversationSessionView({
   )
 }
 
-function ConversationSession({
-  active,
-  activeEntry,
-  activeNoteContent,
-  aiAgentsStatus,
-  conversation,
-  defaultAiAgentReady,
-  entries,
-  groups,
-  locale,
-  modelCatalog,
-  modelCatalogReady,
-  mode,
-  noteList,
-  noteListFilter,
-  onArchive,
-  onClose,
-  onDock,
-  onFileCreated,
-  onFileModified,
-  onForkMessage,
-  onMessageHistoryScrollStateChange,
-  onOpenAiSettings,
-  onOpenNote,
-  onPopOut,
-  onRestoreVaultAiGuidance,
-  onSelectTarget,
-  onSelectModel,
-  onStatusChange,
-  onPromptSubmitted,
-  onTitleFromAnswer,
-  onUnsupportedAiPaste,
-  onVaultChanged,
-  openTabs,
-  readyFallbackTargetId,
-  target,
-  vaultAiGuidanceStatus,
-  vaultPath,
-  vaultPaths,
-}: ConversationSessionProps) {
+function ConversationSession(functionOptions: ConversationSessionProps) {
+  const {
+    active,
+    activeEntry,
+    activeNoteContent,
+    aiAgentsStatus,
+    conversation,
+    defaultAiAgentReady,
+    entries,
+    groups,
+    locale,
+    modelCatalog,
+    modelCatalogReady,
+    mode,
+    noteList,
+    noteListFilter,
+    onArchive,
+    onClose,
+    onDock,
+    onFileCreated,
+    onFileModified,
+    onForkMessage,
+    onMessageHistoryScrollStateChange,
+    onOpenAiSettings,
+    onOpenNote,
+    onPopOut,
+    onRestoreVaultAiGuidance,
+    onSelectTarget,
+    onSelectModel,
+    onStatusChange,
+    onPromptSubmitted,
+    onTitleFromAnswer,
+    onUnsupportedAiPaste,
+    onVaultChanged,
+    openTabs,
+    readyFallbackTargetId,
+    target,
+    vaultAiGuidanceStatus,
+    vaultPath,
+    vaultPaths,
+  } = functionOptions
   const context = activeContextForSession({
     active,
     activeEntry,
@@ -751,7 +738,11 @@ function SideAiWorkspaceLayout({
           separated={headerSeparated}
           statuses={model.statuses}
         />
-        <ConversationSessions model={model} workspace={workspace} onMessageHistoryScrollStateChange={setHeaderSeparated} />
+        <ConversationSessions
+          model={model}
+          workspace={workspace}
+          onMessageHistoryScrollStateChange={setHeaderSeparated}
+        />
       </div>
     </aside>
   )
@@ -778,14 +769,17 @@ function useArchiveConversationSafely({
   conversations: AiConversation[]
   fallbackTarget: AiTarget
 }) {
-  return useCallback((id: string) => {
+  return useCallback(
+    (id: string) => {
     const conversation = conversations.find((candidate) => candidate.id === id)
     if (!conversation || !canArchiveConversation(conversation)) return
 
     const activeCount = conversations.filter((conversation) => !conversation.archived).length
     archiveConversation(id)
     if (activeCount <= 1) addConversation(fallbackTarget)
-  }, [addConversation, archiveConversation, conversations, fallbackTarget])
+    },
+    [addConversation, archiveConversation, conversations, fallbackTarget],
+  )
 }
 
 function useTrackedConversationActions({
@@ -797,16 +791,22 @@ function useTrackedConversationActions({
   renameConversation: (id: string, title: string) => void
   titleConversationFromAnswer: (request: GenerateAiConversationTitleRequest & { id: string }) => void
 }) {
-  const trackedRenameConversation = useCallback((id: string, title: string) => {
+  const trackedRenameConversation = useCallback(
+    (id: string, title: string) => {
     if (!title.trim()) return
     renameConversation(id, title)
     trackAiWorkspaceChatTitled('manual')
-  }, [renameConversation])
-  const trackedTitleConversationFromAnswer = useCallback((request: GenerateAiConversationTitleRequest & { id: string }) => {
+    },
+    [renameConversation],
+  )
+  const trackedTitleConversationFromAnswer = useCallback(
+    (request: GenerateAiConversationTitleRequest & { id: string }) => {
     const conversation = conversations.find((candidate) => candidate.id === request.id)
     titleConversationFromAnswer(request)
     if (conversation?.usesDefaultTitle) trackAiWorkspaceChatTitled('generated')
-  }, [conversations, titleConversationFromAnswer])
+    },
+    [conversations, titleConversationFromAnswer],
+  )
 
   return { trackedRenameConversation, trackedTitleConversationFromAnswer }
 }
@@ -861,9 +861,7 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
     [groups, workspace.defaultAiAgent, workspace.defaultAiTarget],
   )
   const { catalog: modelCatalog, ready: modelCatalogReady } = useAiAgentModelCatalog(workspace.open)
-  const fallbackModelId = fallbackTarget.kind === 'agent'
-    ? preferredAgentModel(fallbackTarget.agent)
-    : null
+  const fallbackModelId = fallbackTarget.kind === 'agent' ? preferredAgentModel(fallbackTarget.agent) : null
   const {
     activeId,
     addConversation,
@@ -898,15 +896,15 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
   const addDefaultConversation = useCallback(() => {
     addConversation(fallbackTarget, fallbackModelId)
   }, [addConversation, fallbackModelId, fallbackTarget])
-  const selectConversationTarget = useCallback((id: string, targetId: string) => {
+  const selectConversationTarget = useCallback(
+    (id: string, targetId: string) => {
     const nextTarget = flatTargets(groups).find((target) => target.id === targetId)
     if (!nextTarget) return
     setConversationTarget(id, targetId)
-    setConversationModel(
-      id,
-      nextTarget.kind === 'agent' ? preferredAgentModel(nextTarget.agent) : null,
+      setConversationModel(id, nextTarget.kind === 'agent' ? preferredAgentModel(nextTarget.agent) : null)
+    },
+    [groups, setConversationModel, setConversationTarget],
     )
-  }, [groups, setConversationModel, setConversationTarget])
   const archiveConversationSafely = useArchiveConversationSafely({
     addConversation,
     archiveConversation,
@@ -915,14 +913,17 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
   })
   useActiveConversationSync(activeConversation, activeId, setActiveId)
   const handleStatusChange = useCallback((id: string, status: AgentStatus) => {
-    setStatuses((current) => current[id] === status ? current : { ...current, [id]: status })
+    setStatuses((current) => (Reflect.get(current, id) === status ? current : { ...current, [id]: status }))
   }, [])
-  const forkConversationUntilMessage = useCallback((sourceId: string, messageId: string) => {
+  const forkConversationUntilMessage = useCallback(
+    (sourceId: string, messageId: string) => {
     const targetId = forkConversation(sourceId)
     if (!targetId) return
 
     cloneAiWorkspaceSessionUntilMessage(sourceId, targetId, messageId)
-  }, [forkConversation])
+    },
+    [forkConversation],
+  )
   const { trackedRenameConversation, trackedTitleConversationFromAnswer } = useTrackedConversationActions({
     conversations,
     renameConversation,
@@ -1005,9 +1006,7 @@ function AiWorkspaceLayout({ model, workspace }: { model: AiWorkspaceModel; work
         sidebarWidth={sizing.sidebarWidth}
         statuses={model.statuses}
       />
-      {!model.sidebarCollapsed && (
-        <ResizeHandle onResize={sizing.onSidebarResize} />
-      )}
+      {!model.sidebarCollapsed && <ResizeHandle onResize={sizing.onSidebarResize} />}
       <div className="flex min-w-0 flex-1 flex-col">
         <ConversationSessions model={model} workspace={workspace} />
       </div>

@@ -416,8 +416,7 @@ function htmlValue(html: HtmlText): HtmlExpressionValue {
 }
 
 function isHtmlValue(value: VaultExpressionValue): value is HtmlExpressionValue {
-  if (value === null || Array.isArray(value) || typeof value !== 'object') return false
-  return value.type === 'html'
+  return value !== null && !Array.isArray(value) && typeof value === 'object'
 }
 
 function valueText(value: VaultExpressionValue): string {
@@ -530,7 +529,10 @@ function formattedDatePreset(date: Date, format: DateFormatName, locale: LocaleT
 
 function formatDate(value: VaultExpressionValue, format: VaultExpressionValue, locale: LocaleTag): string | null {
   const date = dateValue(value)
-  return date ? formattedDatePreset(date, stringArgument(format || 'medium'), locale) : null
+  const requestedFormat = format === null || format === false || format === 0 || format === ''
+    ? 'medium'
+    : format
+  return date ? formattedDatePreset(date, stringArgument(requestedFormat), locale) : null
 }
 
 function normalizedPropertyKey(key: PropertyKey): PropertyKey {

@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 import { CaretDown as ChevronDownIcon, CaretUp as ChevronUpIcon, Check as CheckIcon } from '@phosphor-icons/react'
 import { Select as SelectPrimitive } from "radix-ui"
 

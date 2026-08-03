@@ -181,8 +181,14 @@ function runSideMenuActionPreservingScroll(
   })
 }
 
+function useRequiredComponentsContext() {
+  const components = useComponentsContext()
+  if (!components) throw new Error('BlockNote components context is unavailable')
+  return components
+}
+
 function TolariaAddBlockButton() {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const dict = useDictionary()
   const suggestionMenu = useExtension(SuggestionMenu)
   const { block, editor } = useSideMenuBlock()
@@ -235,7 +241,7 @@ function itemCollapseButtonLabel(locale: AppLocale, isCollapsed: boolean) {
 }
 
 function TolariaHeadingCollapseButton({ locale }: { locale: AppLocale }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const { block, editor } = useSideMenuBlock()
   const collapsedHeadingIds = useCollapsedHeadingIds(editor)
   const isCollapsed = Boolean(block?.id && collapsedHeadingIds.has(block.id))
@@ -281,7 +287,7 @@ function TolariaDragHandleButton({
   dragHandleMenu,
   locale = 'en',
 }: SideMenuProps & { children?: ReactNode; locale?: AppLocale }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const dict = useDictionary()
   const sideMenu = useExtension(SideMenuExtension)
   const { block, editor } = useSideMenuBlock()
@@ -322,7 +328,7 @@ function TolariaDragHandleButton({
 }
 
 function TolariaRemoveBlockItem({ children }: { children: ReactNode }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const { block, editor } = useSideMenuBlock()
 
   if (!block) return null
@@ -350,7 +356,7 @@ function TolariaTableHeaderItem({
   children: ReactNode
   header: 'column' | 'row'
 }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const { block, editor } = useSideMenuBlock()
   const liveBlock = liveSideMenuBlock(editor, block)
   const tableContent = tableHeaderContent(liveBlock)
@@ -386,7 +392,7 @@ function TolariaTableHeaderItem({
 }
 
 function TolariaTurnBlockIntoSubmenu({ locale }: { locale: AppLocale }) {
-  const Components = useComponentsContext()!
+  const Components = useRequiredComponentsContext()
   const { block, editor } = useSideMenuBlock()
 
   if (!block) return null

@@ -1,7 +1,11 @@
 import { Archive, ArrowSquareIn, ArrowSquareOut, GearSix, WarningCircle, X } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { useDragRegion } from '../hooks/useDragRegion'
-import { getVaultAiGuidanceSummary, vaultAiGuidanceNeedsRestore, type VaultAiGuidanceStatus } from '../lib/vaultAiGuidance'
+import {
+  getVaultAiGuidanceSummary,
+  vaultAiGuidanceNeedsRestore,
+  type VaultAiGuidanceStatus,
+} from '../lib/vaultAiGuidance'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { AiConversation } from './aiWorkspaceConversations'
 import type { AiWorkspaceMode } from './aiWorkspaceSizing'
@@ -21,7 +25,9 @@ export function GuidanceWarning({
     <div className="flex shrink-0 items-center gap-2 border-y border-border bg-muted/50 px-3 py-2 text-[12px] text-muted-foreground">
       <WarningCircle size={15} className="shrink-0 text-amber-600" />
       <span className="min-w-0 flex-1">
-        {translate(locale, 'ai.workspace.guidanceWarning', { summary: getVaultAiGuidanceSummary(status) })}
+        {translate(locale, 'ai.workspace.guidanceWarning', {
+          summary: getVaultAiGuidanceSummary(status),
+        })}
       </span>
       {status.canRestore && onRestore && (
         <Button type="button" variant="outline" size="xs" onClick={onRestore}>
@@ -32,17 +38,7 @@ export function GuidanceWarning({
   )
 }
 
-export function WorkspaceHeader({
-  conversation,
-  archiveDisabled,
-  locale,
-  mode,
-  onArchive,
-  onClose,
-  onDock,
-  onOpenAiSettings,
-  onPopOut,
-}: {
+export function WorkspaceHeader(options: {
   conversation: AiConversation
   archiveDisabled: boolean
   locale: AppLocale
@@ -53,6 +49,8 @@ export function WorkspaceHeader({
   onOpenAiSettings?: () => void
   onPopOut?: (context?: { activeConversationId?: string }) => void
 }) {
+  const { conversation, archiveDisabled, locale, mode, onArchive, onClose, onDock, onOpenAiSettings, onPopOut } =
+    options
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
 
   return (
@@ -68,23 +66,59 @@ export function WorkspaceHeader({
       </div>
       <div className="flex items-center gap-1">
         {onOpenAiSettings && (
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.settings')} title={translate(locale, 'ai.workspace.settings')} onClick={onOpenAiSettings}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={translate(locale, 'ai.workspace.settings')}
+            title={translate(locale, 'ai.workspace.settings')}
+            onClick={onOpenAiSettings}
+          >
             <GearSix size={16} />
           </Button>
         )}
-        <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.archive')} title={translate(locale, 'ai.workspace.archive')} disabled={archiveDisabled} onClick={onArchive}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={translate(locale, 'ai.workspace.archive')}
+          title={translate(locale, 'ai.workspace.archive')}
+          disabled={archiveDisabled}
+          onClick={onArchive}
+        >
           <Archive size={16} />
         </Button>
         {mode === 'docked' ? (
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.popOut')} title={translate(locale, 'ai.workspace.popOut')} onClick={() => onPopOut?.({ activeConversationId: conversation.id })}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={translate(locale, 'ai.workspace.popOut')}
+            title={translate(locale, 'ai.workspace.popOut')}
+            onClick={() => onPopOut?.({ activeConversationId: conversation.id })}
+          >
             <ArrowSquareOut size={16} />
           </Button>
         ) : (
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.dock')} title={translate(locale, 'ai.workspace.dock')} onClick={onDock}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={translate(locale, 'ai.workspace.dock')}
+            title={translate(locale, 'ai.workspace.dock')}
+            onClick={onDock}
+          >
             <ArrowSquareIn size={16} />
           </Button>
         )}
-        <Button type="button" variant="ghost" size="icon-xs" aria-label={translate(locale, 'ai.workspace.close')} title={translate(locale, 'ai.workspace.close')} onClick={onClose}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={translate(locale, 'ai.workspace.close')}
+          title={translate(locale, 'ai.workspace.close')}
+          onClick={onClose}
+        >
           <X size={16} />
         </Button>
       </div>

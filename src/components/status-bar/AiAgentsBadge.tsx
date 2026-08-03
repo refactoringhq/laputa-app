@@ -13,12 +13,7 @@ import {
   type AiAgentDefinition,
   type AiAgentsStatus,
 } from '../../lib/aiAgents'
-import {
-  configuredModelTargets,
-  resolveAiTarget,
-  type AiTarget,
-  type AiModelProvider,
-} from '../../lib/aiTargets'
+import { configuredModelTargets, resolveAiTarget, type AiTarget, type AiModelProvider } from '../../lib/aiTargets'
 import type { Settings } from '../../types'
 import {
   getVaultAiGuidanceSummary,
@@ -54,28 +49,42 @@ interface AiAgentsBadgeProps {
   locale?: AppLocale
 }
 
+function resolvedGuidance(status?: VaultAiGuidanceStatus) {
+  if (!status || isVaultAiGuidanceStatusChecking(status)) return null
+  return { status, summary: getVaultAiGuidanceSummary(status) }
+}
+
 function badgeTooltip(
   locale: AppLocale,
   statuses: AiAgentsStatus,
   defaultAgent: AiAgentId,
   guidanceStatus?: VaultAiGuidanceStatus,
 ): string {
-  const guidanceSummary = guidanceStatus && !isVaultAiGuidanceStatusChecking(guidanceStatus)
-    ? getVaultAiGuidanceSummary(guidanceStatus)
-    : null
+  const guidance = resolvedGuidance(guidanceStatus)
   if (!hasAnyInstalledAiAgent(statuses)) return translate(locale, 'status.ai.noAgentsTooltip')
   const definition = getAiAgentDefinition(defaultAgent)
   if (!isAiAgentInstalled(statuses, defaultAgent)) {
-    return translate(locale, 'status.ai.selectedMissing', { agent: definition.label })
+    return translate(locale, 'status.ai.selectedMissing', {
+      agent: definition.label,
+    })
   }
   const version = getAiAgentAvailability(statuses, defaultAgent).version
-  const base = translate(locale, 'status.ai.defaultAgent', { agent: definition.label, version: version ? ` ${version}` : '' })
-  if (!guidanceSummary) return base
-  if (vaultAiGuidanceNeedsRestore(guidanceStatus!)) {
-    return translate(locale, 'status.ai.restoreDetails', { base, summary: guidanceSummary })
+  const base = translate(locale, 'status.ai.defaultAgent', {
+    agent: definition.label,
+    version: version ? ` ${version}` : '',
+  })
+  if (!guidance?.summary) return base
+  if (vaultAiGuidanceNeedsRestore(guidance.status)) {
+    return translate(locale, 'status.ai.restoreDetails', {
+      base,
+      summary: guidance.summary,
+    })
   }
-  if (vaultAiGuidanceUsesCustomFiles(guidanceStatus!)) {
-    return translate(locale, 'status.ai.withGuidance', { base, summary: guidanceSummary })
+  if (vaultAiGuidanceUsesCustomFiles(guidance.status)) {
+    return translate(locale, 'status.ai.withGuidance', {
+      base,
+      summary: guidance.summary,
+    })
   }
   return base
 }
@@ -90,7 +99,9 @@ function triggerLabel(defaultAgent: AiAgentId): string {
 
 function menuHeading(locale: AppLocale, selectedTarget: AiTarget, selectedAgentReady: boolean): string {
   if (selectedTarget.kind === 'api_model') {
-    return translate(locale, 'status.ai.defaultTarget', { target: selectedTarget.label })
+    return translate(locale, 'status.ai.defaultTarget', {
+      target: selectedTarget.label,
+    })
   }
 
   const agent = selectedTarget.label
@@ -104,10 +115,7 @@ function statusText(statuses: AiAgentsStatus, definition: AiAgentDefinition): st
   return version ? `${definition.label} ${version}` : definition.label
 }
 
-function canSwitchAgents(
-  installedAgents: AiAgentDefinition[],
-  defaultAgent: AiAgentId,
-): boolean {
+function canSwitchAgents(installedAgents: AiAgentDefinition[], defaultAgent: AiAgentId): boolean {
   return installedAgents.some((definition) => definition.id !== defaultAgent)
 }
 
@@ -116,9 +124,11 @@ function hasAiAgentWarning(
   defaultAgent: AiAgentId,
   guidanceStatus?: VaultAiGuidanceStatus,
 ): boolean {
-  return !hasAnyInstalledAiAgent(statuses)
-    || !isAiAgentInstalled(statuses, defaultAgent)
-    || !!(guidanceStatus && vaultAiGuidanceNeedsRestore(guidanceStatus))
+  return (
+    !hasAnyInstalledAiAgent(statuses) ||
+    !isAiAgentInstalled(statuses, defaultAgent) ||
+    !!(guidanceStatus && vaultAiGuidanceNeedsRestore(guidanceStatus))
+  )
 }
 
 function canShowSwitcherCue(statuses: AiAgentsStatus, defaultAgent: AiAgentId): boolean {
@@ -126,9 +136,7 @@ function canShowSwitcherCue(statuses: AiAgentsStatus, defaultAgent: AiAgentId): 
 }
 
 function triggerButtonClassName(compact: boolean): string {
-  return compact
-    ? 'h-6 w-6 rounded-sm p-0 text-[12px] font-medium'
-    : 'h-6 px-2 text-[12px] font-medium'
+  return compact ? 'h-6 w-6 rounded-sm p-0 text-[12px] font-medium' : 'h-6 px-2 text-[12px] font-medium'
 }
 
 function CompactSeparator({ compact }: { compact: boolean }) {
@@ -136,25 +144,13 @@ function CompactSeparator({ compact }: { compact: boolean }) {
   return <span style={SEP_STYLE}>|</span>
 }
 
-function TriggerStateIcon({
-  showWarning,
-  showSwitcherCue,
-}: {
-  showWarning: boolean
-  showSwitcherCue: boolean
-}) {
+function TriggerStateIcon({ showWarning, showSwitcherCue }: { showWarning: boolean; showSwitcherCue: boolean }) {
   if (showWarning) return <AlertTriangle size={10} style={{ marginLeft: 2 }} />
   if (showSwitcherCue) return <ChevronsUpDown size={10} style={{ marginLeft: 2 }} />
   return null
 }
 
-function TriggerLeadingIcon({
-  selectedTarget,
-  showWarning,
-}: {
-  selectedTarget: AiTarget
-  showWarning: boolean
-}) {
+function TriggerLeadingIcon({ selectedTarget, showWarning }: { selectedTarget: AiTarget; showWarning: boolean }) {
   if (showWarning) return <AlertTriangle size={13} weight="regular" />
   if (selectedTarget.kind === 'agent') return <AiAgentIcon agent={selectedTarget.agent} size={13} />
   return <Sparkle size={13} weight="regular" />
@@ -178,16 +174,10 @@ type AiAgentsBadgeButtonProps = ComponentPropsWithoutRef<typeof Button> & {
   title: string
 }
 
-const AiAgentsBadgeButton = forwardRef<HTMLButtonElement, AiAgentsBadgeButtonProps>(function AiAgentsBadgeButton({
-  ariaLabel,
-  compact,
-  defaultAgent,
-  selectedTarget,
-  showSwitcherCue,
-  showWarning,
-  title,
-  ...buttonProps
-}, ref) {
+const AiAgentsBadgeButton = forwardRef<HTMLButtonElement, AiAgentsBadgeButtonProps>(
+  function AiAgentsBadgeButton(options, ref) {
+    const { ariaLabel, compact, defaultAgent, selectedTarget, showSwitcherCue, showWarning, title, ...buttonProps } =
+      options
   return (
     <Button
       ref={ref}
@@ -208,7 +198,8 @@ const AiAgentsBadgeButton = forwardRef<HTMLButtonElement, AiAgentsBadgeButtonPro
       </span>
     </Button>
   )
-})
+  },
+)
 
 function GuidanceMenuSection({
   guidanceStatus,
@@ -225,10 +216,7 @@ function GuidanceMenuSection({
         {getVaultAiGuidanceSummary(guidanceStatus)}
       </DropdownMenuItem>
       {vaultAiGuidanceNeedsRestore(guidanceStatus) && guidanceStatus.canRestore && (
-        <DropdownMenuItem
-          onSelect={() => onRestoreGuidance?.()}
-          data-testid="status-ai-guidance-restore"
-        >
+        <DropdownMenuItem onSelect={() => onRestoreGuidance?.()} data-testid="status-ai-guidance-restore">
           {translate(locale, 'status.ai.restoreGuidance')}
         </DropdownMenuItem>
       )}
@@ -236,28 +224,29 @@ function GuidanceMenuSection({
   )
 }
 
-function AgentMenuContent({
-  statuses,
-  guidanceStatus,
-  providers = [],
-  selectedTarget,
-  selectedAgentReady,
-  onSetDefaultAgent,
-  onSetDefaultTarget,
-  onRestoreGuidance,
-  locale = 'en',
-}: AiAgentsBadgeProps & { selectedTarget: AiTarget; selectedAgentReady: boolean }) {
+function AgentMenuContent(
+  options: AiAgentsBadgeProps & {
+    selectedTarget: AiTarget
+    selectedAgentReady: boolean
+  },
+) {
+  const {
+    statuses,
+    guidanceStatus,
+    providers = [],
+    selectedTarget,
+    selectedAgentReady,
+    onSetDefaultAgent,
+    onSetDefaultTarget,
+    onRestoreGuidance,
+    locale = 'en',
+  } = options
   const installedAgents = installedAgentDefinitions(statuses)
   const modelTargets = configuredModelTargets(providers)
   const selectedAgentValue = selectedTarget.kind === 'agent' && selectedAgentReady ? selectedTarget.agent : undefined
 
   return (
-    <DropdownMenuContent
-      align="start"
-      side="top"
-      className="min-w-[18rem]"
-      data-testid="status-ai-agents-menu"
-    >
+    <DropdownMenuContent align="start" side="top" className="min-w-[18rem]" data-testid="status-ai-agents-menu">
       <DropdownMenuLabel>{menuHeading(locale, selectedTarget, selectedAgentReady)}</DropdownMenuLabel>
       {installedAgents.length === 0 ? (
         <DropdownMenuItem disabled>{translate(locale, 'status.ai.noAgents')}</DropdownMenuItem>
@@ -273,9 +262,7 @@ function AgentMenuContent({
             <DropdownMenuRadioItem key={definition.id} value={definition.id} className="gap-2">
               <AiAgentIcon agent={definition.id} size={16} />
               <span>{definition.label}</span>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {statusText(statuses, definition)}
-              </span>
+              <span className="ml-auto text-xs text-muted-foreground">{statusText(statuses, definition)}</span>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -286,11 +273,7 @@ function AgentMenuContent({
         locale={locale}
         onSetDefaultTarget={onSetDefaultTarget}
       />
-      <GuidanceMenuSection
-        guidanceStatus={guidanceStatus}
-        locale={locale}
-        onRestoreGuidance={onRestoreGuidance}
-      />
+      <GuidanceMenuSection guidanceStatus={guidanceStatus} locale={locale} onRestoreGuidance={onRestoreGuidance} />
     </DropdownMenuContent>
   )
 }
@@ -331,19 +314,20 @@ function ModelTargetMenuSection({
   )
 }
 
-export function AiAgentsBadge({
-  statuses,
-  guidanceStatus,
-  defaultAgent,
-  defaultTarget,
-  providers = [],
-  onSetDefaultAgent,
-  onSetDefaultTarget,
-  onRestoreGuidance,
-  onOpenWorkspace,
-  compact = false,
-  locale = 'en',
-}: AiAgentsBadgeProps) {
+export function AiAgentsBadge(options: AiAgentsBadgeProps) {
+  const {
+    statuses,
+    guidanceStatus,
+    defaultAgent,
+    defaultTarget,
+    providers = [],
+    onSetDefaultAgent,
+    onSetDefaultTarget,
+    onRestoreGuidance,
+    onOpenWorkspace,
+    compact = false,
+    locale = 'en',
+  } = options
   const selectedTarget = resolveAiTarget({
     default_ai_agent: defaultAgent,
     default_ai_target: defaultTarget,
@@ -352,8 +336,11 @@ export function AiAgentsBadge({
   const selectedAgentReady = selectedTarget.kind === 'api_model' || isAiAgentInstalled(statuses, defaultAgent)
   const showWarning = selectedTarget.kind === 'agent' && hasAiAgentWarning(statuses, defaultAgent, guidanceStatus)
   const showSwitcherCue = !showWarning && canShowSwitcherCue(statuses, defaultAgent)
-  const tooltip = selectedTarget.kind === 'api_model'
-    ? translate(locale, 'status.ai.defaultTarget', { target: selectedTarget.label })
+  const tooltip =
+    selectedTarget.kind === 'api_model'
+      ? translate(locale, 'status.ai.defaultTarget', {
+          target: selectedTarget.label,
+        })
     : badgeTooltip(locale, statuses, defaultAgent, guidanceStatus)
 
   if (isAiAgentsStatusChecking(statuses)) return null
@@ -364,7 +351,16 @@ export function AiAgentsBadge({
     return (
       <>
         <CompactSeparator compact={compact} />
-        <AiAgentsBadgeButton ariaLabel={label} compact={compact} defaultAgent={defaultAgent} onClick={onOpenWorkspace} selectedTarget={selectedTarget} showSwitcherCue={showSwitcherCue} showWarning={showWarning} title={label} />
+        <AiAgentsBadgeButton
+          ariaLabel={label}
+          compact={compact}
+          defaultAgent={defaultAgent}
+          onClick={onOpenWorkspace}
+          selectedTarget={selectedTarget}
+          showSwitcherCue={showSwitcherCue}
+          showWarning={showWarning}
+          title={label}
+        />
       </>
     )
   }
@@ -374,7 +370,15 @@ export function AiAgentsBadge({
       <CompactSeparator compact={compact} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild={true}>
-          <AiAgentsBadgeButton ariaLabel={translate(locale, 'status.ai.openOptions')} compact={compact} defaultAgent={defaultAgent} selectedTarget={selectedTarget} showSwitcherCue={showSwitcherCue} showWarning={showWarning} title={tooltip} />
+          <AiAgentsBadgeButton
+            ariaLabel={translate(locale, 'status.ai.openOptions')}
+            compact={compact}
+            defaultAgent={defaultAgent}
+            selectedTarget={selectedTarget}
+            showSwitcherCue={showSwitcherCue}
+            showWarning={showWarning}
+            title={tooltip}
+          />
         </DropdownMenuTrigger>
         <AgentMenuContent
           statuses={statuses}

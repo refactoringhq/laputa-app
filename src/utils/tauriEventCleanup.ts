@@ -5,7 +5,7 @@ export function cleanupTauriEventListener(unlisten: TauriUnlisten | null | undef
 
   void Promise.resolve()
     .then(unlisten)
-    .catch(() => {})
+    .catch(() => { /* Listener cleanup is best-effort during teardown. */ })
 }
 
 export function cleanupTauriEventListeners(

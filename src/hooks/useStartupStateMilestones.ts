@@ -15,7 +15,7 @@ function markReadyStateMilestones(options: StartupStateMilestonesOptions): void 
 }
 
 export function useStartupStateMilestones(options: StartupStateMilestonesOptions): void {
-  useEffect(() => markReadyStateMilestones(options), [options])
+  useEffect(() => { markReadyStateMilestones(options); }, [options])
 
   useEffect(() => {
     if (options.isVaultContentLoading || options.onboardingStatus !== 'ready') return

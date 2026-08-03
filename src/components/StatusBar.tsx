@@ -5,10 +5,7 @@ import type { AppLocale } from '../lib/i18n'
 import type { GitRemoteStatus, SyncStatus } from '../types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
-import {
-  StatusBarPrimarySection,
-  StatusBarSecondarySection,
-} from './status-bar/StatusBarSections'
+import { StatusBarPrimarySection, StatusBarSecondarySection } from './status-bar/StatusBarSections'
 import type { VaultOption } from './status-bar/types'
 
 export type { VaultOption } from './status-bar/types'
@@ -109,50 +106,51 @@ interface StatusBarFooterProps extends StatusBarProps {
   stacked: boolean
 }
 
-function StatusBarPrimaryFromFooter({
-  modifiedCount = 0,
-  vaultPath,
-  defaultWorkspacePath,
-  vaults,
-  multiWorkspaceEnabled,
-  onSwitchVault,
-  onSetDefaultWorkspace,
-  onOpenVaultSettings,
-  onOpenLocalFolder,
-  onCreateEmptyVault,
-  onCloneVault,
-  onCloneGettingStarted,
-  onClickPending,
-  onClickPulse,
-  onCommitPush,
-  commitActionPending = false,
-  gitFeaturesEnabled = true,
-  onInitializeGit,
-  isOffline = false,
-  isVaultReloading = false,
-  isGitVault = true,
-  syncStatus = 'idle',
-  lastSyncTime = null,
-  conflictCount = 0,
-  remoteStatus,
-  repositories,
-  selectedRepositoryPath,
-  onRepositoryChange,
-  onTriggerSync,
-  onPullAndPush,
-  onOpenConflictResolver,
-  buildNumber,
-  onCheckForUpdates,
-  onRemoveVault,
-  onReorderVaults,
-  onUpdateWorkspaceIdentity,
-  aiFeaturesEnabled = true,
-  mcpStatus,
-  onInstallMcp,
-  locale = 'en',
-  compact,
-  stacked,
-}: StatusBarFooterProps) {
+function StatusBarPrimaryFromFooter(options: StatusBarFooterProps) {
+  const {
+    modifiedCount = 0,
+    vaultPath,
+    defaultWorkspacePath,
+    vaults,
+    multiWorkspaceEnabled,
+    onSwitchVault,
+    onSetDefaultWorkspace,
+    onOpenVaultSettings,
+    onOpenLocalFolder,
+    onCreateEmptyVault,
+    onCloneVault,
+    onCloneGettingStarted,
+    onClickPending,
+    onClickPulse,
+    onCommitPush,
+    commitActionPending = false,
+    gitFeaturesEnabled = true,
+    onInitializeGit,
+    isOffline = false,
+    isVaultReloading = false,
+    isGitVault = true,
+    syncStatus = 'idle',
+    lastSyncTime = null,
+    conflictCount = 0,
+    remoteStatus,
+    repositories,
+    selectedRepositoryPath,
+    onRepositoryChange,
+    onTriggerSync,
+    onPullAndPush,
+    onOpenConflictResolver,
+    buildNumber,
+    onCheckForUpdates,
+    onRemoveVault,
+    onReorderVaults,
+    onUpdateWorkspaceIdentity,
+    aiFeaturesEnabled = true,
+    mcpStatus,
+    onInstallMcp,
+    locale = 'en',
+    compact,
+    stacked,
+  } = options
   return (
     <StatusBarPrimarySection
       modifiedCount={modifiedCount}
@@ -200,19 +198,20 @@ function StatusBarPrimaryFromFooter({
   )
 }
 
-function StatusBarSecondaryFromFooter({
-  noteCount,
-  zoomLevel = 100,
-  themeMode = 'light',
-  onZoomReset,
-  onToggleThemeMode,
-  onOpenFeedback,
-  onOpenDocs,
-  onOpenSettings,
-  locale = 'en',
-  compact,
-  stacked,
-}: StatusBarFooterProps) {
+function StatusBarSecondaryFromFooter(options: StatusBarFooterProps) {
+  const {
+    noteCount,
+    zoomLevel = 100,
+    themeMode = 'light',
+    onZoomReset,
+    onToggleThemeMode,
+    onOpenFeedback,
+    onOpenDocs,
+    onOpenSettings,
+    locale = 'en',
+    compact,
+    stacked,
+  } = options
   return (
       <StatusBarSecondarySection
         noteCount={noteCount}

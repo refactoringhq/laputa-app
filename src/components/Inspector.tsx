@@ -14,7 +14,12 @@ import {
   NoteInfoPanel,
 } from './InspectorPanels'
 import { normalizeNotePathForIdentity } from '../utils/notePathIdentity'
-import { EmptyInspector, InitializePropertiesPrompt, InspectorHeader, InvalidFrontmatterNotice } from './inspector/InspectorChrome'
+import {
+  EmptyInspector,
+  InitializePropertiesPrompt,
+  InspectorHeader,
+  InvalidFrontmatterNotice,
+} from './inspector/InspectorChrome'
 import { useBacklinks, useReferencedBy } from './inspector/useInspectorData'
 import { useInspectorFocusBoundary } from '../hooks/editorFocusOwnership'
 import { useInspectorPropertyActions } from './inspector/useInspectorPropertyActions'
@@ -34,10 +39,15 @@ interface InspectorProps {
   vaultPath?: string
   onNavigate: (target: string) => void
   onViewCommitDiff?: (commitHash: string) => void
-  onUpdateFrontmatter?: (path: string, key: string, value: FrontmatterValue, options?: FrontmatterOpOptions) => Promise<void>
+  onUpdateFrontmatter?: (
+    path: string,
+    key: string,
+    value: FrontmatterValue,
+    options?: FrontmatterOpOptions,
+  ) => Promise<void>
   onDeleteProperty?: (path: string, key: string, options?: FrontmatterOpOptions) => Promise<void>
   onAddProperty?: (path: string, key: string, value: FrontmatterValue, options?: FrontmatterOpOptions) => Promise<void>
-  onCreateMissingType?: (path: string, missingType: string, nextTypeName: string) => Promise<boolean | void>
+  onCreateMissingType?: (path: string, missingType: string, nextTypeName: string) => Promise<boolean | undefined>
   onCreateAndOpenNote?: (title: string) => Promise<boolean>
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   onInitializeProperties?: (path: string) => void
@@ -65,7 +75,10 @@ function pathBelongsToWorkspace(path: string, workspace: WorkspaceIdentity): boo
   return normalizedPath === normalizedWorkspacePath || normalizedPath.startsWith(`${normalizedWorkspacePath}/`)
 }
 
-function inferEntryWorkspace(entry: VaultEntry, workspaces: WorkspaceIdentity[] | undefined): WorkspaceIdentity | undefined {
+function inferEntryWorkspace(
+  entry: VaultEntry,
+  workspaces: WorkspaceIdentity[] | undefined,
+): WorkspaceIdentity | undefined {
   if (entry.workspace) return entry.workspace
   return workspaces
     ?.filter((workspace) => pathBelongsToWorkspace(entry.path, workspace))
@@ -115,24 +128,7 @@ function useDeferredInspectorReferences(
   return readyFor?.entry.path === entry.path ? readyFor : null
 }
 
-function ValidFrontmatterPanels({
-  entry,
-  entries,
-  frontmatter,
-  typeEntryMap,
-  vaultPath,
-  onNavigate,
-  onCreateAndOpenNote,
-  onUpdateProperty,
-  onUpdatePropertyAfterCreate,
-  onDeleteProperty,
-  onAddProperty,
-  onAddPropertyAfterCreate,
-  onCreateMissingType,
-  onChangeWorkspace,
-  workspaces,
-  locale,
-}: {
+function ValidFrontmatterPanels(options: {
   entry: VaultEntry
   entries: VaultEntry[]
   frontmatter: ReturnType<typeof parseFrontmatter>
@@ -145,11 +141,29 @@ function ValidFrontmatterPanels({
   onDeleteProperty?: (key: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
   onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
-  onCreateMissingType?: (typeName: string) => Promise<boolean | void>
+  onCreateMissingType?: (typeName: string) => Promise<boolean | undefined>
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   workspaces?: WorkspaceIdentity[]
   locale: AppLocale
 }) {
+  const {
+    entry,
+    entries,
+    frontmatter,
+    typeEntryMap,
+    vaultPath,
+    onNavigate,
+    onCreateAndOpenNote,
+    onUpdateProperty,
+    onUpdatePropertyAfterCreate,
+    onDeleteProperty,
+    onAddProperty,
+    onAddPropertyAfterCreate,
+    onCreateMissingType,
+    onChangeWorkspace,
+    workspaces,
+    locale,
+  } = options
   const entryForWorkspaceActions = entryWithInferredWorkspace(entry, workspaces)
   return (
     <>
@@ -162,7 +176,9 @@ function ValidFrontmatterPanels({
         onAddProperty={onAddProperty}
         onNavigate={onNavigate}
         onCreateMissingType={onCreateMissingType}
-        onChangeWorkspace={onChangeWorkspace ? (workspace) => onChangeWorkspace(entryForWorkspaceActions, workspace) : undefined}
+        onChangeWorkspace={
+          onChangeWorkspace ? (workspace) => onChangeWorkspace(entryForWorkspaceActions, workspace) : undefined
+        }
         workspaces={workspaces}
         locale={locale}
       />
@@ -219,36 +235,10 @@ function DeferredInspectorReferencePanels(props: {
   const deferred = useDeferredInspectorReferences(props.entry, props.entries)
   if (!deferred) return null
 
-  return (
-    <InspectorReferencePanels
-      {...props}
-      entries={deferred.entries}
-      entry={deferred.entry}
-    />
-  )
+  return <InspectorReferencePanels {...props} entries={deferred.entries} entry={deferred.entry} />
 }
 
-function PrimaryInspectorPanel({
-  entry,
-  frontmatterState,
-  frontmatter,
-  entries,
-  typeEntryMap,
-  vaultPath,
-  onNavigate,
-  onToggleRawEditor,
-  onInitializeProperties,
-  onCreateAndOpenNote,
-  onUpdateProperty,
-  onUpdatePropertyAfterCreate,
-  onDeleteProperty,
-  onAddProperty,
-  onAddPropertyAfterCreate,
-  onCreateMissingType,
-  onChangeWorkspace,
-  workspaces,
-  locale,
-}: {
+function PrimaryInspectorPanel(options: {
   entry: VaultEntry
   frontmatterState: ReturnType<typeof detectFrontmatterState>
   frontmatter: ReturnType<typeof parseFrontmatter>
@@ -264,11 +254,32 @@ function PrimaryInspectorPanel({
   onDeleteProperty?: (key: string) => void
   onAddProperty?: (key: string, value: FrontmatterValue) => void
   onAddPropertyAfterCreate?: (key: string, value: FrontmatterValue) => void
-  onCreateMissingType?: (typeName: string) => Promise<boolean | void>
+  onCreateMissingType?: (typeName: string) => Promise<boolean | undefined>
   onChangeWorkspace?: (entry: VaultEntry, workspace: WorkspaceIdentity) => Promise<void> | void
   workspaces?: WorkspaceIdentity[]
   locale: AppLocale
 }) {
+  const {
+    entry,
+    frontmatterState,
+    frontmatter,
+    entries,
+    typeEntryMap,
+    vaultPath,
+    onNavigate,
+    onToggleRawEditor,
+    onInitializeProperties,
+    onCreateAndOpenNote,
+    onUpdateProperty,
+    onUpdatePropertyAfterCreate,
+    onDeleteProperty,
+    onAddProperty,
+    onAddPropertyAfterCreate,
+    onCreateMissingType,
+    onChangeWorkspace,
+    workspaces,
+    locale,
+  } = options
   if (frontmatterState === 'valid') {
     return (
       <ValidFrontmatterPanels
@@ -296,28 +307,31 @@ function PrimaryInspectorPanel({
     return onToggleRawEditor ? <InvalidFrontmatterNotice locale={locale} onFix={onToggleRawEditor} /> : null
   }
 
-  return onInitializeProperties ? <InitializePropertiesPrompt locale={locale} onClick={() => onInitializeProperties(entry.path)} /> : null
+  return onInitializeProperties ? (
+    <InitializePropertiesPrompt locale={locale} onClick={() => onInitializeProperties(entry.path)} />
+  ) : null
 }
 
-function InspectorBody({
-  entry,
-  entries,
-  content,
-  gitHistory,
-  vaultPath,
-  onNavigate,
-  onViewCommitDiff,
-  onUpdateFrontmatter,
-  onDeleteProperty,
-  onAddProperty,
-  onCreateMissingType,
-  onChangeWorkspace,
-  onCreateAndOpenNote,
-  onInitializeProperties,
-  onToggleRawEditor,
-  workspaces,
-  locale = 'en',
-}: Omit<InspectorProps, 'collapsed' | 'onToggle'>) {
+function InspectorBody(options: Omit<InspectorProps, 'collapsed' | 'onToggle'>) {
+  const {
+    entry,
+    entries,
+    content,
+    gitHistory,
+    vaultPath,
+    onNavigate,
+    onViewCommitDiff,
+    onUpdateFrontmatter,
+    onDeleteProperty,
+    onAddProperty,
+    onCreateMissingType,
+    onChangeWorkspace,
+    onCreateAndOpenNote,
+    onInitializeProperties,
+    onToggleRawEditor,
+    workspaces,
+    locale = 'en',
+  } = options
   const frontmatter = useMemo(() => parseFrontmatter(content), [content])
   const frontmatterState = useMemo(() => detectFrontmatterState(content), [content])
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
@@ -382,15 +396,15 @@ function InspectorBody({
 export function Inspector({ collapsed, onToggle, ...bodyProps }: InspectorProps) {
   const inspectorRef = useRef<HTMLElement | null>(null)
   useInspectorFocusBoundary(inspectorRef)
-  const frontmatterWarnings = useMemo(
-    () => detectFrontmatterWarnings(bodyProps.content),
-    [bodyProps.content],
-  )
+  const frontmatterWarnings = useMemo(() => detectFrontmatterWarnings(bodyProps.content), [bodyProps.content])
 
   return (
     <aside
       ref={inspectorRef}
-      className={cn('flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground transition-[width] duration-200', collapsed && '!w-10 !min-w-10')}
+      className={cn(
+        'flex flex-1 flex-col overflow-hidden border-l border-border bg-background text-foreground transition-[width] duration-200',
+        collapsed && '!w-10 !min-w-10',
+      )}
     >
       <InspectorHeader
         collapsed={collapsed}

@@ -6,14 +6,14 @@ import { Input } from '@/components/ui/input'
 interface CreateTypeDialogProps {
   open: boolean
   onClose: () => void
-  onCreate: (name: string) => boolean | void | Promise<boolean | void>
+  onCreate: (name: string) => boolean | undefined | Promise<boolean | undefined>
   initialName?: string
 }
 
 interface CreateTypeDialogFormProps {
   initialName: string
   onClose: () => void
-  onCreate: (name: string) => boolean | void | Promise<boolean | void>
+  onCreate: (name: string) => boolean | undefined | Promise<boolean | undefined>
 }
 
 function CreateTypeDialogForm({ initialName, onClose, onCreate }: CreateTypeDialogFormProps) {

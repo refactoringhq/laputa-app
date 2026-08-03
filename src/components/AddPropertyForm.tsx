@@ -17,8 +17,8 @@ import { useDateDisplayFormat } from '../hooks/useAppPreferences'
 
 function parseDateValue(value: string): Date | undefined {
   const iso = toISODate(value)
-  const d = new Date(iso + 'T00:00:00')
-  return isNaN(d.getTime()) ? undefined : d
+  const d = new Date(`${iso}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? undefined : d
 }
 
 function dateToISO(day: Date): string {

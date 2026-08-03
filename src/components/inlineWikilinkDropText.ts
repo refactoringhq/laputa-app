@@ -59,9 +59,10 @@ export function extractDroppedPathText(dataTransfer: DataTransfer): string | nul
   if (uriPathText) return uriPathText
 
   const filePaths = Array.from(dataTransfer.files)
-    .map((file) => (typeof (file as File & { path?: string }).path === 'string'
-      ? (file as File & { path?: string }).path!.trim()
-      : ''))
+    .map((file) => {
+      const filePath = (file as File & { path?: string }).path
+      return typeof filePath === 'string' ? filePath.trim() : ''
+    })
     .filter(Boolean)
 
   const filePathText = formatDroppedPathList(filePaths)

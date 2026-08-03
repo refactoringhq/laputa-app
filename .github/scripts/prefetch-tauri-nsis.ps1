@@ -103,7 +103,7 @@ New-Item -ItemType Directory -Force -Path $tauriToolsPath | Out-Null
 
 $missingNsisFile = Find-MissingFile -Root $nsisPath -RelativePaths $nsisRequiredFiles
 if ($missingNsisFile) {
-  Write-Host "Tauri NSIS cache is missing $missingNsisFile; downloading NSIS 3.11."
+  Write-Output "Tauri NSIS cache is missing $missingNsisFile; downloading NSIS 3.11."
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -LiteralPath $nsisPath
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -LiteralPath (Join-Path $tauriToolsPath "nsis-3.11")
 
@@ -118,15 +118,15 @@ if ($missingNsisFile) {
 
   Move-Item -Force -LiteralPath $extractedNsisPath -Destination $nsisPath
 } else {
-  Write-Host "Tauri NSIS cache already contains NSIS 3.11."
+  Write-Output "Tauri NSIS cache already contains NSIS 3.11."
 }
 
 $tauriUtilsPath = Join-Path $nsisPath $tauriUtilsRelativePath
 if (-not (Test-FileSha1 -Path $tauriUtilsPath -ExpectedSha1 $tauriUtilsSha1)) {
-  Write-Host "Downloading Tauri NSIS utility plugin."
+  Write-Output "Downloading Tauri NSIS utility plugin."
   Save-VerifiedDownload -Uri $tauriUtilsUrl -OutFile $tauriUtilsPath -ExpectedSha1 $tauriUtilsSha1
 } else {
-  Write-Host "Tauri NSIS utility plugin is already cached."
+  Write-Output "Tauri NSIS utility plugin is already cached."
 }
 
 $missingFile = Find-MissingFile -Root $nsisPath -RelativePaths ($nsisRequiredFiles + @($tauriUtilsRelativePath))
@@ -134,4 +134,4 @@ if ($missingFile) {
   throw "Tauri NSIS toolchain is incomplete after prefetch; missing $missingFile."
 }
 
-Write-Host "Tauri NSIS toolchain ready at $nsisPath."
+Write-Output "Tauri NSIS toolchain ready at $nsisPath."

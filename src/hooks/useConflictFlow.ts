@@ -28,11 +28,13 @@ async function fetchConflictFiles(vaultPath: string): Promise<string[]> {
   return tauriCall<string[]>('get_conflict_files', { vaultPath })
 }
 
-async function resolveAndCheck(
-  vaultPath: string, filePath: string, strategy: 'ours' | 'theirs',
-): Promise<string[]> {
-  const relativePath = filePath.replace(vaultPath + '/', '')
-  await tauriCall('git_resolve_conflict', { vaultPath, file: relativePath, strategy })
+async function resolveAndCheck(vaultPath: string, filePath: string, strategy: 'ours' | 'theirs'): Promise<string[]> {
+  const relativePath = filePath.replace(`${vaultPath}/`, '')
+  await tauriCall('git_resolve_conflict', {
+    vaultPath,
+    file: relativePath,
+    strategy,
+  })
   return fetchConflictFiles(vaultPath)
 }
 
@@ -40,18 +42,17 @@ async function commitMergeResolution(vaultPath: string): Promise<void> {
   await tauriCall('git_commit_conflict_resolution', { vaultPath })
 }
 
-export function useConflictFlow({
-  resolvedPath, entries, conflictFiles,
-  pausePull, resumePull, triggerSync, reloadVault,
-  initConflictFiles, openConflictResolver, closeConflictResolver,
-  onSelectNote, activeTabPath, setToastMessage,
-}: ConflictFlowDeps) {
+function useOpenConflictFileRef({
+  closeConflictResolver,
+  entries,
+  onSelectNote,
+  resolvedPath,
+}: Pick<ConflictFlowDeps, 'closeConflictResolver' | 'entries' | 'onSelectNote' | 'resolvedPath'>) {
   const openConflictFileRef = useRef<(relativePath: string) => void>(() => {})
-
   useEffect(() => {
     openConflictFileRef.current = (relativePath: string) => {
       const fullPath = `${resolvedPath}/${relativePath}`
-      const entry = entries.find(e => e.path === fullPath)
+      const entry = entries.find((candidate) => candidate.path === fullPath)
       if (entry) {
         onSelectNote(entry)
         closeConflictResolver()
@@ -59,12 +60,22 @@ export function useConflictFlow({
         openLocalFile(fullPath, resolvedPath)
       }
     }
-  }, [resolvedPath, entries, onSelectNote, closeConflictResolver])
+  }, [closeConflictResolver, entries, onSelectNote, resolvedPath])
+  return openConflictFileRef
+}
+
+export function useConflictFlow(options: ConflictFlowDeps) {
+  const { resolvedPath, entries, conflictFiles, pausePull, resumePull, triggerSync, reloadVault, initConflictFiles, openConflictResolver, closeConflictResolver, onSelectNote, activeTabPath, setToastMessage } = options
+  const openConflictFileRef = useOpenConflictFileRef({ closeConflictResolver, entries, onSelectNote, resolvedPath })
 
   const handleOpenConflictResolver = useCallback(async () => {
     let files = conflictFiles
     if (files.length === 0) {
-      try { files = await fetchConflictFiles(resolvedPath) } catch { return }
+      try {
+        files = await fetchConflictFiles(resolvedPath)
+      } catch {
+        return
+      }
       if (files.length === 0) {
         setToastMessage('No merge conflicts to resolve')
         return
@@ -80,7 +91,8 @@ export function useConflictFlow({
     closeConflictResolver()
   }, [resumePull, closeConflictResolver])
 
-  const handleResolveConflictInline = useCallback(async (filePath: string, strategy: 'ours' | 'theirs') => {
+  const handleResolveConflictInline = useCallback(
+    async (filePath: string, strategy: 'ours' | 'theirs') => {
     try {
       const remaining = await resolveAndCheck(resolvedPath, filePath, strategy)
       if (remaining.length === 0) {
@@ -95,12 +107,20 @@ export function useConflictFlow({
     } catch (err) {
       setToastMessage(`Failed to resolve conflict: ${err}`)
     }
-  }, [resolvedPath, reloadVault, triggerSync, setToastMessage])
+    },
+    [resolvedPath, reloadVault, triggerSync, setToastMessage],
+  )
 
-  const handleKeepMine = useCallback((path: string) => handleResolveConflictInline(path, 'ours'), [handleResolveConflictInline])
-  const handleKeepTheirs = useCallback((path: string) => handleResolveConflictInline(path, 'theirs'), [handleResolveConflictInline])
+  const handleKeepMine = useCallback(
+    (path: string) => handleResolveConflictInline(path, 'ours'),
+    [handleResolveConflictInline],
+  )
+  const handleKeepTheirs = useCallback(
+    (path: string) => handleResolveConflictInline(path, 'theirs'),
+    [handleResolveConflictInline],
+  )
 
-  const isConflicted = !!activeTabPath && conflictFiles.some(f => activeTabPath.endsWith(f))
+  const isConflicted = !!activeTabPath && conflictFiles.some((f) => activeTabPath.endsWith(f))
 
   return {
     openConflictFileRef,

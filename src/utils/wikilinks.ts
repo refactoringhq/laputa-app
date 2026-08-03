@@ -423,7 +423,7 @@ export function extractBacklinkContext(
         // Collapse whitespace and truncate
         const flat = trimmed.replace(/\s+/g, ' ')
         if (flat.length <= maxLength) return flat
-        return flat.slice(0, maxLength - 1) + '\u2026'
+        return `${flat.slice(0, maxLength - 1)}\u2026`
       }
       match = re.exec(trimmed)
     }
@@ -541,7 +541,7 @@ export function extractSnippet(content: MarkdownSource): MarkdownSource {
   const stripped = stripMarkdownChars(clean).trim()
   if (stripped) {
     if (stripped.length <= 160) return stripped
-    return stripped.slice(0, 160) + '...'
+    return `${stripped.slice(0, 160)}...`
   }
   // Fallback: collect sub-heading text when no paragraph content exists
   const headingText = withoutH1.split('\n')
@@ -551,7 +551,7 @@ export function extractSnippet(content: MarkdownSource): MarkdownSource {
   const headingStripped = stripMarkdownChars(headingText).trim()
   if (!headingStripped) return ''
   if (headingStripped.length <= 160) return headingStripped
-  return headingStripped.slice(0, 160) + '...'
+  return `${headingStripped.slice(0, 160)}...`
 }
 
 export function countWords(content: MarkdownSource): WordCount {

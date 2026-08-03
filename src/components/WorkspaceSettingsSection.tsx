@@ -16,17 +16,18 @@ interface WorkspaceSettingsSectionProps {
   vaults: VaultOption[]
 }
 
-export function WorkspaceSettingsSection({
-  defaultWorkspacePath,
-  enabled,
-  locale,
-  onEnabledChange,
-  onRemoveVault,
-  onReorderVaults,
-  onSetDefaultWorkspace,
-  onUpdateWorkspaceIdentity,
-  vaults,
-}: WorkspaceSettingsSectionProps) {
+export function WorkspaceSettingsSection(options: WorkspaceSettingsSectionProps) {
+  const {
+    defaultWorkspacePath,
+    enabled,
+    locale,
+    onEnabledChange,
+    onRemoveVault,
+    onReorderVaults,
+    onSetDefaultWorkspace,
+    onUpdateWorkspaceIdentity,
+    vaults,
+  } = options
   const t = createTranslator(locale)
 
   return (

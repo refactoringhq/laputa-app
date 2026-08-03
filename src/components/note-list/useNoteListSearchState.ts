@@ -20,7 +20,7 @@ export function useNoteListSearchState() {
     startSearchTransition(() => {
       setSearch(value)
     })
-  }, [startSearchTransition])
+  }, [])
 
   useEffect(() => {
     if (!searchVisible) return

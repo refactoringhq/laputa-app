@@ -55,10 +55,12 @@ function shouldResumeFreshStart(
   const registeredVaultPath = vaultSwitcher.allVaults[0]?.path
   const switcherOwnsOnboardingVault = onboardingState.vaultPath === vaultSwitcher.vaultPath
 
-  return remembersOnlyImplicitDefaultVault
-    && hasOneRegisteredVault
-    && registeredVaultPath === vaultSwitcher.vaultPath
-    && switcherOwnsOnboardingVault
+  return (
+    remembersOnlyImplicitDefaultVault &&
+    hasOneRegisteredVault &&
+    registeredVaultPath === vaultSwitcher.vaultPath &&
+    switcherOwnsOnboardingVault
+  )
 }
 
 function needsTelemetryConsent(
@@ -77,17 +79,18 @@ function needsAiAgentsOnboarding(
   return onboardingState.status === 'ready' && aiAgentsPromptVisible && !showMcpSetupDialog
 }
 
-function shouldShowStartupScreenForState({
-  aiAgentsPromptVisible,
-  isNoteWindow,
-  isStartupLoading,
-  onboardingState,
-  runtimeMissingVaultPath,
-  settingsLoaded,
-  shouldResumeFreshStartOnboarding,
-  showMcpSetupDialog,
-  telemetryConsent,
-}: ShouldShowStartupScreenArgs): boolean {
+function shouldShowStartupScreenForState(options: ShouldShowStartupScreenArgs): boolean {
+  const {
+    aiAgentsPromptVisible,
+    isNoteWindow,
+    isStartupLoading,
+    onboardingState,
+    runtimeMissingVaultPath,
+    settingsLoaded,
+    shouldResumeFreshStartOnboarding,
+    showMcpSetupDialog,
+    telemetryConsent,
+  } = options
   if (isNoteWindow) return false
 
   const startupReasons = [
@@ -111,18 +114,19 @@ function isVaultContentLoading(
   return !isNoteWindow && (isStartupLoading || readyVaultIsLoading)
 }
 
-export function useStartupScreenState({
-  aiAgentsPromptVisible,
-  isNoteWindow,
-  onboardingState,
-  runtimeMissingVaultPath,
-  selectedVaultPath,
-  settingsLoaded,
-  showMcpSetupDialog,
-  telemetryConsent,
-  vaultIsLoading,
-  vaultSwitcher,
-}: UseStartupScreenStateArgs): StartupScreenState {
+export function useStartupScreenState(options: UseStartupScreenStateArgs): StartupScreenState {
+  const {
+    aiAgentsPromptVisible,
+    isNoteWindow,
+    onboardingState,
+    runtimeMissingVaultPath,
+    selectedVaultPath,
+    settingsLoaded,
+    showMcpSetupDialog,
+    telemetryConsent,
+    vaultIsLoading,
+    vaultSwitcher,
+  } = options
   const shouldResumeFreshStartOnboarding = useMemo(
     () => shouldResumeFreshStart(onboardingState, selectedVaultPath, vaultSwitcher),
     [onboardingState, selectedVaultPath, vaultSwitcher],
@@ -140,12 +144,7 @@ export function useStartupScreenState({
     showMcpSetupDialog,
     telemetryConsent,
   })
-  const vaultContentLoading = isVaultContentLoading(
-    isNoteWindow,
-    isStartupLoading,
-    onboardingState,
-    vaultIsLoading,
-  )
+  const vaultContentLoading = isVaultContentLoading(isNoteWindow, isStartupLoading, onboardingState, vaultIsLoading)
 
   return {
     isStartupLoading,

@@ -18,16 +18,17 @@ function stripLeadingSpace(value: string): string {
   return value.startsWith(' ') ? value.slice(1) : value
 }
 
-export function CommandPaletteAiMode({
-  entries,
-  value,
-  claudeCodeReady,
-  aiAgentReady,
-  aiAgentLabel = 'Claude Code',
-  inputRef,
-  onChange,
-  onSubmit,
-}: CommandPaletteAiModeProps) {
+export function CommandPaletteAiMode(options: CommandPaletteAiModeProps) {
+  const {
+    entries,
+    value,
+    claudeCodeReady,
+    aiAgentReady,
+    aiAgentLabel = 'Claude Code',
+    inputRef,
+    onChange,
+    onSubmit,
+  } = options
   const resolvedAiAgentReady = aiAgentReady ?? claudeCodeReady
 
   return (
@@ -42,13 +43,13 @@ export function CommandPaletteAiMode({
       dataTestId="command-palette-ai-input"
       editorClassName="border-none px-0 py-0 text-[15px]"
       suggestionListVariant="palette"
-      paletteHeader={(
+      paletteHeader={
         <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           <Sparkle size={12} weight="fill" />
           <span>Ask {aiAgentLabel}</span>
         </div>
-      )}
-      paletteEmptyState={(
+      }
+      paletteEmptyState={
         <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
           {!resolvedAiAgentReady ? (
             `${aiAgentLabel} is not available on this machine.`
@@ -63,14 +64,14 @@ export function CommandPaletteAiMode({
             </>
           )}
         </div>
-      )}
-      paletteFooter={(
+      }
+      paletteFooter={
         <div className="flex items-center gap-4 border-t border-border px-4 py-1.5 text-[11px] text-muted-foreground">
           <span>{aiAgentLabel} mode</span>
           <span>↵ send</span>
           <span>esc close</span>
         </div>
-      )}
+      }
     />
   )
 }

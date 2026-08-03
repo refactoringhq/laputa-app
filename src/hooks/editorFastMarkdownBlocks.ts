@@ -108,7 +108,7 @@ const TEXT_STYLE_KEYS: Array<keyof TextStyles> = ['bold', 'code', 'italic', 'str
 const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null
 
 function now(): number {
-  return globalThis.performance?.now?.() ?? Date.now()
+  return globalThis.performance.now()
 }
 
 function sourceBytes(source: FastMarkdownSource): number {
@@ -520,14 +520,12 @@ function parseParagraph(state: ParserState, start: LineIndex): { block: BlockLik
 
 function startsBlock(lines: MarkdownLine[], index: LineIndex): boolean {
   const line = lines.at(index) ?? ''
-  return Boolean(
-    headingBlock(line)
-    || quoteBlock(line)
-    || listLine(line)
-    || FENCE_RE.test(line)
+  if (headingBlock(line)) return true
+  if (quoteBlock(line)) return true
+  if (listLine(line)) return true
+  return FENCE_RE.test(line)
     || THEMATIC_BREAK_RE.test(line)
-    || isTableStart(lines, index),
-  )
+    || isTableStart(lines, index)
 }
 
 function blockStep({ block, next }: BlockStepInput): ParsedBlockStep {

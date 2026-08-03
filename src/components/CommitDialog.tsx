@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Sparkle } from '@phosphor-icons/react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,23 +45,18 @@ const getDialogCopy = (commitMode: CommitMode): CommitDialogCopy => {
   }
 }
 
-const changedFilesLabel = (modifiedCount: number): string => (
+const changedFilesLabel = (modifiedCount: number): string =>
   `${modifiedCount} file${modifiedCount !== 1 ? 's' : ''} changed`
-)
 
-const isSubmitShortcut = (event: React.KeyboardEvent): boolean => (
+const isSubmitShortcut = (event: React.KeyboardEvent): boolean =>
   event.key === 'Enter' && (event.metaKey || event.ctrlKey)
-)
 
 const isCloseShortcut = (event: React.KeyboardEvent): boolean => event.key === 'Escape'
 
-const formatAuthorIdentity = (identity: GitAuthorIdentity): string => (
-  `${identity.name} <${identity.email}>`
-)
+const formatAuthorIdentity = (identity: GitAuthorIdentity): string => `${identity.name} <${identity.email}>`
 
-const formatOptionalAuthorIdentity = (identity: GitAuthorIdentity | null): string => (
+const formatOptionalAuthorIdentity = (identity: GitAuthorIdentity | null): string =>
   identity ? formatAuthorIdentity(identity) : ''
-)
 
 const focusMessageInput = (inputRef: React.RefObject<HTMLTextAreaElement | null>): void => {
   setTimeout(() => inputRef.current?.focus(), 50)
@@ -78,13 +80,7 @@ const authorWarningText = (identity: GitAuthorIdentity, locale: AppLocale): stri
   return null
 }
 
-const CommitAuthorIdentity = ({
-  identity,
-  locale,
-}: {
-  identity: GitAuthorIdentity | null
-  locale: AppLocale
-}) => {
+const CommitAuthorIdentity = ({ identity, locale }: { identity: GitAuthorIdentity | null; locale: AppLocale }) => {
   const hidden = identity === null
   const warningText = identity ? authorWarningText(identity, locale) : null
 
@@ -94,9 +90,7 @@ const CommitAuthorIdentity = ({
         <span className="font-medium text-muted-foreground">{translate(locale, 'git.author.label')}</span>
         <span className="truncate text-right font-mono text-[11px]">{formatOptionalAuthorIdentity(identity)}</span>
       </div>
-      {warningText && (
-        <p className="text-[11px] leading-4 text-amber-700 dark:text-amber-300">{warningText}</p>
-      )}
+      {warningText && <p className="text-[11px] leading-4 text-amber-700 dark:text-amber-300">{warningText}</p>}
     </div>
   )
 }
@@ -143,8 +137,14 @@ function CommitMessageGenerateButton({
     <Button
       type="button"
       variant="outline"
-      onClick={() => { void handleGenerateMessage() }}
-      disabled={generationButtonDisabled({ isGenerating: isGeneratingMessage, modifiedCount, onGenerateMessage })}
+      onClick={() => {
+        void handleGenerateMessage()
+      }}
+      disabled={generationButtonDisabled({
+        isGenerating: isGeneratingMessage,
+        modifiedCount,
+        onGenerateMessage,
+      })}
       aria-label={translate(locale, 'git.commitMessage.generateFromDiff')}
       title={translate(locale, 'git.commitMessage.generateFromDiff')}
     >
@@ -154,27 +154,30 @@ function CommitMessageGenerateButton({
   )
 }
 
-function CommitDialogActions({
-  actionLabel,
-  isGeneratingMessage,
-  locale,
-  message,
-  modifiedCount,
-  onClose,
-  onGenerateMessage,
-  onGeneratedMessage,
-  onSubmit,
-  shortcutHint,
-}: CommitDialogCopy & {
-  isGeneratingMessage: boolean
-  locale: AppLocale
-  message: string
-  modifiedCount: number
-  onClose: () => void
-  onGenerateMessage?: () => Promise<string> | string
-  onGeneratedMessage: (message: string) => void
-  onSubmit: () => void
-}) {
+function CommitDialogActions(
+  options: CommitDialogCopy & {
+    isGeneratingMessage: boolean
+    locale: AppLocale
+    message: string
+    modifiedCount: number
+    onClose: () => void
+    onGenerateMessage?: () => Promise<string> | string
+    onGeneratedMessage: (message: string) => void
+    onSubmit: () => void
+  },
+) {
+  const {
+    actionLabel,
+    isGeneratingMessage,
+    locale,
+    message,
+    modifiedCount,
+    onClose,
+    onGenerateMessage,
+    onGeneratedMessage,
+    onSubmit,
+    shortcutHint,
+  } = options
   return (
     <DialogFooter className="flex-row items-center justify-between sm:justify-between">
       <span className="text-[11px] text-muted-foreground">{shortcutHint}</span>
@@ -249,7 +252,13 @@ export function CommitDialog(props: CommitDialogProps) {
     }
   }, [open])
 
-  useGeneratedCommitMessage({ generatedMessage, generatedMessageKey, inputRef, open, setMessage })
+  useGeneratedCommitMessage({
+    generatedMessage,
+    generatedMessageKey,
+    inputRef,
+    open,
+    setMessage,
+  })
 
   const handleSubmit = () => {
     const trimmed = message.trim()
@@ -272,7 +281,12 @@ export function CommitDialog(props: CommitDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose()
+      }}
+    >
       <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
         <DialogHeader>
           <div className="flex items-center justify-between">
