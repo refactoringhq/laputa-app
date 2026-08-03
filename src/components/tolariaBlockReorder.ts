@@ -26,7 +26,7 @@ type PointerReorderState = {
   draggedBlockId: string
   editorElement: HTMLElement
   hasMoved: boolean
-  lastDropTarget?: DropTarget | null
+  lastDropTarget: DropTarget | null
   ownerDocument: Document
   pointerId: number
   startX: number
@@ -280,7 +280,9 @@ export function usePointerBlockReorder(
           nativeEvent.clientX - state.startX,
           nativeEvent.clientY - state.startY,
         )
-        if (!state.hasMoved && distance < POINTER_REORDER_THRESHOLD_PX) return
+        const movementStarted = [state.hasMoved, distance >= POINTER_REORDER_THRESHOLD_PX]
+          .includes(true)
+        if (!movementStarted) return
 
         state.hasMoved = true
         suppressNextClickRef.current = true
@@ -294,7 +296,7 @@ export function usePointerBlockReorder(
           x: nativeEvent.clientX,
           y: nativeEvent.clientY,
         })
-        updateDropIndicator(state.affordances, state.lastDropTarget ?? null)
+        updateDropIndicator(state.affordances, state.lastDropTarget)
         nativeEvent.preventDefault()
       }
       const handlePointerUp = (nativeEvent: PointerEvent) => { finishPointerReorder(nativeEvent); }
@@ -316,6 +318,7 @@ export function usePointerBlockReorder(
         draggedBlockId: liveBlock.id,
         editorElement,
         hasMoved: false,
+        lastDropTarget: null,
         ownerDocument,
         pointerId,
         startX: event.clientX,

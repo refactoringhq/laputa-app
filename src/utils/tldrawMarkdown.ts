@@ -142,12 +142,17 @@ export function isTldrawBlock(block: BlockLike): boolean {
 }
 
 export function tldrawMarkdown(block: BlockLike): string {
-  const props = block.props ?? {}
+  const {
+    boardId = '',
+    height = TLDRAW_DEFAULT_HEIGHT,
+    snapshot = '{}',
+    width = '',
+  } = block.props ?? {}
   return tldrawFenceSource({
-    boardId: props.boardId ?? '',
-    height: props.height ?? TLDRAW_DEFAULT_HEIGHT,
-    snapshot: props.snapshot ?? '{}',
-    width: props.width ?? '',
+    boardId,
+    height,
+    snapshot,
+    width,
   })
 }
 

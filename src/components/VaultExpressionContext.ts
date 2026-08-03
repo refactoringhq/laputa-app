@@ -32,6 +32,13 @@ interface ResolvedVaultExpressionTemplate {
 }
 
 const VaultExpressionContext = createContext<VaultExpressionContextValue | null>(null)
+const EMPTY_VAULT_EXPRESSION_CONTEXT: VaultExpressionContextValue = {
+  currentContent: '',
+  entries: [],
+  locale: 'en-US',
+  sourceEntry: null,
+  vaultPath: '',
+}
 
 export function VaultExpressionProvider({
   children,
@@ -158,24 +165,15 @@ function useVaultExpressionDependencyContents(
 
 export function useResolvedVaultExpressionTemplate(source: string): ResolvedVaultExpressionTemplate {
   const context = useContext(VaultExpressionContext)
+  const expressionContext = context ?? EMPTY_VAULT_EXPRESSION_CONTEXT
   const compiled = useMemo(() => compileVaultExpressionTemplate(source), [source])
-  const contentsByPath = useVaultExpressionDependencyContents(compiled, context ?? {
-    currentContent: '',
-    entries: [],
-    locale: 'en-US',
-    sourceEntry: null,
-    vaultPath: '',
-  })
+  const contentsByPath = useVaultExpressionDependencyContents(compiled, expressionContext)
 
   return useMemo(() => renderVaultExpressionTemplate({
     compiled,
     context: {
       contentsByPath,
-      currentContent: context?.currentContent ?? '',
-      entries: context?.entries ?? [],
-      locale: context?.locale ?? 'en-US',
-      sourceEntry: context?.sourceEntry ?? null,
-      vaultPath: context?.vaultPath ?? '',
+      ...expressionContext,
     },
-  }), [compiled, contentsByPath, context])
+  }), [compiled, contentsByPath, expressionContext])
 }

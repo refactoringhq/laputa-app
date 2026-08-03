@@ -54,6 +54,10 @@ function resolvedGuidance(status?: VaultAiGuidanceStatus) {
   return { status, summary: getVaultAiGuidanceSummary(status) }
 }
 
+function agentVersionSuffix(version: string | null | undefined): string {
+  return version ? ` ${version}` : ''
+}
+
 function badgeTooltip(
   locale: AppLocale,
   statuses: AiAgentsStatus,
@@ -71,8 +75,16 @@ function badgeTooltip(
   const version = getAiAgentAvailability(statuses, defaultAgent).version
   const base = translate(locale, 'status.ai.defaultAgent', {
     agent: definition.label,
-    version: version ? ` ${version}` : '',
+    version: agentVersionSuffix(version),
   })
+  return guidanceTooltip(locale, base, guidance)
+}
+
+function guidanceTooltip(
+  locale: AppLocale,
+  base: string,
+  guidance: ReturnType<typeof resolvedGuidance>,
+): string {
   if (!guidance?.summary) return base
   if (vaultAiGuidanceNeedsRestore(guidance.status)) {
     return translate(locale, 'status.ai.restoreDetails', {
@@ -224,6 +236,44 @@ function GuidanceMenuSection({
   )
 }
 
+function InstalledAgentsMenu({
+  agents,
+  locale,
+  selectedValue,
+  statuses,
+  onSetDefaultAgent,
+  onSetDefaultTarget,
+}: {
+  agents: AiAgentDefinition[]
+  locale: AppLocale
+  selectedValue?: AiAgentId
+  statuses: AiAgentsStatus
+  onSetDefaultAgent?: (agent: AiAgentId) => void
+  onSetDefaultTarget?: (target: string) => void
+}) {
+  if (agents.length === 0) {
+    return <DropdownMenuItem disabled>{translate(locale, 'status.ai.noAgents')}</DropdownMenuItem>
+  }
+
+  return (
+    <DropdownMenuRadioGroup
+      value={selectedValue}
+      onValueChange={(value) => {
+        onSetDefaultAgent?.(value as AiAgentId)
+        onSetDefaultTarget?.(`agent:${value}`)
+      }}
+    >
+      {agents.map((definition) => (
+        <DropdownMenuRadioItem key={definition.id} value={definition.id} className="gap-2">
+          <AiAgentIcon agent={definition.id} size={16} />
+          <span>{definition.label}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{statusText(statuses, definition)}</span>
+        </DropdownMenuRadioItem>
+      ))}
+    </DropdownMenuRadioGroup>
+  )
+}
+
 function AgentMenuContent(
   options: AiAgentsBadgeProps & {
     selectedTarget: AiTarget
@@ -248,25 +298,14 @@ function AgentMenuContent(
   return (
     <DropdownMenuContent align="start" side="top" className="min-w-[18rem]" data-testid="status-ai-agents-menu">
       <DropdownMenuLabel>{menuHeading(locale, selectedTarget, selectedAgentReady)}</DropdownMenuLabel>
-      {installedAgents.length === 0 ? (
-        <DropdownMenuItem disabled>{translate(locale, 'status.ai.noAgents')}</DropdownMenuItem>
-      ) : (
-        <DropdownMenuRadioGroup
-          value={selectedAgentValue}
-          onValueChange={(value) => {
-            onSetDefaultAgent?.(value as AiAgentId)
-            onSetDefaultTarget?.(`agent:${value}`)
-          }}
-        >
-          {installedAgents.map((definition) => (
-            <DropdownMenuRadioItem key={definition.id} value={definition.id} className="gap-2">
-              <AiAgentIcon agent={definition.id} size={16} />
-              <span>{definition.label}</span>
-              <span className="ml-auto text-xs text-muted-foreground">{statusText(statuses, definition)}</span>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      )}
+      <InstalledAgentsMenu
+        agents={installedAgents}
+        locale={locale}
+        selectedValue={selectedAgentValue}
+        statuses={statuses}
+        onSetDefaultAgent={onSetDefaultAgent}
+        onSetDefaultTarget={onSetDefaultTarget}
+      />
       <ModelTargetMenuSection
         targets={modelTargets}
         selectedTarget={selectedTarget}
