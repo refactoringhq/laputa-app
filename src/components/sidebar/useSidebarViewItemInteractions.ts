@@ -24,11 +24,17 @@ type ViewFilenameAction = (filename: string, rootPath?: string) => void
 
 type RowKeyboardAction = 'select' | 'rename' | 'menu'
 
+const ROW_KEYBOARD_ACTIONS: Partial<Record<string, RowKeyboardAction>> = {
+  Enter: 'select',
+  ' ': 'select',
+  F2: 'rename',
+  ContextMenu: 'menu',
+}
+
 function getRowKeyboardAction(event: KeyboardEvent<HTMLElement>): RowKeyboardAction | null {
-  if (event.key === 'Enter' || event.key === ' ') return 'select'
-  if (event.key === 'F2') return 'rename'
-  if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) return 'menu'
-  return null
+  const directAction = ROW_KEYBOARD_ACTIONS[event.key]
+  if (directAction) return directAction
+  return event.shiftKey && event.key === 'F10' ? 'menu' : null
 }
 
 function runViewFilenameAction(view: ViewFile, action?: ViewFilenameAction) {
@@ -203,13 +209,8 @@ function useViewRowKeyboardActions({
   )
 }
 
-export function useSidebarViewItemInteractions({
-  view,
-  onSelect,
-  onEditView,
-  onDeleteView,
-  onUpdateViewDefinition,
-}: SidebarViewItemInteractionInput) {
+export function useSidebarViewItemInteractions(input: SidebarViewItemInteractionInput) {
+  const { onSelect, onUpdateViewDefinition, view } = input
   const state = useViewInteractionState()
   const rename = useViewRenameActions({
     closeContextMenu: state.closeContextMenu,
@@ -219,11 +220,7 @@ export function useSidebarViewItemInteractions({
     view,
   })
   const menu = useViewMenuActions({
-    view,
-    onSelect,
-    onEditView,
-    onDeleteView,
-    onUpdateViewDefinition,
+    ...input,
     closeContextMenu: state.closeContextMenu,
     contextMenuPos: state.contextMenuPos,
     openContextMenuAt: state.openContextMenuAt,

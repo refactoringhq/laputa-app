@@ -149,6 +149,7 @@ function localizeMoveSavedViewCommand(command: CommandAction, t: Translate, dire
 }
 
 type CommandLocalizer = (command: CommandAction, t: Translate) => string
+type NullableCommandLocalizer = (command: CommandAction, t: Translate) => string | null
 
 const VIEW_STATE_LOCALIZERS: readonly [string, CommandLocalizer][] = [
   ['zoom-in', (command, t) =>
@@ -213,18 +214,29 @@ export function localizeCommandGroup(group: CommandGroup, locale: AppLocale = 'e
   return createTranslator(locale)(Reflect.get(GROUP_LABEL_KEYS, group) as keyof ReturnType<typeof createTranslator> extends never ? never : Parameters<ReturnType<typeof createTranslator>>[0])
 }
 
+const DYNAMIC_COMMAND_LOCALIZERS: readonly NullableCommandLocalizer[] = [
+  localizeNoteStateCommand,
+  localizeViewStateCommand,
+  localizeSettingsStateCommand,
+  localizeGitStateCommand,
+  localizeTypeCommand,
+]
+
+function localizeDynamicCommand(command: CommandAction, t: Translate): string | null {
+  for (const localize of DYNAMIC_COMMAND_LOCALIZERS) {
+    const label = localize(command, t)
+    if (label) return label
+  }
+  return null
+}
+
+function localizeCommandAction(command: CommandAction, t: Translate): CommandAction {
+  const key = STATIC_LABEL_KEYS[command.id]
+  const label = key ? t(key) : localizeDynamicCommand(command, t) ?? command.label
+  return label === command.label ? command : { ...command, label }
+}
+
 export function localizeCommandActions(commands: CommandAction[], locale: AppLocale = 'en'): CommandAction[] {
   const t = createTranslator(locale)
-  return commands.map((command) => {
-    const key = STATIC_LABEL_KEYS[command.id]
-    const label = key
-      ? t(key)
-      : localizeNoteStateCommand(command, t)
-        ?? localizeViewStateCommand(command, t)
-        ?? localizeSettingsStateCommand(command, t)
-        ?? localizeGitStateCommand(command, t)
-        ?? localizeTypeCommand(command, t)
-        ?? command.label
-    return label === command.label ? command : { ...command, label }
-  })
+  return commands.map((command) => localizeCommandAction(command, t))
 }

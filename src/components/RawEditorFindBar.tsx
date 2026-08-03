@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { translate, type AppLocale } from '../lib/i18n'
+import type { FindControlsProps, ReplaceControlsProps } from './rawEditorFindControlTypes'
+import type { ActiveEditorFindMatchSelection, RawEditorFindBarProps, RawEditorFindController, RawEditorFindRequest } from './rawEditorFindTypes'
 import {
   buildEditorFindReplacementChange,
   buildEditorFindReplacementChanges,
@@ -15,23 +17,7 @@ import {
   type EditorFindOptions,
 } from '../utils/editorFind'
 
-export interface RawEditorFindRequest {
-  id: number
-  path: string
-  replace: boolean
-}
-
-interface RawEditorFindBarProps {
-  doc: string
-  locale?: AppLocale
-  onClose: () => void
-  onReplaceOpenChange: (open: boolean) => void
-  open: boolean
-  path: string
-  replaceOpen: boolean
-  request?: RawEditorFindRequest | null
-  viewRef: React.MutableRefObject<EditorView | null>
-}
+export type { RawEditorFindRequest } from './rawEditorFindTypes'
 
 function selectMatch(view: EditorView, match: EditorFindMatch, focusEditor: boolean): void {
   view.dispatch({
@@ -76,13 +62,9 @@ function useRequestFocus({
   }, [inputRef, onReplaceOpenChange, open, path, request])
 }
 
-function focusEditorOnNextFrame(viewRef: React.MutableRefObject<EditorView | null>): void {
-  requestAnimationFrame(() => viewRef.current?.focus())
-}
-
 function closeRawEditorFind(onClose: () => void, viewRef: React.MutableRefObject<EditorView | null>): void {
   onClose()
-  focusEditorOnNextFrame(viewRef)
+  requestAnimationFrame(() => viewRef.current?.focus())
 }
 
 function handleRawEditorFindKeyDown(
@@ -101,11 +83,8 @@ function handleRawEditorFindKeyDown(
   moveMatch(event.shiftKey ? -1 : 1)
 }
 
-function selectActiveEditorFindMatch(
-  viewRef: React.MutableRefObject<EditorView | null>,
-  open: boolean,
-  activeMatch?: EditorFindMatch,
-): void {
+function selectActiveEditorFindMatch(selection: ActiveEditorFindMatchSelection): void {
+  const { activeMatch, open, viewRef } = selection
   const view = viewRef.current
   if (!open || !view || !activeMatch) return
   selectMatch(view, activeMatch, false)
@@ -161,26 +140,6 @@ function replaceAllEditorFindMatches({
   return true
 }
 
-interface RawEditorFindController {
-  caseSensitive: boolean
-  close: () => void
-  findInputRef: React.RefObject<HTMLInputElement | null>
-  handleFindChange: (event: React.ChangeEvent<HTMLInputElement>) => void
-  handleFindKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
-  hasMatches: boolean
-  moveNext: () => void
-  movePrevious: () => void
-  query: string
-  regex: boolean
-  replaceAll: () => void
-  replaceCurrent: () => void
-  replacement: string
-  setReplacement: (value: string) => void
-  status: string
-  toggleCaseSensitive: () => void
-  toggleRegex: () => void
-}
-
 function useRawEditorFindController(
   functionOptions: Omit<RawEditorFindBarProps, 'replaceOpen'>,
 ): RawEditorFindController {
@@ -201,7 +160,7 @@ function useRawEditorFindController(
   useRequestFocus({ inputRef, onReplaceOpenChange, open, path, request })
 
   useEffect(() => {
-    selectActiveEditorFindMatch(viewRef, open, activeMatch)
+    selectActiveEditorFindMatch({ activeMatch, open, viewRef })
   }, [activeMatch, open, viewRef])
 
   const moveMatch = useCallback(
@@ -269,27 +228,6 @@ function useRawEditorFindController(
     toggleCaseSensitive: () => setCaseSensitive((value) => !value),
     toggleRegex: () => setRegex((value) => !value),
   }
-}
-
-type FindControlsProps = Pick<
-  RawEditorFindController,
-  | 'caseSensitive'
-  | 'close'
-  | 'findInputRef'
-  | 'handleFindChange'
-  | 'handleFindKeyDown'
-  | 'hasMatches'
-  | 'moveNext'
-  | 'movePrevious'
-  | 'query'
-  | 'regex'
-  | 'status'
-  | 'toggleCaseSensitive'
-  | 'toggleRegex'
-> & {
-  locale: AppLocale
-  onReplaceOpenChange: (open: boolean) => void
-  replaceOpen: boolean
 }
 
 function FindControls(options: FindControlsProps) {
@@ -401,13 +339,6 @@ function FindControls(options: FindControlsProps) {
       </Button>
     </div>
   )
-}
-
-type ReplaceControlsProps = Pick<
-  RawEditorFindController,
-  'hasMatches' | 'replaceAll' | 'replaceCurrent' | 'replacement' | 'setReplacement'
-> & {
-  locale: AppLocale
 }
 
 function ReplaceControls({
