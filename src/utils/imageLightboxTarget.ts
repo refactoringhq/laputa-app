@@ -29,12 +29,14 @@ function resolveImageElement(target: EventTarget | null): HTMLImageElement | nul
   if (target instanceof HTMLImageElement) return target
   if (!(target instanceof HTMLElement)) return null
   if (target.closest(IMAGE_INTERACTION_IGNORE_SELECTOR)) return null
+  return imageInWrapper(target.closest(IMAGE_WRAPPER_SELECTOR))
+}
 
-  const wrapper = target.closest(IMAGE_WRAPPER_SELECTOR)
+function imageInWrapper(wrapper: Element | null): HTMLImageElement | null {
   if (!(wrapper instanceof HTMLElement)) return null
-
   const image = wrapper.querySelector('img')
-  return image instanceof HTMLImageElement ? image : null
+  if (!(image instanceof HTMLImageElement)) return null
+  return image
 }
 
 function isTooSmallToView(image: HTMLImageElement): boolean {

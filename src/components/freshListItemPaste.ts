@@ -16,7 +16,8 @@ const LIST_ITEM_SELECTOR = '[data-content-type="bulletListItem"], [data-content-
 
 function eventTargetElement(target: EventTarget | null): HTMLElement | null {
   if (target instanceof HTMLElement) return target
-  return target instanceof Node ? target.parentElement : null
+  if (!(target instanceof Node)) return null
+  return target.parentElement
 }
 
 export function handleFreshListItemPlainTextPaste({

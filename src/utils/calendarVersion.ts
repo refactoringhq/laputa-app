@@ -24,17 +24,22 @@ function isVersionNumberPart(value: string, expectedLength?: number): boolean {
 }
 
 function parseCalendarVersion(version: string): CalendarVersionParts | null {
-  const versionParts = version.split('-')
-  if (versionParts.length > 2) return null
-
-  const calendar = versionParts.at(0)
-  const prerelease = versionParts.at(1)
-  if (!calendar) return null
+  const versionParts = splitVersion(version)
+  if (!versionParts) return null
+  const [calendar, prerelease] = versionParts
   const calendarVersion = parseCalendarVersionParts(calendar)
   if (!calendarVersion) return null
   if (prerelease === undefined) return calendarVersion
   const prereleaseVersion = parsePrereleaseVersionParts(prerelease)
   return prereleaseVersion ? { ...calendarVersion, ...prereleaseVersion } : null
+}
+
+function splitVersion(version: string): [string, string?] | null {
+  const versionParts = version.split('-')
+  if (versionParts.length > 2) return null
+  const calendar = versionParts.at(0)
+  if (!calendar) return null
+  return [calendar, versionParts.at(1)]
 }
 
 function parseCalendarVersionParts(calendar: string): CalendarVersionParts | null {

@@ -61,14 +61,31 @@ export function markFrontendReady(options: FrontendReadyOptions = {}): void {
 export function reloadFrontendOnceIfStartupFailed(
   options: StartupReloadOptions = {},
 ): boolean {
-  const win = options.win ?? window
-  const storage = options.storage ?? getSessionStorage(win)
-
-  if (win.__tolariaFrontendReady === true) return false
-  if (readSessionItem(storage, STARTUP_RELOAD_ATTEMPT_STORAGE_NAME) === '1') return false
+  const win = startupWindow(options.win)
+  const storage = startupStorage(options.storage, win)
+  if (!startupNeedsReload(win, storage)) return false
   if (!writeSessionItem(storage, STARTUP_RELOAD_ATTEMPT_STORAGE_NAME, '1')) return false
-
-  const reload = options.reload ?? (() => win.location.reload())
+  const reload = startupReload(options.reload, win)
   reload()
   return true
+}
+
+function startupWindow(configuredWindow: Window | undefined): Window {
+  if (configuredWindow) return configuredWindow
+  return window
+}
+
+function startupStorage(configuredStorage: Storage | undefined, win: Window): Storage | null {
+  if (configuredStorage) return configuredStorage
+  return getSessionStorage(win)
+}
+
+function startupReload(configuredReload: (() => void) | undefined, win: Window): () => void {
+  if (configuredReload) return configuredReload
+  return () => win.location.reload()
+}
+
+function startupNeedsReload(win: Window, storage: Storage | null): boolean {
+  if (win.__tolariaFrontendReady === true) return false
+  return readSessionItem(storage, STARTUP_RELOAD_ATTEMPT_STORAGE_NAME) !== '1'
 }

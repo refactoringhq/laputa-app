@@ -1,11 +1,14 @@
 let activeWhiteboardPlatformPermissionGuards = 0
 
-function errorStringProperty(error: unknown, property: 'message' | 'name'): string {
-  if (error instanceof Error) return property === 'message' ? error.message : error.name
-  if (property === 'message' && typeof error === 'string') return error
-  if (typeof error !== 'object' || error === null || !(property in error)) return ''
+function errorProperty(error: unknown, property: 'message' | 'name'): unknown {
+  if (error instanceof Error) return Reflect.get(error, property)
+  if (typeof error === 'string') return property === 'message' ? error : undefined
+  if (typeof error !== 'object' || error === null) return undefined
+  return property in error ? Reflect.get(error, property) : undefined
+}
 
-  const value = Reflect.get(error, property)
+function errorStringProperty(error: unknown, property: 'message' | 'name'): string {
+  const value = errorProperty(error, property)
   return typeof value === 'string' ? value : ''
 }
 

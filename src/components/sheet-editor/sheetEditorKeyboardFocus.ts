@@ -4,9 +4,11 @@ import {
 } from './sheetEditorTargetGuards'
 
 export function workbookKeyboardRoot(container: HTMLDivElement | null): HTMLElement | null {
-  const sheetSurface = container?.querySelector<HTMLElement>('.sheet-container') ?? null
+  if (!container) return null
+  const sheetSurface = container.querySelector<HTMLElement>('.sheet-container')
   const root = sheetSurface?.closest<HTMLElement>('[tabindex="0"]') ?? null
-  return root && container?.contains(root) ? root : (container?.querySelector<HTMLElement>('[tabindex="0"]') ?? null)
+  if (root && container.contains(root)) return root
+  return container.querySelector<HTMLElement>('[tabindex="0"]')
 }
 
 function isWorkbookKeyboardTarget(container: HTMLDivElement | null, target: EventTarget | null): boolean {

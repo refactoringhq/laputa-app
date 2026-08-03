@@ -15,7 +15,8 @@ function isUnitlessThemeNumber(key: string, cssKey: string): boolean {
 
 function themeCssValue(key: string, cssKey: string, value: string | number): string {
   if (typeof value !== 'number') return String(value)
-  return isUnitlessThemeNumber(key, cssKey) ? String(value) : `${value}px`
+  if (isUnitlessThemeNumber(key, cssKey)) return String(value)
+  return `${value}px`
 }
 
 /** Convert a nested theme config object into a flat map of CSS custom properties */

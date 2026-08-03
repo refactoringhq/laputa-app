@@ -5,17 +5,20 @@ const CARET_SCROLL_MARGIN_PX = 4
 function selectedCaretRect(): DOMRect | null {
   const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0) return null
-
   const range = selection.getRangeAt(0)
-  const clientRects = typeof range.getClientRects === 'function'
-    ? Array.from(range.getClientRects())
-    : []
-  const lastClientRect = clientRects.at(-1)
-  if (lastClientRect) return lastClientRect
+  return lastRangeRect(range) ?? boundingRangeRect(range)
+}
 
-  return typeof range.getBoundingClientRect === 'function'
-    ? range.getBoundingClientRect()
-    : null
+function lastRangeRect(range: Range): DOMRect | null {
+  if (typeof range.getClientRects !== 'function') return null
+  const clientRects = Array.from(range.getClientRects())
+  const lastClientRect = clientRects.at(-1)
+  return lastClientRect ?? null
+}
+
+function boundingRangeRect(range: Range): DOMRect | null {
+  if (typeof range.getBoundingClientRect !== 'function') return null
+  return range.getBoundingClientRect()
 }
 
 function scrollCaretIntoView(editor: HTMLDivElement) {

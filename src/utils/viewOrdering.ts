@@ -14,7 +14,8 @@ function orderedViewIndex(views: ViewFile[], filename: string): number {
 }
 
 function destinationIndex(index: number, direction: ViewMoveDirection): number {
-  return direction === 'up' ? index - 1 : index + 1
+  if (direction === 'up') return index - 1
+  return index + 1
 }
 
 export function canMoveView(views: ViewFile[], filename: string, direction: ViewMoveDirection): boolean {

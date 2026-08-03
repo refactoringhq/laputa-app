@@ -34,16 +34,22 @@ function resolveRefLabel(ref: string, resolvedTitle: string | undefined): string
 export function resolveRefProps(ref: string, entries: VaultEntry[], typeEntryMap: Record<string, VaultEntry>) {
   const resolved = resolveRef(ref, entries)
   const refType = resolved?.isA ?? null
-  const te = typeEntryMap[refType ?? '']
-  const icon = resolved?.icon
+  const typeEntry = refType ? Reflect.get(typeEntryMap, refType) : undefined
+  const appearance = resolveRefAppearance(refType, typeEntry)
   return {
     label: resolveRefLabel(ref, resolved?.title),
-    noteIcon: icon ?? null,
-    typeColor: getTypeColor(refType, te?.color),
-    bgColor: getTypeLightColor(refType, te?.color),
+    noteIcon: resolved?.icon ?? null,
+    ...appearance,
     isArchived: resolved?.archived ?? false,
     target: wikilinkTarget(ref),
     title: entryStatusTitle(resolved),
-    TypeIcon: getTypeIcon(refType, te?.icon),
+  }
+}
+
+function resolveRefAppearance(refType: string | null, typeEntry: VaultEntry | undefined) {
+  return {
+    typeColor: getTypeColor(refType, typeEntry?.color),
+    bgColor: getTypeLightColor(refType, typeEntry?.color),
+    TypeIcon: getTypeIcon(refType, typeEntry?.icon),
   }
 }
