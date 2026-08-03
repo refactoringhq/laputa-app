@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -64,20 +63,20 @@ fn non_empty_env_path(key: &str) -> Option<PathBuf> {
 }
 
 pub(super) fn client_script_path(path: &Path) -> String {
-    strip_windows_verbatim_prefix(&path.to_string_lossy()).into_owned()
+    strip_windows_verbatim_prefix(&path.to_string_lossy())
 }
 
-fn strip_windows_verbatim_prefix(path: &str) -> Cow<'_, str> {
-    const VERBATIM_PREFIX: &str = r"\\?\";
-    const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+fn strip_windows_verbatim_prefix(path: &str) -> String {
+    const VERBATIM_PREFIX: &str = "\\\\?\\";
+    const VERBATIM_UNC_PREFIX: &str = "\\\\?\\UNC\\";
 
     if let Some(rest) = path.strip_prefix(VERBATIM_UNC_PREFIX) {
-        return Cow::Owned(format!(r"\\{rest}"));
+        return format!(r"\\{rest}");
     }
 
     path.strip_prefix(VERBATIM_PREFIX)
-        .map(Cow::Borrowed)
-        .unwrap_or_else(|| Cow::Borrowed(path))
+        .unwrap_or(path)
+        .to_string()
 }
 
 #[cfg(test)]

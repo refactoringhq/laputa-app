@@ -1,34 +1,109 @@
 use super::{git_command_at, GitWorkspace};
 use crate::vault::path_identity::vault_relative_path_string;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::Output;
 
 use super::GitCommit;
 
-/// Get git log history for a specific file in the vault.
-pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitCommit>, String> {
-    let vault = Path::new(vault_path);
-    let file = Path::new(file_path);
-    let workspace = GitWorkspace::resolve(vault)?
-        .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
-    let relative_str = workspace.repo_relative_path(Path::new(&vault_relative_path_string(
-        workspace.vault_root(),
-        file,
-    )?));
+struct FileHistoryTarget {
+    workspace: GitWorkspace,
+    relative_path: String,
+}
 
-    let output = git_command_at(workspace.git_root())
+struct AddedFileSource<'a> {
+    relative_path: &'a str,
+    content: &'a str,
+}
+
+#[derive(Clone, Copy)]
+struct HistoryLimit(usize);
+
+struct FileSelection {
+    vault: PathBuf,
+    file: PathBuf,
+}
+
+struct CommitRevision(String);
+
+fn history_output(target: &FileHistoryTarget, limit: HistoryLimit) -> Result<Output, String> {
+    git_command_at(target.workspace.git_root())
         .and_then(|mut command| {
             command
                 .args([
                     "log",
                     "--format=%H|%h|%an|%aI|%s",
                     "-n",
-                    "20",
+                    &limit.0.to_string(),
                     "--",
-                    &relative_str,
+                    &target.relative_path,
                 ])
                 .output()
         })
-        .map_err(|e| format!("Failed to run git log: {}", e))?;
+        .map_err(|error| format!("Failed to run git log: {error}"))
+}
+
+fn resolve_file_target(vault: &Path, file: &Path) -> Result<FileHistoryTarget, String> {
+    let workspace = GitWorkspace::resolve(vault)?
+        .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
+    let vault_relative = vault_relative_path_string(workspace.vault_root(), file)?;
+    let relative_path = workspace.repo_relative_path(Path::new(&vault_relative));
+    Ok(FileHistoryTarget {
+        workspace,
+        relative_path,
+    })
+}
+
+fn parse_history_commits(output: &Output) -> Vec<GitCommit> {
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| !line.is_empty())
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.splitn(5, '|').collect();
+            (parts.len() == 5).then(|| GitCommit {
+                hash: parts[0].to_string(),
+                short_hash: parts[1].to_string(),
+                author: parts[2].to_string(),
+                date: chrono::DateTime::parse_from_rfc3339(parts[3])
+                    .map(|date| date.timestamp())
+                    .unwrap_or(0),
+                message: parts[4].to_string(),
+            })
+        })
+        .collect()
+}
+
+fn added_file_diff(source: AddedFileSource<'_>) -> String {
+    let lines: Vec<String> = source
+        .content
+        .lines()
+        .map(|line| format!("+{line}"))
+        .collect();
+    format!(
+        "diff --git a/{0} b/{0}\nnew file\n--- /dev/null\n+++ b/{0}\n@@ -0,0 +1,{1} @@\n{2}",
+        source.relative_path,
+        lines.len(),
+        lines.join("\n")
+    )
+}
+
+/// Get git log history for a specific file in the vault.
+pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitCommit>, String> {
+    get_file_history_for(
+        FileSelection {
+            vault: PathBuf::from(vault_path),
+            file: PathBuf::from(file_path),
+        },
+        HistoryLimit(20),
+    )
+}
+
+fn get_file_history_for(
+    selection: FileSelection,
+    limit: HistoryLimit,
+) -> Result<Vec<GitCommit>, String> {
+    let target = resolve_file_target(&selection.vault, &selection.file)?;
+
+    let output = history_output(&target, limit)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -39,92 +114,66 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
         return Err(format!("git log failed: {}", stderr));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let commits = stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .filter_map(|line| {
-            // Format: hash|short_hash|author|date|message
-            // Use splitn(5) so message (last) can contain '|'
-            let parts: Vec<&str> = line.splitn(5, '|').collect();
-            if parts.len() != 5 {
-                return None;
-            }
-            let date = chrono::DateTime::parse_from_rfc3339(parts[3])
-                .map(|dt| dt.timestamp())
-                .unwrap_or(0);
-
-            Some(GitCommit {
-                hash: parts[0].to_string(),
-                short_hash: parts[1].to_string(),
-                author: parts[2].to_string(),
-                date,
-                message: parts[4].to_string(),
-            })
-        })
-        .collect();
-
-    Ok(commits)
+    Ok(parse_history_commits(&output))
 }
 
 /// Get git diff for a specific file.
 pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String> {
-    let vault = Path::new(vault_path);
-    let file = Path::new(file_path);
-    let workspace = GitWorkspace::resolve(vault)?
-        .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
-    let relative_str = workspace.repo_relative_path(Path::new(&vault_relative_path_string(
-        workspace.vault_root(),
-        file,
-    )?));
+    get_file_diff_for(FileSelection {
+        vault: PathBuf::from(vault_path),
+        file: PathBuf::from(file_path),
+    })
+}
+
+fn get_file_diff_for(selection: FileSelection) -> Result<String, String> {
+    let target = resolve_file_target(&selection.vault, &selection.file)?;
 
     // First try tracked file diff
-    let output = git_command_at(workspace.git_root())
-        .and_then(|mut command| command.args(["diff", "--", &relative_str]).output())
+    let output = git_command_at(target.workspace.git_root())
+        .and_then(|mut command| command.args(["diff", "--", &target.relative_path]).output())
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
     // If no diff (maybe staged or untracked), try diff --cached
     if stdout.is_empty() {
-        let cached = git_command_at(workspace.git_root())
-            .and_then(|mut command| {
-                command
-                    .args(["diff", "--cached", "--", &relative_str])
-                    .output()
-            })
-            .map_err(|e| format!("Failed to run git diff --cached: {}", e))?;
-
-        let cached_stdout = String::from_utf8_lossy(&cached.stdout).to_string();
-        if !cached_stdout.is_empty() {
-            return Ok(cached_stdout);
-        }
-
-        // Try showing untracked file as all-new
-        let status = git_command_at(workspace.git_root())
-            .and_then(|mut command| {
-                command
-                    .args(["status", "--porcelain", "--", &relative_str])
-                    .output()
-            })
-            .map_err(|e| format!("Failed to run git status: {}", e))?;
-
-        let status_out = String::from_utf8_lossy(&status.stdout);
-        if status_out.starts_with("??") {
-            // Untracked file: show entire content as added
-            let content =
-                std::fs::read_to_string(file).map_err(|e| format!("Failed to read file: {}", e))?;
-            let lines: Vec<String> = content.lines().map(|l| format!("+{}", l)).collect();
-            return Ok(format!(
-                "diff --git a/{0} b/{0}\nnew file\n--- /dev/null\n+++ b/{0}\n@@ -0,0 +1,{1} @@\n{2}",
-                relative_str,
-                lines.len(),
-                lines.join("\n")
-            ));
+        if let Some(fallback) = fallback_file_diff(&target, &selection.file)? {
+            return Ok(fallback);
         }
     }
 
     Ok(stdout)
+}
+
+fn fallback_file_diff(target: &FileHistoryTarget, file: &Path) -> Result<Option<String>, String> {
+    let cached = git_command_at(target.workspace.git_root())
+        .and_then(|mut command| {
+            command
+                .args(["diff", "--cached", "--", &target.relative_path])
+                .output()
+        })
+        .map_err(|e| format!("Failed to run git diff --cached: {e}"))?;
+    let cached_stdout = String::from_utf8_lossy(&cached.stdout).to_string();
+    if !cached_stdout.is_empty() {
+        return Ok(Some(cached_stdout));
+    }
+
+    let status = git_command_at(target.workspace.git_root())
+        .and_then(|mut command| {
+            command
+                .args(["status", "--porcelain", "--", &target.relative_path])
+                .output()
+        })
+        .map_err(|e| format!("Failed to run git status: {e}"))?;
+    if !String::from_utf8_lossy(&status.stdout).starts_with("??") {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(file).map_err(|e| format!("Failed to read file: {e}"))?;
+    Ok(Some(added_file_diff(AddedFileSource {
+        relative_path: &target.relative_path,
+        content: &content,
+    })))
 }
 
 /// Get git diff for a specific file at a given commit (compared to its parent).
@@ -133,25 +182,31 @@ pub fn get_file_diff_at_commit(
     file_path: &str,
     commit_hash: &str,
 ) -> Result<String, String> {
-    let vault = Path::new(vault_path);
-    let file = Path::new(file_path);
-    let workspace = GitWorkspace::resolve(vault)?
-        .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
-    let relative_str = workspace.repo_relative_path(Path::new(&vault_relative_path_string(
-        workspace.vault_root(),
-        file,
-    )?));
+    get_file_diff_for_revision(
+        FileSelection {
+            vault: PathBuf::from(vault_path),
+            file: PathBuf::from(file_path),
+        },
+        CommitRevision(commit_hash.to_string()),
+    )
+}
+
+fn get_file_diff_for_revision(
+    selection: FileSelection,
+    revision: CommitRevision,
+) -> Result<String, String> {
+    let target = resolve_file_target(&selection.vault, &selection.file)?;
 
     // Show diff between commit^ and commit for this file
-    let output = git_command_at(workspace.git_root())
+    let output = git_command_at(target.workspace.git_root())
         .and_then(|mut command| {
             command
                 .args([
                     "diff",
-                    &format!("{}^", commit_hash),
-                    commit_hash,
+                    &format!("{}^", revision.0),
+                    &revision.0,
                     "--",
-                    &relative_str,
+                    &target.relative_path,
                 ])
                 .output()
         })
@@ -162,23 +217,20 @@ pub fn get_file_diff_at_commit(
     // If diff is empty, it might be the initial commit (no parent).
     // Fall back to showing the full file content as added.
     if stdout.is_empty() {
-        let show = git_command_at(workspace.git_root())
+        let show = git_command_at(target.workspace.git_root())
             .and_then(|mut command| {
                 command
-                    .args(["show", &format!("{}:{}", commit_hash, relative_str)])
+                    .args(["show", &format!("{}:{}", revision.0, target.relative_path)])
                     .output()
             })
             .map_err(|e| format!("Failed to run git show: {}", e))?;
 
         if show.status.success() {
             let content = String::from_utf8_lossy(&show.stdout);
-            let lines: Vec<String> = content.lines().map(|l| format!("+{}", l)).collect();
-            return Ok(format!(
-                "diff --git a/{0} b/{0}\nnew file\n--- /dev/null\n+++ b/{0}\n@@ -0,0 +1,{1} @@\n{2}",
-                relative_str,
-                lines.len(),
-                lines.join("\n")
-            ));
+            return Ok(added_file_diff(AddedFileSource {
+                relative_path: &target.relative_path,
+                content: &content,
+            }));
         }
     }
 

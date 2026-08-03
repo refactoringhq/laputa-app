@@ -53,16 +53,15 @@ pub fn is_separate_vault_instance() -> bool {
 }
 
 fn app_bundle_for_executable(executable: &Path) -> Option<PathBuf> {
-    let macos_dir = executable.parent()?;
-    if macos_dir.file_name()? != "MacOS" {
-        return None;
-    }
-    let contents_dir = macos_dir.parent()?;
-    if contents_dir.file_name()? != "Contents" {
-        return None;
-    }
+    let macos_dir = parent_named(executable, "MacOS")?;
+    let contents_dir = parent_named(&macos_dir, "Contents")?;
     let app_bundle = contents_dir.parent()?;
     (app_bundle.extension()? == "app").then(|| app_bundle.to_path_buf())
+}
+
+fn parent_named(path: &Path, expected_name: &str) -> Option<PathBuf> {
+    let parent = path.parent()?;
+    (parent.file_name()? == expected_name).then(|| parent.to_path_buf())
 }
 
 fn vault_launch_arguments(vault_path: &Path, vault_color: Option<&str>) -> Vec<OsString> {

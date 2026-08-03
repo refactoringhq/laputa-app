@@ -66,7 +66,7 @@ struct RawNotePath<'a>(&'a str);
 
 impl<'a> RawNotePath<'a> {
     fn is_windows_verbatim(&self) -> bool {
-        self.0.starts_with(r"\\?\") || self.0.starts_with(r"\??\")
+        self.0.starts_with("\\\\?\\") || self.0.starts_with("\\??\\")
     }
 
     fn normalized_for_file_io(&self) -> Cow<'a, str> {
@@ -76,7 +76,7 @@ impl<'a> RawNotePath<'a> {
         if !self.0.contains('/') {
             return Cow::Borrowed(self.0);
         }
-        Cow::Owned(self.0.replace('/', r"\"))
+        Cow::Owned(self.0.replace('/', "\\"))
     }
 }
 

@@ -206,50 +206,39 @@ where
     F: FnMut(AiAgentStreamEvent),
 {
     let permission_mode = request.permission_mode();
-    match request.agent {
-        AiAgentId::ClaudeCode => run_claude_agent_stream(request, permission_mode, emit),
-        AiAgentId::Codex => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::codex_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Copilot => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::copilot_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Opencode => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::opencode_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Pi => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::pi_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Antigravity => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::antigravity_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Kiro => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::kiro_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Hermes => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::hermes_cli::run_agent_stream,
-            emit,
-        ),
+    dispatch_ai_agent_stream(request, permission_mode, emit)
+}
+
+fn dispatch_ai_agent_stream<F>(
+    request: AiAgentStreamRequest,
+    permission_mode: AiAgentPermissionMode,
+    emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    let Some(runner) = shared_agent_runner(request.agent) else {
+        return run_claude_agent_stream(request, permission_mode, emit);
+    };
+    run_shared_agent_stream(request, permission_mode, runner, emit)
+}
+
+type SharedAgentRunner<F> =
+    fn(crate::cli_agent_runtime::AgentStreamRequest, F) -> Result<String, String>;
+
+fn shared_agent_runner<F>(agent: AiAgentId) -> Option<SharedAgentRunner<F>>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    match agent {
+        AiAgentId::ClaudeCode => None,
+        AiAgentId::Codex => Some(crate::codex_cli::run_agent_stream),
+        AiAgentId::Copilot => Some(crate::copilot_cli::run_agent_stream),
+        AiAgentId::Opencode => Some(crate::opencode_cli::run_agent_stream),
+        AiAgentId::Pi => Some(crate::pi_cli::run_agent_stream),
+        AiAgentId::Antigravity => Some(crate::antigravity_cli::run_agent_stream),
+        AiAgentId::Kiro => Some(crate::kiro_cli::run_agent_stream),
+        AiAgentId::Hermes => Some(crate::hermes_cli::run_agent_stream),
     }
 }
 

@@ -2,7 +2,8 @@ use super::{FolderNode, VaultEntry};
 use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{ChildStdin, Stdio};
+use std::thread::JoinHandle;
 use walkdir::{DirEntry, WalkDir};
 
 fn normalize_relative_path(path: &str) -> String {
@@ -55,14 +56,7 @@ fn run_git_check_ignore(vault_path: &Path, relative_paths: &[String]) -> Option<
         .spawn()
         .ok()?;
 
-    let mut stdin = child.stdin.take()?;
-    let paths = relative_paths.to_vec();
-    let writer = std::thread::spawn(move || -> std::io::Result<()> {
-        for path in paths {
-            writeln!(stdin, "{path}")?;
-        }
-        Ok(())
-    });
+    let writer = spawn_ignore_writer(child.stdin.take()?, relative_paths.to_vec());
 
     let output = child.wait_with_output().ok()?;
     writer.join().ok()?.ok()?;
@@ -70,6 +64,18 @@ fn run_git_check_ignore(vault_path: &Path, relative_paths: &[String]) -> Option<
         return Some(String::from_utf8_lossy(&output.stdout).to_string());
     }
     None
+}
+
+fn spawn_ignore_writer(
+    mut stdin: ChildStdin,
+    paths: Vec<String>,
+) -> JoinHandle<std::io::Result<()>> {
+    std::thread::spawn(move || {
+        for path in paths {
+            writeln!(stdin, "{path}")?;
+        }
+        Ok(())
+    })
 }
 
 fn ignored_relative_paths(vault_path: &Path, relative_paths: &[String]) -> HashSet<String> {

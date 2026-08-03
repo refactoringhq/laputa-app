@@ -86,3 +86,4 @@ CODE-HEALTH-REPORT.md
 .codacy/tools-configs/*
 !.codacy/tools-configs/semgrep.yaml
 !.codacy/tools-configs/trivy.yaml
+!.codacy/tools-configs/lizard.yaml

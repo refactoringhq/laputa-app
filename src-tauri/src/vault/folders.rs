@@ -51,18 +51,7 @@ pub fn rename_folder(
     let relative_path = ensure_relative_folder_path(folder_path)?;
     let normalized_name = normalize_folder_name(next_name)?;
     let source_path = vault_path.join(&relative_path);
-
-    if !source_path.exists() {
-        return Err(format!("Folder does not exist: {}", folder_path));
-    }
-    if !source_path.is_dir() {
-        return Err(format!("Not a folder: {}", folder_path));
-    }
-
-    let current_name = source_path
-        .file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .ok_or_else(|| "Folder path cannot target the vault root".to_string())?;
+    let current_name = existing_folder_name(&source_path, folder_path)?;
 
     if current_name == normalized_name {
         return Ok(FolderRenameResult {
@@ -92,6 +81,19 @@ pub fn rename_folder(
         old_path: display_relative_path(&relative_path),
         new_path: display_relative_path(&destination_relative),
     })
+}
+
+fn existing_folder_name(source_path: &Path, folder_path: &str) -> Result<String, String> {
+    if !source_path.exists() {
+        return Err(format!("Folder does not exist: {folder_path}"));
+    }
+    if !source_path.is_dir() {
+        return Err(format!("Not a folder: {folder_path}"));
+    }
+    source_path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .ok_or_else(|| "Folder path cannot target the vault root".to_string())
 }
 
 pub fn delete_folder(vault_path: &Path, folder_path: &str) -> Result<String, String> {

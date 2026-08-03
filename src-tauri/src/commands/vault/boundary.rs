@@ -307,6 +307,7 @@ pub(crate) fn with_boundary<T>(
     action(&boundary)
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum ValidatedPathMode {
     Existing,
     Writable,
@@ -324,21 +325,26 @@ pub(crate) fn with_validated_path<T>(
                 requested_root: root.requested,
                 canonical_root: root.canonical,
             };
-            let validated_path = match mode {
-                ValidatedPathMode::Existing => boundary.validate_existing_path(path)?,
-                ValidatedPathMode::Writable => boundary.validate_writable_path(path)?,
-            };
+            let validated_path = validate_for_mode(&boundary, path, mode)?;
             return action(&validated_path);
         }
     }
 
     with_boundary(vault_path, |boundary| {
-        let validated_path = match mode {
-            ValidatedPathMode::Existing => boundary.validate_existing_path(path)?,
-            ValidatedPathMode::Writable => boundary.validate_writable_path(path)?,
-        };
+        let validated_path = validate_for_mode(boundary, path, mode)?;
         action(&validated_path)
     })
+}
+
+fn validate_for_mode(
+    boundary: &VaultBoundary,
+    path: &str,
+    mode: ValidatedPathMode,
+) -> Result<String, String> {
+    match mode {
+        ValidatedPathMode::Existing => boundary.validate_existing_path(path),
+        ValidatedPathMode::Writable => boundary.validate_writable_path(path),
+    }
 }
 
 pub(crate) fn with_existing_paths<T>(

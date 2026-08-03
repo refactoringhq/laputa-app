@@ -21,25 +21,28 @@ pub struct GitRemoteStatus {
 /// Get the current branch name, and how many commits ahead/behind the upstream.
 pub fn git_remote_status(vault_path: impl AsRef<Path>) -> Result<GitRemoteStatus, String> {
     let vault = vault_path.as_ref();
-    let workspace = GitWorkspace::resolve(vault)?
-        .ok_or_else(|| "Vault is not inside a Git work tree".to_string())?;
+    let workspace = required_workspace(vault)?;
     let git_root = workspace.git_root();
     let branch = branch_label(git_root)?;
 
     if !has_configured_remote(git_root)? {
-        return Ok(status_without_remote(branch));
+        return Ok(status_without_sync(branch, false));
     }
 
     // Fetch latest remote refs (silent, best-effort)
     let _ = git_output(git_root, &["fetch", "--quiet"]);
 
     let Some(target) = sync_target(git_root)? else {
-        return Ok(status_without_upstream(branch));
+        return Ok(status_without_sync(branch, true));
     };
 
     let (ahead, behind) = upstream_counts(git_root, &target.display)?;
 
     Ok(status_with_upstream(branch, target.display, ahead, behind))
+}
+
+fn required_workspace(vault: &Path) -> Result<GitWorkspace, String> {
+    GitWorkspace::resolve(vault)?.ok_or_else(|| "Vault is not inside a Git work tree".to_string())
 }
 
 fn upstream_counts(git_root: &Path, target: &str) -> Result<(u32, u32), String> {
@@ -56,23 +59,12 @@ fn upstream_counts(git_root: &Path, target: &str) -> Result<(u32, u32), String> 
     })
 }
 
-fn status_without_remote(branch: String) -> GitRemoteStatus {
+fn status_without_sync(branch: String, has_remote: bool) -> GitRemoteStatus {
     GitRemoteStatus {
         branch,
         ahead: 0,
         behind: 0,
-        has_remote: false,
-        has_upstream: false,
-        upstream: None,
-    }
-}
-
-fn status_without_upstream(branch: String) -> GitRemoteStatus {
-    GitRemoteStatus {
-        branch,
-        ahead: 0,
-        behind: 0,
-        has_remote: true,
+        has_remote,
         has_upstream: false,
         upstream: None,
     }

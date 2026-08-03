@@ -24,8 +24,14 @@ fn assert_updated_content(case: UpdateCase<'_>) {
     }
 }
 
+fn assert_update_cases(cases: impl IntoIterator<Item = UpdateCase<'static>>) {
+    for case in cases {
+        assert_updated_content(case);
+    }
+}
+
 #[test]
-fn test_update_frontmatter_replaces_or_adds_scalar_fields() {
+fn test_update_frontmatter_replaces_or_adds_string_fields() {
     let cases = [
         UpdateCase {
             content: "---\nStatus: Draft\n---\n# Test\n",
@@ -48,6 +54,14 @@ fn test_update_frontmatter_replaces_or_adds_scalar_fields() {
             expected_present: &["type: Project"],
             expected_absent: &["\"Is A\": Note", "\"Is A\": Project"],
         },
+    ];
+
+    assert_update_cases(cases);
+}
+
+#[test]
+fn test_update_frontmatter_adds_typed_scalar_fields() {
+    let cases = [
         UpdateCase {
             content: "---\nStatus: Draft\n---\n# Test\n",
             key: "Reviewed",
@@ -78,9 +92,7 @@ fn test_update_frontmatter_replaces_or_adds_scalar_fields() {
         },
     ];
 
-    for case in cases {
-        assert_updated_content(case);
-    }
+    assert_update_cases(cases);
 }
 
 #[test]
@@ -126,9 +138,7 @@ fn test_update_frontmatter_list_and_delete_paths() {
         },
     ];
 
-    for case in list_cases {
-        assert_updated_content(case);
-    }
+    assert_update_cases(list_cases);
 }
 
 #[test]
@@ -193,9 +203,7 @@ fn test_update_frontmatter_canonicalizes_system_metadata_keys() {
         },
     ];
 
-    for case in cases {
-        assert_updated_content(case);
-    }
+    assert_update_cases(cases);
 }
 
 #[test]
@@ -231,7 +239,5 @@ fn test_update_frontmatter_canonicalizes_type_key_case() {
         },
     ];
 
-    for case in cases {
-        assert_updated_content(case);
-    }
+    assert_update_cases(cases);
 }
