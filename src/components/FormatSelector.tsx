@@ -25,8 +25,29 @@ const OPEN_COMBOBOX_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', ' '])
 interface FormatSelectorProps {
   format: NoteFormat
   locale?: AppLocale
-  onDeleteProperty?: (key: string) => void
-  onUpdateProperty?: (key: string, value: FrontmatterValue) => void
+  onDeleteProperty?(key: string): void
+  onUpdateProperty?(key: string, value: FrontmatterValue): void
+}
+
+interface OpenTriggerKeyDownInput {
+  closeCombobox: () => void
+  event: KeyboardEvent<HTMLButtonElement>
+  format: NoteFormat
+  highlightedIndex: number
+  moveHighlight: (direction: 'next' | 'previous') => void
+  selectFormat: (format: NoteFormat) => void
+}
+
+interface FormatSelectorPopoverProps {
+  format: NoteFormat
+  highlightedIndex: number
+  listboxId: string
+  locale: AppLocale
+  onHighlight(index: number): void
+  onOpenChange(open: boolean): void
+  onSelect(format: NoteFormat): void
+  onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>): void
+  open: boolean
 }
 
 function initialHighlightedIndex(format: NoteFormat): number {
@@ -56,6 +77,37 @@ function FormatIcon({ format }: { format: NoteFormat }) {
   return <Icon size={14} className="shrink-0" aria-hidden="true" />
 }
 
+function handleOpenTriggerKeyDown({
+  closeCombobox,
+  event,
+  format,
+  highlightedIndex,
+  moveHighlight,
+  selectFormat,
+}: OpenTriggerKeyDownInput): void {
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      moveHighlight('next')
+      return
+    case 'ArrowUp':
+      event.preventDefault()
+      moveHighlight('previous')
+      return
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      selectFormat(FORMAT_OPTIONS.at(highlightedIndex) ?? format)
+      return
+    case 'Escape':
+      event.preventDefault()
+      closeCombobox()
+      return
+    default:
+      return
+  }
+}
+
 function FormatRowLabel({ locale }: { locale: AppLocale }) {
   return (
     <span className={PROPERTY_PANEL_LABEL_CLASS_NAME}>
@@ -67,6 +119,84 @@ function FormatRowLabel({ locale }: { locale: AppLocale }) {
       </span>
       <span className="min-w-0 truncate">{translate(locale, 'inspector.properties.displayAs')}</span>
     </span>
+  )
+}
+
+function FormatSelectorPopover({
+  format,
+  highlightedIndex,
+  listboxId,
+  locale,
+  onHighlight,
+  onOpenChange,
+  onSelect,
+  onTriggerKeyDown,
+  open,
+}: FormatSelectorPopoverProps) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          role="combobox"
+          aria-controls={listboxId}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-label={translate(locale, 'inspector.properties.displayAs')}
+          aria-activedescendant={open ? `${listboxId}-${highlightedIndex}` : undefined}
+          className={cn('h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current hover:ring-1 hover:ring-current')}
+          style={PROPERTY_CHIP_STYLE}
+          onKeyDown={onTriggerKeyDown}
+        >
+          <span className="flex min-w-0 items-center gap-1 truncate">
+            <FormatIcon format={format} />
+            <span className="min-w-0 truncate">{formatLabel(format, locale)}</span>
+          </span>
+          <CaretUpDown size={14} aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        side="left"
+        sideOffset={4}
+        className="w-40 overflow-hidden p-1"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+        }}
+      >
+        <div id={listboxId} role="listbox">
+          {FORMAT_OPTIONS.map((option, index) => (
+            <Button
+              id={`${listboxId}-${index}`}
+              key={option}
+              type="button"
+              variant="ghost"
+              size="sm"
+              role="option"
+              aria-selected={option === format}
+              className={cn('h-auto w-full justify-between px-2 py-1.5 text-left font-normal', index === highlightedIndex && 'bg-muted')}
+              onMouseEnter={() => {
+                onHighlight(index)
+              }}
+              onClick={() => {
+                onSelect(option)
+              }}
+            >
+              <span className="flex min-w-0 items-center gap-2 truncate">
+                <FormatIcon format={option} />
+                <span>{formatLabel(option, locale)}</span>
+              </span>
+              {option === format ? <Check size={14} aria-hidden="true" /> : null}
+            </Button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -114,7 +244,9 @@ function EditableFormatSelector({
     setOpen(true)
   }
 
-  const closeCombobox = () => setOpen(false)
+  const closeCombobox = () => {
+    setOpen(false)
+  }
 
   const selectFormat = (nextFormat: NoteFormat) => {
     updateFormat(nextFormat)
@@ -133,30 +265,6 @@ function EditableFormatSelector({
     closeCombobox()
   }
 
-  const handleOpenTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault()
-        moveHighlight('next')
-        return
-      case 'ArrowUp':
-        event.preventDefault()
-        moveHighlight('previous')
-        return
-      case 'Enter':
-      case ' ':
-        event.preventDefault()
-        selectFormat(FORMAT_OPTIONS.at(highlightedIndex) ?? format)
-        return
-      case 'Escape':
-        event.preventDefault()
-        closeCombobox()
-        return
-      default:
-        return
-    }
-  }
-
   const handleClosedTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!shouldOpenCombobox(event)) return
     event.preventDefault()
@@ -165,7 +273,7 @@ function EditableFormatSelector({
 
   const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (open) {
-      handleOpenTriggerKeyDown(event)
+      handleOpenTriggerKeyDown({ closeCombobox, event, format, highlightedIndex, moveHighlight, selectFormat })
       return
     }
     handleClosedTriggerKeyDown(event)
@@ -179,70 +287,17 @@ function EditableFormatSelector({
     >
       <FormatRowLabel locale={locale} />
       <div className="flex min-w-0 items-center justify-start">
-        <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              role="combobox"
-              aria-controls={listboxId}
-              aria-expanded={open}
-              aria-haspopup="listbox"
-              aria-label={translate(locale, 'inspector.properties.displayAs')}
-              aria-activedescendant={open ? `${listboxId}-${highlightedIndex}` : undefined}
-              className={cn(
-                'h-auto max-w-full justify-between gap-1 border-none px-2 shadow-none ring-inset [&_svg]:text-current hover:ring-1 hover:ring-current',
-              )}
-              style={PROPERTY_CHIP_STYLE}
-              onKeyDown={handleTriggerKeyDown}
-            >
-              <span className="flex min-w-0 items-center gap-1 truncate">
-                <FormatIcon format={format} />
-                <span className="min-w-0 truncate">{formatLabel(format, locale)}</span>
-              </span>
-              <CaretUpDown size={14} aria-hidden="true" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            side="left"
-            sideOffset={4}
-            className="w-40 overflow-hidden p-1"
-            onOpenAutoFocus={(event) => event.preventDefault()}
-            onCloseAutoFocus={(event) => event.preventDefault()}
-          >
-            <div id={listboxId} role="listbox">
-              {FORMAT_OPTIONS.map((option, index) => {
-                const selected = option === format
-                const highlighted = index === highlightedIndex
-                return (
-                  <Button
-                    id={`${listboxId}-${index}`}
-                    key={option}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    role="option"
-                    aria-selected={selected}
-                    className={cn(
-                      'h-auto w-full justify-between px-2 py-1.5 text-left font-normal',
-                      highlighted && 'bg-muted',
-                    )}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    onClick={() => selectFormat(option)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2 truncate">
-                      <FormatIcon format={option} />
-                      <span>{formatLabel(option, locale)}</span>
-                    </span>
-                    {selected ? <Check size={14} aria-hidden="true" /> : null}
-                  </Button>
-                )
-              })}
-            </div>
-          </PopoverContent>
-        </Popover>
+        <FormatSelectorPopover
+          format={format}
+          highlightedIndex={highlightedIndex}
+          listboxId={listboxId}
+          locale={locale}
+          onHighlight={setHighlightedIndex}
+          onOpenChange={handleOpenChange}
+          onSelect={selectFormat}
+          onTriggerKeyDown={handleTriggerKeyDown}
+          open={open}
+        />
       </div>
     </div>
   )

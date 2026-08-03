@@ -174,6 +174,7 @@ export function TolariaSlashMenu({
           else itemElements.current.delete(item.key)
         }}
         role="menuitem"
+        tabIndex={-1}
       >
         <Components.SuggestionMenu.Item
           className="bn-suggestion-menu-item"
