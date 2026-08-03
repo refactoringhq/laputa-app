@@ -173,6 +173,7 @@ export function TolariaSlashMenu({
           if (element) itemElements.current.set(item.key, element)
           else itemElements.current.delete(item.key)
         }}
+        role="menuitem"
       >
         <Components.SuggestionMenu.Item
           className="bn-suggestion-menu-item"

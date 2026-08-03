@@ -130,12 +130,19 @@ export function resolveAiTarget(settings: Settings): AiTarget {
   const storedLegacyAgent = normalizeStoredAiAgent(settings.default_ai_agent)
   const legacyAgent = storedLegacyAgent ?? DEFAULT_AI_AGENT
   const target = resolveStoredAiTarget(settings.default_ai_target, targets)
-  if (target) {
-    if (shouldPreferLegacyAgent(target, storedLegacyAgent)) return agentTargetFor(agents, legacyAgent) ?? target
-    return target
-  }
+  if (target) return preferredStoredTarget(target, agents, legacyAgent, storedLegacyAgent)
 
   return agentTargetFor(agents, legacyAgent) ?? agents[0]
+}
+
+function preferredStoredTarget(
+  target: AiTarget,
+  agents: AiTarget[],
+  legacyAgent: AiAgentId,
+  storedLegacyAgent: AiAgentId | null,
+): AiTarget {
+  if (!shouldPreferLegacyAgent(target, storedLegacyAgent)) return target
+  return agentTargetFor(agents, legacyAgent) ?? target
 }
 
 export function targetAgent(target: AiTarget): AiAgentId {

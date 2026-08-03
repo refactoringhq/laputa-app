@@ -120,21 +120,15 @@ function boundaryForChip(
 ): { boundary: SelectionBoundary | null; remaining: number } {
   const tokenLength = chipToken(child.dataset.chipTarget ?? '').length
   if (remaining <= 0) {
-    const previousSibling = node.childNodes.item(index - 1)
     return {
-      boundary: previousSibling
-        ? findTextBoundaryAtEdge(previousSibling, 'end') ?? { container: node, offset: index }
-        : { container: node, offset: index },
+      boundary: siblingBoundary(node, index - 1, 'end', index),
       remaining: 0,
     }
   }
 
   if (remaining <= tokenLength) {
-    const nextSibling = node.childNodes.item(index + 1)
     return {
-      boundary: nextSibling
-        ? findTextBoundaryAtEdge(nextSibling, 'start') ?? { container: node, offset: index + 1 }
-        : { container: node, offset: index + 1 },
+      boundary: siblingBoundary(node, index + 1, 'start', index + 1),
       remaining: 0,
     }
   }
@@ -143,6 +137,17 @@ function boundaryForChip(
     boundary: null,
     remaining: remaining - tokenLength,
   }
+}
+
+function siblingBoundary(
+  node: Node,
+  siblingIndex: number,
+  edge: 'start' | 'end',
+  fallbackOffset: number,
+): SelectionBoundary {
+  const sibling = node.childNodes.item(siblingIndex)
+  if (!sibling) return { container: node, offset: fallbackOffset }
+  return findTextBoundaryAtEdge(sibling, edge) ?? { container: node, offset: fallbackOffset }
 }
 
 function findSelectionBoundary(

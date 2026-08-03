@@ -1,14 +1,5 @@
 import { type EditorView, ViewPlugin } from '@codemirror/view'
 
-function parseZoomValue(source: string | undefined): number | null {
-  const value = source?.trim() ?? ''
-  if (!value || value === 'normal') return null
-
-  let parsed = parseFloat(value)
-  if (value.endsWith('%')) parsed /= 100
-  return parsed > 0 && Number.isFinite(parsed) ? parsed : null
-}
-
 /**
  * Read the current CSS zoom factor from document.documentElement.
  * Returns 1 when no zoom is applied or the value is unparseable.
@@ -153,4 +144,13 @@ export function zoomCursorFix() {
       },
     }
   })
+}
+
+function parseZoomValue(source: string | undefined): number | null {
+  const value = source?.trim() ?? ''
+  if (!value || value === 'normal') return null
+
+  let parsed = parseFloat(value)
+  if (value.endsWith('%')) parsed /= 100
+  return parsed > 0 && Number.isFinite(parsed) ? parsed : null
 }

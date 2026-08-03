@@ -78,11 +78,16 @@ export function firstTarget(
   defaultAgent: AiAgentId,
 ): AiTarget {
   const targets = flatTargets(groups)
-  const selectedDefault = defaultTarget ? targets.find((target) => target.id === defaultTarget.id) : undefined
+  const selectedDefault = defaultTarget && targets.find((target) => target.id === defaultTarget.id)
   if (selectedDefault) return selectedDefault
 
   const selectedAgent = targets.find((target) => target.kind === 'agent' && target.agent === defaultAgent)
-  return selectedAgent ?? targets[0] ?? defaultTarget ?? agentTargets()[0]
+  if (selectedAgent) return selectedAgent
+  return firstAvailableTarget(targets, defaultTarget)
+}
+
+function firstAvailableTarget(targets: AiTarget[], defaultTarget: AiTarget | undefined): AiTarget {
+  return targets[0] ?? defaultTarget ?? agentTargets()[0]
 }
 
 export function resolveTarget(conversation: AiConversation, groups: AiWorkspaceTargetGroups, fallback: AiTarget): AiTarget {

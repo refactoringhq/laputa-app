@@ -20,13 +20,6 @@ function canonicalWriteKey(key: FrontmatterKey): FrontmatterKey {
   return canonicalFrontmatterWriteKey(key)
 }
 
-function formatYamlValue(value: FrontmatterValue): YamlValue {
-  if (Array.isArray(value)) return `\n${value.map(v => `  - "${v}"`).join('\n')}`
-  if (typeof value === 'boolean') return value ? 'true' : 'false'
-  if (value === null) return 'null'
-  return String(value)
-}
-
 function formatYamlKey(key: FrontmatterKey): YamlKey {
   return key.includes(' ') ? `"${key}"` : key
 }
@@ -167,4 +160,11 @@ export function deleteMockFrontmatterProperty(path: VaultPath, key: FrontmatterK
   const { fm, rest, lineEnding } = parsed
   const newLines = processKeyInLines(frontmatterLines(fm, lineEnding), key, null)
   return formatFrontmatterBlock(newLines, lineEnding, rest)
+}
+
+function formatYamlValue(value: FrontmatterValue): YamlValue {
+  if (Array.isArray(value)) return `\n${value.map(v => `  - "${v}"`).join('\n')}`
+  if (typeof value === 'boolean') return value ? 'true' : 'false'
+  if (value === null) return 'null'
+  return String(value)
 }

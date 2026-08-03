@@ -30,6 +30,12 @@ const URL_CHIP_STYLE: CSSProperties = {
 
 type ChipScalarValue = string | number | boolean | null
 
+interface RelationshipChipLabelInput {
+  displayLabel: string
+  ref: string
+  targetEntry: VaultEntry | undefined
+}
+
 function normalizeOpenableUrl(value: string): string | null {
   if (!isUrlValue(value)) return null
   const normalized = normalizeUrl(value)
@@ -76,7 +82,7 @@ function resolveRelationshipChip(
 ): PropertyChipValue | null {
   const targetEntry = resolveEntry(allEntries, wikilinkTarget(ref))
   const displayLabel = wikilinkDisplay(ref)
-  const label = ref.includes('|') ? displayLabel : (targetEntry?.title ?? displayLabel)
+  const label = relationshipChipLabel({ displayLabel, ref, targetEntry })
   if (!label) return null
   if (!targetEntry) {
     return {
@@ -96,6 +102,11 @@ function resolveRelationshipChip(
     action: { kind: 'note', entry: targetEntry },
     tone: 'relationship',
   }
+}
+
+function relationshipChipLabel({ displayLabel, ref, targetEntry }: RelationshipChipLabelInput): string {
+  if (ref.includes('|')) return displayLabel
+  return targetEntry?.title ?? displayLabel
 }
 
 function resolveScalarChip(value: unknown): PropertyChipValue | null {

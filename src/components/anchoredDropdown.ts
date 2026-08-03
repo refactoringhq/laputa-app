@@ -47,12 +47,6 @@ function getViewport(): AnchoredDropdownViewport {
   }
 }
 
-function parseZoomValue(source: string | undefined): number | null {
-  if (!source || source === 'normal') return null
-  const value = source.endsWith('%') ? Number.parseFloat(source) / 100 : Number.parseFloat(source)
-  return Number.isFinite(value) && value > 0 ? value : null
-}
-
 function getRootZoom(): number {
   const style = getComputedStyle(document.documentElement)
   const overlayZoom = parseZoomValue(style.getPropertyValue('--tolaria-overlay-zoom-factor').trim())
@@ -194,4 +188,11 @@ export function useAnchoredDropdownPosition(
   }, [open, updatePosition])
 
   return { updatePosition }
+}
+
+function parseZoomValue(source: string | undefined): number | null {
+  if (!source || source === 'normal') return null
+  const parsed = Number.parseFloat(source)
+  const value = source.endsWith('%') ? parsed / 100 : parsed
+  return Number.isFinite(value) && value > 0 ? value : null
 }

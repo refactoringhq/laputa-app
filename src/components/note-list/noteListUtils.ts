@@ -31,23 +31,24 @@ function resolveSelectionFilterTitle(selection: SidebarSelection, locale: AppLoc
   return translate(locale, FILTER_TITLE_KEYS[selection.filter])
 }
 
-function resolveFolderTitle(selection: SidebarSelection): string | null {
-  if (selection.kind !== 'folder') return null
-  if (selection.path.trim()) return vaultRelativePathLabel(selection.path)
-  return selection.rootPath ? vaultRelativePathLabel(selection.rootPath) : null
-}
-
 export function resolveHeaderTitle(selection: SidebarSelection, typeDocument: VaultEntry | null, views?: ViewFile[], locale: AppLocale = 'en'): string {
   if (selection.kind === 'view') {
     const view = views?.find((v) => v.filename === selection.filename)
     return view?.definition.name ?? translate(locale, 'noteList.title.view')
   }
   if (selection.kind === 'entity') return selection.entry.title
-  const folderTitle = resolveFolderTitle(selection)
-  if (folderTitle) return folderTitle
-  if (typeDocument) return typeDocument.title
+  return resolveNonEntityHeaderTitle(selection, typeDocument, locale)
+}
 
-  return resolveSelectionFilterTitle(selection, locale) ?? translate(locale, 'noteList.title.notes')
+function resolveNonEntityHeaderTitle(
+  selection: SidebarSelection,
+  typeDocument: VaultEntry | null,
+  locale: AppLocale,
+): string {
+  return resolveFolderTitle(selection)
+    ?? typeDocument?.title
+    ?? resolveSelectionFilterTitle(selection, locale)
+    ?? translate(locale, 'noteList.title.notes')
 }
 
 function searchableTitle(entry: { title?: unknown }): string {
@@ -225,12 +226,22 @@ export function extractDeletedContentFromDiff(diff: string): string | null {
       inHunk = true
       continue
     }
-    if (!inHunk) continue
-    if (line.startsWith('\\')) continue
-    if (line.startsWith('-') || line.startsWith(' ')) {
-      lines.push(line.slice(1))
-    }
+    const content = deletedDiffContent(line, inHunk)
+    if (content !== null) lines.push(content)
   }
 
   return lines.length > 0 ? lines.join('\n') : null
+}
+
+function deletedDiffContent(line: string, inHunk: boolean): string | null {
+  if (!inHunk || line.startsWith('\\')) return null
+  if (line.startsWith('-')) return line.slice(1)
+  if (line.startsWith(' ')) return line.slice(1)
+  return null
+}
+
+function resolveFolderTitle(selection: SidebarSelection): string | null {
+  if (selection.kind !== 'folder') return null
+  if (selection.path.trim()) return vaultRelativePathLabel(selection.path)
+  return selection.rootPath ? vaultRelativePathLabel(selection.rootPath) : null
 }
