@@ -62,7 +62,7 @@
     "mobile:qa:ios-editing:tablet": "node apps/mobile/scripts/assert-ios-editing-qa.mjs --tablet",
     "mobile:qa:ios-editing:phone": "node apps/mobile/scripts/assert-ios-editing-qa.mjs --phone",
     "mobile:dev-vault": "node apps/mobile/scripts/serve-local-vault.mjs",
-    "mobile:qa:screenshots": "pnpm mobile:export:web && playwright test --config apps/mobile/playwright.config.ts",
+    "mobile:qa:screenshots": "EXPO_PUBLIC_TOLARIA_WORKSPACE_SOURCE=fixture pnpm --filter @tolaria/mobile exec expo export --platform web --clear --output-dir /tmp/tolaria-mobile-ui-web && playwright test --config apps/mobile/playwright.config.ts",
     "mobile:start": "pnpm --filter @tolaria/mobile start",
     "mobile:ios": "pnpm --filter @tolaria/mobile ios",
     "mobile:typecheck": "pnpm --filter @tolaria/mobile typecheck",
