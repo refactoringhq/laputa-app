@@ -48,6 +48,7 @@ import { createRichEditorCodeBlockTabExtension } from './richEditorCodeBlockTabE
 import { createRichEditorCodeBlockShortcutExtension } from './richEditorCodeBlockShortcutExtension'
 import { createRichEditorCodeBlockArrowNavigationExtension } from './richEditorCodeBlockArrowNavigationExtension'
 import { createRichEditorEmptyListNavigationExtension } from './richEditorEmptyListNavigationExtension'
+import { createRichEditorListTabExtension } from './richEditorListTabExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
 import { useEditorPdfExport } from './useEditorPdfExport'
 import type { NotePdfExportSource } from '../utils/notePdfExport'
@@ -307,6 +308,7 @@ function useEditorSetup({
       createRichEditorCodeBlockArrowNavigationExtension(),
       createRichEditorEmptyListNavigationExtension(),
       createRichEditorCodeBlockTabExtension(),
+      createRichEditorListTabExtension(),
       createRichEditorCodeBlockShortcutExtension(),
       createMarkdownHighlightShortcutExtension(),
       createTodoBlockShortcutExtension(),
