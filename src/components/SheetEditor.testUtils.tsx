@@ -247,7 +247,7 @@ const ironCalcMock = vi.hoisted(() => {
     }
 
     pauseEvaluation(): void {}
-    resumeEvaluation(): void {}
+    resumeEvaluation(): void { console.log("CHECK") }
     evaluate(): void {}
     setSelectedSheet(): void {}
     getSelectedSheet(): SheetIndex {
