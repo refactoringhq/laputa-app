@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, type RefObject } from 'react'
 import type { SearchResult } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
@@ -66,6 +66,21 @@ function useGitignoredVisibilitySearchRefresh({
   }, [active, performSearch, query])
 }
 
+function useSearchLifecycle(
+  active: boolean,
+  reset: () => void,
+  debounceRef: RefObject<ReturnType<typeof setTimeout> | null>,
+  searchGenRef: RefObject<number>,
+) {
+  useEffect(() => {
+    searchGenRef.current++
+    clearTimeout(debounceRef.current ?? undefined)
+    debounceRef.current = null
+    if (!active) return
+    return reset
+  }, [active, debounceRef, reset, searchGenRef])
+}
+
 export function useUnifiedSearch(vaultPath: string | string[], active: boolean) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -84,13 +99,7 @@ export function useUnifiedSearch(vaultPath: string | string[], active: boolean) 
     searchGenRef.current++
   }, [])
 
-  // On any active change: cancel inflight + debounce, then reset if opening
-  useEffect(() => {
-    searchGenRef.current++
-    clearTimeout(debounceRef.current ?? undefined)
-    debounceRef.current = null
-    if (active) reset()
-  }, [active, reset])
+  useSearchLifecycle(active, reset, debounceRef, searchGenRef)
 
   const performSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); setElapsedMs(null); setLoading(false); return }
@@ -113,16 +122,21 @@ export function useUnifiedSearch(vaultPath: string | string[], active: boolean) 
     }
   }, [vaultPath])
 
+  const updateQuery = useCallback((nextQuery: string) => {
+    setQuery(nextQuery)
+    if (nextQuery.trim()) return
+    clearTimeout(debounceRef.current ?? undefined)
+    debounceRef.current = null
+    setResults([])
+    setElapsedMs(null)
+    searchGenRef.current++
+    setLoading(false)
+  }, [])
+
   useEffect(() => {
     clearTimeout(debounceRef.current ?? undefined)
     debounceRef.current = null
-    if (!query.trim()) {
-      setResults([])
-      setElapsedMs(null)
-      searchGenRef.current++
-      setLoading(false)
-      return
-    }
+    if (!query.trim()) return
     debounceRef.current = setTimeout(() => { void performSearch(query) }, DEBOUNCE_MS)
     return () => {
       clearTimeout(debounceRef.current ?? undefined)
@@ -136,5 +150,5 @@ export function useUnifiedSearch(vaultPath: string | string[], active: boolean) 
     query,
   })
 
-  return { query, setQuery, results, selectedIndex, setSelectedIndex, loading, elapsedMs }
+  return { query, setQuery: updateQuery, results, selectedIndex, setSelectedIndex, loading, elapsedMs }
 }

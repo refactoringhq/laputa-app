@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { cn } from '@/lib/utils'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { useDragRegion } from '../hooks/useDragRegion'
+import { useInitialPulseLoad } from '../hooks/useInitialPulseLoad'
 import type { PulseCommit, PulseFile } from '../types'
 import { relativeDate } from '../utils/noteListHelpers'
 import { openExternalUrl } from '../utils/url'
@@ -463,31 +464,12 @@ export const PulseView = memo(function PulseView(options: PulseViewProps) {
   const [error, setError] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
   const [skip, setSkip] = useState(0)
+  const [retryCount, setRetryCount] = useState(0)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const retryLoad = useCallback(() => setRetryCount((count) => count + 1), [])
+  const loadInitialCommits = useCallback(() => tauriCall<PulseCommit[]>('get_vault_pulse', { vaultPath, limit: PAGE_SIZE, skip: 0 }), [vaultPath])
 
-  // Initial load
-  const loadInitial = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setCommits([])
-    setSkip(0)
-    setHasMore(true)
-    try {
-      const result = await tauriCall<PulseCommit[]>('get_vault_pulse', {
-        vaultPath,
-        limit: PAGE_SIZE,
-        skip: 0,
-      })
-      setCommits(result)
-      setHasMore(result.length >= PAGE_SIZE)
-      setSkip(result.length)
-    } catch (err) {
-      const msg = typeof err === 'string' ? err : translate(locale, 'pulse.loadError')
-      setError(msg)
-    } finally {
-      setLoading(false)
-    }
-  }, [locale, vaultPath])
+  useInitialPulseLoad({ loadCommits: loadInitialCommits, locale, pageSize: PAGE_SIZE, refreshKey, retryCount, setCommits, setError, setHasMore, setLoading, setSkip })
 
   // Append next page
   const loadMore = useCallback(async () => {
@@ -508,11 +490,6 @@ export const PulseView = memo(function PulseView(options: PulseViewProps) {
       setLoadingMore(false)
     }
   }, [vaultPath, skip, loadingMore, hasMore])
-
-  useEffect(() => {
-    void refreshKey
-    loadInitial()
-  }, [loadInitial, refreshKey])
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -549,7 +526,7 @@ export const PulseView = memo(function PulseView(options: PulseViewProps) {
           error={error}
           locale={locale}
           onOpenNote={onOpenNote}
-          onRetry={loadInitial}
+          onRetry={retryLoad}
           sentinelRef={sentinelRef}
         />
       </div>

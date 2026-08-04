@@ -642,7 +642,7 @@ External vault mutations are any disk writes Tolaria did not just perform throug
 - **Generate commit message command**: Cmd+K action that opens the commit dialog, reloads the selected repository with line stats, and fills the message field. Direct configured model targets receive structured path/status/line-count metadata plus bounded diff excerpts; disabled AI, offline AI, agent targets, or model failures use a deterministic changed-file summary instead.
 - **Branch indicator**: Current Git branch chip in the bottom bar for Git-backed vaults
 - **No remote indicator**: Neutral chip in the bottom bar when `GitRemoteStatus.hasRemote === false`
-- **Pulse view**: Activity feed when Pulse filter is selected
+- **Pulse view**: Activity feed when Pulse filter is selected. `useInitialPulseLoad` owns cancellable initial, refresh-key, and retry loads so `PulseView` remains focused on pagination and presentation.
 - **Pull command**: Cmd+K → "Pull from Remote", also in Vault menu
 - **Git status popup**: Click sync badge → shows active branch, upstream/missing-upstream state, aggregate ahead/behind, and a Pull button when tracking is configured for the active repository set
 - **Conflict banner**: Inline banner in editor with Keep mine / Keep theirs for conflicted notes

@@ -311,11 +311,14 @@ function applyThemeModeSelection(value: ThemeMode): void {
 export function SettingsPanel(options: SettingsPanelProps) {
   const { open, settings, aiAgentsStatus = createMissingAiAgentsStatus(), initialSectionId = null, locale = 'en', systemLocale = locale, onSave, onCopyMcpConfig, vaults = [], defaultWorkspacePath = null, onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity, isGitVault = true, vaultPath = '', explicitOrganizationEnabled = true, onSaveExplicitOrganization, onClose } = options
   if (!open) return null
+  const initialDraft = createSettingsDraft(settings, explicitOrganizationEnabled)
 
   return (
     <SettingsPanelInner
+      key={JSON.stringify(initialDraft)}
       settings={settings}
       aiAgentsStatus={aiAgentsStatus}
+      initialDraft={initialDraft}
       initialSectionId={initialSectionId}
       locale={locale}
       systemLocale={systemLocale}
@@ -343,6 +346,7 @@ type SettingsPanelInnerProps = Omit<
   'open' | 'explicitOrganizationEnabled' | 'aiAgentsStatus' | 'isGitVault' | 'vaultPath'
 > & {
   aiAgentsStatus: AiAgentsStatus
+  initialDraft: SettingsDraft
   initialSectionId: string | null
   locale: AppLocale
   systemLocale: AppLocale
@@ -351,12 +355,9 @@ type SettingsPanelInnerProps = Omit<
   explicitOrganizationEnabled: boolean
 }
 
-function useSettingsDraftActions(options: Pick<SettingsPanelInnerProps, 'explicitOrganizationEnabled' | 'onClose' | 'onSave' | 'onSaveExplicitOrganization' | 'settings'>) {
-  const { explicitOrganizationEnabled, onClose, onSave, onSaveExplicitOrganization, settings } = options
-  const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled))
-  useEffect(() => {
-    setDraft(createSettingsDraft(settings, explicitOrganizationEnabled))
-  }, [explicitOrganizationEnabled, settings])
+function useSettingsDraftActions(options: Pick<SettingsPanelInnerProps, 'initialDraft' | 'onClose' | 'onSave' | 'onSaveExplicitOrganization' | 'settings'>) {
+  const { initialDraft, onClose, onSave, onSaveExplicitOrganization, settings } = options
+  const [draft, setDraft] = useState(initialDraft)
   const updateDraft = useCallback(<Key extends keyof SettingsDraft>(key: Key, value: SettingsDraft[Key]) => {
     setDraft((current) => ({ ...current, [key]: value }))
   }, [])
@@ -425,10 +426,10 @@ function useSettingsPanelInteractions(options: {
 }
 
 function SettingsPanelInner(options: SettingsPanelInnerProps) {
-  const { settings, aiAgentsStatus, initialSectionId, systemLocale, onSave, onCopyMcpConfig, vaults, defaultWorkspacePath, onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity, isGitVault, vaultPath, explicitOrganizationEnabled, onSaveExplicitOrganization, onClose } = options
+  const { settings, aiAgentsStatus, initialDraft, initialSectionId, systemLocale, onSave, onCopyMcpConfig, vaults, defaultWorkspacePath, onRemoveVault, onReorderVaults, onSetDefaultWorkspace, onUpdateWorkspaceIdentity, isGitVault, vaultPath, onSaveExplicitOrganization, onClose } = options
   const backdropRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const { draft, updateDraft, handleGitignoredVisibilityChange, handleAllNotesFileVisibilityChange, handleThemeModeChange, handleSave } = useSettingsDraftActions({ explicitOrganizationEnabled, onClose, onSave, onSaveExplicitOrganization, settings })
+  const { draft, updateDraft, handleGitignoredVisibilityChange, handleAllNotesFileVisibilityChange, handleThemeModeChange, handleSave } = useSettingsDraftActions({ initialDraft, onClose, onSave, onSaveExplicitOrganization, settings })
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
   const t = createTranslator(draftLocale)
   useSettingsPanelInteractions({ backdropRef, handleSave, initialSectionId, onClose, panelRef })

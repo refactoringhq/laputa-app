@@ -151,20 +151,22 @@ export function useSettings() {
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS)
   const [loaded, setLoaded] = useState(false)
 
-  const loadSettings = useCallback(async () => {
-    try {
-      const s = await tauriCall<Settings>('get_settings', {})
-      setSettings(normalizeSettings(s))
-    } catch (err) {
-      console.warn('Failed to load settings:', err)
-    } finally {
-      setLoaded(true)
+  useEffect(() => {
+    let active = true
+    void tauriCall<Settings>('get_settings', {})
+      .then((value) => {
+        if (active) setSettings(normalizeSettings(value))
+      })
+      .catch((error: unknown) => {
+        console.warn('Failed to load settings:', error)
+      })
+      .finally(() => {
+        if (active) setLoaded(true)
+      })
+    return () => {
+      active = false
     }
   }, [])
-
-  useEffect(() => {
-    loadSettings()
-  }, [loadSettings])
 
   const saveSettings = useCallback(async (newSettings: Settings) => {
     const previousHideGitignored = shouldHideGitignoredFiles(settings)

@@ -28,5 +28,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      'react-hooks/refs': 'error',
+      'react-hooks/set-state-in-effect': 'error',
+    },
   },
 ])

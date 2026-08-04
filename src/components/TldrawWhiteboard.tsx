@@ -67,6 +67,12 @@ interface ResizeStart {
 
 type ResizeMode = 'height' | 'width' | 'both'
 
+function resizeModeFromHandle(handle: HTMLButtonElement): ResizeMode {
+  const mode = handle.dataset.resizeMode
+  if (mode === 'height' || mode === 'width') return mode
+  return 'both'
+}
+
 const DEFAULT_HEIGHT = 520
 const MIN_HEIGHT = 260
 const MIN_WIDTH = 360
@@ -610,9 +616,10 @@ export function TldrawWhiteboard({
     }
   }, [boardId, store])
 
-  const startResize = (mode: ResizeMode) => (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
+    const mode = resizeModeFromHandle(event.currentTarget)
 
     const rect = boardRef.current?.getBoundingClientRect()
     const start: ResizeStart = {
@@ -692,19 +699,22 @@ export function TldrawWhiteboard({
         type="button"
         aria-label="Resize whiteboard width"
         className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--width border-0 bg-transparent p-0"
-        onPointerDown={startResize('width')}
+        data-resize-mode="width"
+        onPointerDown={startResize}
       />
       <button
         type="button"
         aria-label="Resize whiteboard height"
         className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--height border-0 bg-transparent p-0"
-        onPointerDown={startResize('height')}
+        data-resize-mode="height"
+        onPointerDown={startResize}
       />
       <button
         type="button"
         aria-label="Resize whiteboard"
         className="tldraw-whiteboard__resize-handle tldraw-whiteboard__resize-handle--corner border-0 bg-transparent p-0"
-        onPointerDown={startResize('both')}
+        data-resize-mode="both"
+        onPointerDown={startResize}
       />
     </div>
   )
