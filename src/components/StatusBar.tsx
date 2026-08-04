@@ -107,93 +107,14 @@ interface StatusBarFooterProps extends StatusBarProps {
 }
 
 function StatusBarPrimaryFromFooter(options: StatusBarFooterProps) {
-  const {
-    modifiedCount = 0,
-    vaultPath,
-    defaultWorkspacePath,
-    vaults,
-    multiWorkspaceEnabled,
-    onSwitchVault,
-    onSetDefaultWorkspace,
-    onOpenVaultSettings,
-    onOpenLocalFolder,
-    onCreateEmptyVault,
-    onCloneVault,
-    onCloneGettingStarted,
-    onClickPending,
-    onClickPulse,
-    onCommitPush,
-    commitActionPending = false,
-    gitFeaturesEnabled = true,
-    onInitializeGit,
-    isOffline = false,
-    isVaultReloading = false,
-    isGitVault = true,
-    syncStatus = 'idle',
-    lastSyncTime = null,
-    conflictCount = 0,
-    remoteStatus,
-    repositories,
-    selectedRepositoryPath,
-    onRepositoryChange,
-    onTriggerSync,
-    onPullAndPush,
-    onOpenConflictResolver,
-    buildNumber,
-    onCheckForUpdates,
-    onRemoveVault,
-    onReorderVaults,
-    onUpdateWorkspaceIdentity,
-    aiFeaturesEnabled = true,
-    mcpStatus,
-    onInstallMcp,
-    locale = 'en',
-    compact,
-    stacked,
-  } = options
   return (
     <StatusBarPrimarySection
-      modifiedCount={modifiedCount}
-      vaultPath={vaultPath}
-      defaultWorkspacePath={defaultWorkspacePath}
-      vaults={vaults}
-      multiWorkspaceEnabled={multiWorkspaceEnabled}
-      onSwitchVault={onSwitchVault}
-      onSetDefaultWorkspace={onSetDefaultWorkspace}
-      onOpenVaultSettings={onOpenVaultSettings}
-      onOpenLocalFolder={onOpenLocalFolder}
-      onCreateEmptyVault={onCreateEmptyVault}
-      onCloneVault={onCloneVault}
-      onCloneGettingStarted={onCloneGettingStarted}
-      onClickPending={onClickPending}
-      onClickPulse={onClickPulse}
-      onCommitPush={onCommitPush}
-      commitActionPending={commitActionPending}
-      gitFeaturesEnabled={gitFeaturesEnabled}
-      onInitializeGit={onInitializeGit}
-      isOffline={isOffline}
-      isVaultReloading={isVaultReloading}
-      isGitVault={isGitVault}
-      syncStatus={syncStatus}
-      lastSyncTime={lastSyncTime}
-      conflictCount={conflictCount}
-      remoteStatus={remoteStatus}
-      repositories={repositories}
-      selectedRepositoryPath={selectedRepositoryPath}
-      onRepositoryChange={onRepositoryChange}
-      onTriggerSync={onTriggerSync}
-      onPullAndPush={onPullAndPush}
-      onOpenConflictResolver={onOpenConflictResolver}
-      buildNumber={buildNumber}
-      onCheckForUpdates={onCheckForUpdates}
-      onRemoveVault={onRemoveVault}
-      onReorderVaults={onReorderVaults}
-      onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
-      mcpStatus={aiFeaturesEnabled ? mcpStatus : undefined}
-      onInstallMcp={onInstallMcp}
-      locale={locale}
-      stacked={stacked}
-      compact={compact}
+      {...options}
+      modifiedCount={options.modifiedCount ?? 0}
+      syncStatus={options.syncStatus ?? 'idle'}
+      lastSyncTime={options.lastSyncTime ?? null}
+      conflictCount={options.conflictCount ?? 0}
+      mcpStatus={options.aiFeaturesEnabled === false ? undefined : options.mcpStatus}
     />
   )
 }

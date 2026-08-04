@@ -197,10 +197,7 @@ function isStartupDefaultExportImportError(error: unknown): boolean {
     || message.includes("undefined is not an object (evaluating 'o.default')")
 }
 
-function showFatalRenderError(
-  error: unknown,
-  errorInfo: { componentStack?: string },
-): void {
+function fatalRenderOverlay(): HTMLElement {
   const existing = document.getElementById('tolaria-fatal-render-error')
   const overlay = existing ?? document.createElement('pre')
   overlay.id = 'tolaria-fatal-render-error'
@@ -217,12 +214,18 @@ function showFatalRenderError(
     'font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace',
     'white-space:pre-wrap',
   ].join(';')
+  return overlay
+}
 
-  const message = error instanceof Error ? error.stack ?? error.message : String(error)
+function showFatalRenderError(
+  error: unknown,
+  errorInfo: { componentStack?: string },
+): void {
+  const overlay = fatalRenderOverlay()
   overlay.textContent = [
     'Tolaria render error',
     '',
-    message,
+    errorText(error),
     '',
     errorInfo.componentStack ?? '',
   ].join('\n')
@@ -242,16 +245,19 @@ function captureReactRootError(
   reloadFrontendOnceIfStartupFailed()
 }
 
+function shouldIgnoreRecoverableRootError(error: unknown, componentStack: string): boolean {
+  if (isResizeObserverLoopError(error)) return true
+  if (isRecoveredBlockNoteRenderError(error, componentStack)) return true
+  if (isRecoverableBlockNoteRenderError(error) && !isBlockNoteRenderUpdateDepthError(error)) return true
+  return isRecoveredActionTooltipError(error, componentStack)
+}
+
 function captureRecoverableReactRootError(
   error: unknown,
   errorInfo: { componentStack?: string },
 ): void {
   const componentStack = errorInfo.componentStack ?? ''
-  if (isResizeObserverLoopError(error)) return
-  if (isRecoveredBlockNoteRenderError(error, componentStack)) return
-  if (isRecoverableBlockNoteRenderError(error) && !isBlockNoteRenderUpdateDepthError(error)) return
-  if (isRecoveredActionTooltipError(error, componentStack)) return
-
+  if (shouldIgnoreRecoverableRootError(error, componentStack)) return
   captureReactRootError(error, { componentStack })
 }
 

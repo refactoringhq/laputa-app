@@ -14,7 +14,6 @@ import type { FilterGroup, ViewDefinition } from '../types'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
 
 type SaveViewResult = boolean | undefined
-type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
 type InitialViewFormValues = Pick<ViewDefinition, 'name' | 'icon' | 'color' | 'filters'>
 
 interface CreateViewDialogProps {
@@ -138,13 +137,26 @@ function getInitialViewFormValues(
   editingView: ViewDefinition | null | undefined,
   availableFields: string[],
 ): InitialViewFormValues {
+  const defaultFilters = defaultViewFilters(availableFields)
+  if (editingView) return editingViewFormValues(editingView, defaultFilters)
   return {
-    name: editingView?.name ?? '',
-    icon: editingView?.icon ?? '',
-    color: editingView?.color ?? null,
-    filters: editingView?.filters ?? {
-      all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }],
-    },
+    name: '',
+    icon: '',
+    color: null,
+    filters: defaultFilters,
+  }
+}
+
+function defaultViewFilters(availableFields: string[]): FilterGroup {
+  return { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] }
+}
+
+function editingViewFormValues(editingView: ViewDefinition, defaultFilters: FilterGroup): InitialViewFormValues {
+  return {
+    name: editingView.name,
+    icon: editingView.icon ?? '',
+    color: editingView.color ?? null,
+    filters: editingView.filters ?? defaultFilters,
   }
 }
 
@@ -198,3 +210,5 @@ export function CreateViewDialog({
     </Dialog>
   )
 }
+
+type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>

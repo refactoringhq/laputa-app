@@ -51,7 +51,7 @@ function reconcileListUpdate(
   else onUpdate(key, newItems)
 }
 
-function deriveTypeInfo(entries: VaultEntry[] | undefined, entryIsA: string | null) {
+function collectTypeMetadata(entries: VaultEntry[] | undefined) {
   const typeEntries = (entries ?? []).filter(e => e.isA === 'Type')
   const availableTypes = new Set<string>()
   const typeColorKeys: Record<string, string | null> = {}
@@ -64,10 +64,17 @@ function deriveTypeInfo(entries: VaultEntry[] | undefined, entryIsA: string | nu
   }
   return {
     availableTypes: Array.from(availableTypes).sort((a, b) => a.localeCompare(b)),
-    customColorKey: entryIsA ? ((Reflect.get(typeColorKeys, entryIsA) as string | null | undefined) ?? null) : null,
     typeColorKeys,
     typeIconKeys,
   }
+}
+
+function deriveTypeInfo(entries: VaultEntry[] | undefined, entryIsA: string | null) {
+  const metadata = collectTypeMetadata(entries)
+  const customColorKey = entryIsA
+    ? ((Reflect.get(metadata.typeColorKeys, entryIsA) as string | null | undefined) ?? null)
+    : null
+  return { ...metadata, customColorKey }
 }
 
 function collectVaultStatuses(entries: VaultEntry[] | undefined): string[] {
@@ -127,6 +134,11 @@ function buildExistingFrontmatterKeys(frontmatter: ParsedFrontmatter): Set<strin
   return new Set(Object.keys(frontmatter).map(canonicalFrontmatterKey))
 }
 
+function shouldSkipTypeDerivedKey(key: string, existingKeys: ReadonlySet<string>, seen: ReadonlySet<string>): boolean {
+  const canonicalKey = canonicalFrontmatterKey(key)
+  return existingKeys.has(canonicalKey) || seen.has(canonicalKey) || isRelationshipSchemaKey(key)
+}
+
 function buildTypeDerivedPropertyEntries({
   entries,
   entryIsA,
@@ -145,7 +157,7 @@ function buildTypeDerivedPropertyEntries({
 
   for (const [key, value] of Object.entries(typeEntry.properties ?? {})) {
     const canonicalKey = canonicalFrontmatterKey(key)
-    if (existingKeys.has(canonicalKey) || seen.has(canonicalKey) || isRelationshipSchemaKey(key)) continue
+    if (shouldSkipTypeDerivedKey(key, existingKeys, seen)) continue
     const propertyValue = frontmatterValueFromVaultProperty(value)
     if (!isVisibleProperty([key, propertyValue])) continue
     seen.add(canonicalKey)

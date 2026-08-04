@@ -214,19 +214,22 @@ function findPrioritizedEntry(
   sourceWorkspaceAlias: string | null,
   matcher: EntryMatcher,
 ): VaultEntry | undefined {
-  if (resolutionKey.workspaceAlias) {
-    return findIndexedEntry(index.entriesByWorkspaceAlias.get(resolutionKey.workspaceAlias) ?? [], resolutionKey, matcher)
-  }
-  if (!sourceWorkspaceAlias) return findIndexedEntry(index.entries, resolutionKey, matcher)
+  return findIndexedEntry(
+    prioritizedEntries(index, resolutionKey.workspaceAlias, sourceWorkspaceAlias),
+    resolutionKey,
+    matcher,
+  )
+}
 
-  const workspaceMatch = findIndexedEntry(index.entriesByWorkspaceAlias.get(sourceWorkspaceAlias) ?? [], resolutionKey, matcher)
-  if (workspaceMatch) return workspaceMatch
-
-  for (const entry of index.entries) {
-    if (entry.workspaceAlias === sourceWorkspaceAlias) continue
-    if (matcher(entry, resolutionKey)) return entry.entry
-  }
-  return undefined
+function prioritizedEntries(
+  index: ResolutionIndex,
+  targetWorkspaceAlias: string | null,
+  sourceWorkspaceAlias: string | null,
+): IndexedResolutionEntry[] {
+  if (targetWorkspaceAlias) return index.entriesByWorkspaceAlias.get(targetWorkspaceAlias) ?? []
+  if (!sourceWorkspaceAlias) return index.entries
+  const localEntries = index.entriesByWorkspaceAlias.get(sourceWorkspaceAlias) ?? []
+  return localEntries.concat(index.entries.filter((entry) => entry.workspaceAlias !== sourceWorkspaceAlias))
 }
 
 function matchesPathSuffix(entry: IndexedResolutionEntry, resolutionKey: ResolutionKey): boolean {
@@ -260,15 +263,14 @@ function resolveEntryFromIndex(
   resolutionKey: ResolutionKey,
   sourceWorkspaceAlias: string | null,
 ): VaultEntry | undefined {
-  return (
-    (resolutionKey.pathSuffixes.length > 0
-      ? findPrioritizedEntry(index, resolutionKey, sourceWorkspaceAlias, matchesPathSuffix)
-      : undefined)
-    ?? findPrioritizedEntry(index, resolutionKey, sourceWorkspaceAlias, matchesFilename)
-    ?? findPrioritizedEntry(index, resolutionKey, sourceWorkspaceAlias, matchesAlias)
-    ?? findPrioritizedEntry(index, resolutionKey, sourceWorkspaceAlias, matchesTitle)
-    ?? findPrioritizedEntry(index, resolutionKey, sourceWorkspaceAlias, matchesHumanizedTitle)
-  )
+  const matchers = resolutionKey.pathSuffixes.length > 0
+    ? [matchesPathSuffix, matchesFilename, matchesAlias, matchesTitle, matchesHumanizedTitle]
+    : [matchesFilename, matchesAlias, matchesTitle, matchesHumanizedTitle]
+  for (const matcher of matchers) {
+    const entry = findPrioritizedEntry(index, resolutionKey, sourceWorkspaceAlias, matcher)
+    if (entry) return entry
+  }
+  return undefined
 }
 
 /**

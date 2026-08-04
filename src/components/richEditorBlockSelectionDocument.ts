@@ -94,32 +94,6 @@ export function insertedBlockIds(blocks: readonly unknown[]): string[] {
   return uniqueBlockIds(blocks.filter(isBlockLike).map((block) => block.id))
 }
 
-export function blockSelectionAfterArrow(
-  selectedBlockIds: readonly string[],
-  allBlockIds: readonly string[],
-  direction: BlockSelectionDirection,
-  extend: boolean,
-): string[] {
-  const selected = uniqueBlockIds(selectedBlockIds).filter((id) => allBlockIds.includes(id))
-  if (selected.length === 0) return allBlockIds[0] ? [allBlockIds[0]] : []
-
-  const firstIndex = allBlockIds.indexOf(selected[0])
-  const lastIndex = allBlockIds.indexOf(selected[selected.length - 1])
-  if (firstIndex < 0 || lastIndex < 0) return allBlockIds[0] ? [allBlockIds[0]] : []
-
-  if (extend) {
-    const nextFirstIndex = direction === 'up' ? Math.max(0, firstIndex - 1) : firstIndex
-    const nextLastIndex = direction === 'down' ? Math.min(allBlockIds.length - 1, lastIndex + 1) : lastIndex
-    return allBlockIds.slice(nextFirstIndex, nextLastIndex + 1)
-  }
-
-  const targetIndex = direction === 'up'
-    ? Math.max(0, firstIndex - 1)
-    : Math.min(allBlockIds.length - 1, lastIndex + 1)
-  const targetBlockId = allBlockIds.at(targetIndex)
-  return targetBlockId ? [targetBlockId] : selected
-}
-
 export function blockSelectionAfterDelete(
   selectedBlockIds: readonly string[],
   allBlockIds: readonly string[],
@@ -255,12 +229,25 @@ function movePlacementForSelection(
   }
 }
 
+function canMoveBlocks(editor: RichEditorBlockSelectionEditor): boolean {
+  return Boolean(editor.insertBlocks && editor.removeBlocks && editor.transact)
+}
+
+function isNoOpMove(
+  operationBlockIds: readonly string[],
+  selectedBlockIds: readonly string[],
+  placement: NonNullable<ReturnType<typeof movePlacementForSelection>>,
+): boolean {
+  return hasSameBlockIds(operationBlockIds, selectedBlockIds)
+    && hasSameBlockIds(placement.targetOperationBlockIds, [placement.targetBlockId])
+}
+
 export function moveSelectedDocumentBlocks(
   editor: RichEditorBlockSelectionEditor,
   selectedBlockIds: readonly string[],
   direction: BlockSelectionDirection,
 ): boolean {
-  if (!editor.insertBlocks || !editor.removeBlocks || !editor.transact) return false
+  if (!canMoveBlocks(editor)) return false
 
   const operationBlockIds = collapsedContentOperationBlockIds(editor, selectedBlockIds)
   const blocks = selectedDocumentBlocks(editor.document, operationBlockIds)
@@ -268,17 +255,65 @@ export function moveSelectedDocumentBlocks(
 
   const placement = movePlacementForSelection(editor, operationBlockIds, direction)
   if (!placement) return true
-  if (
-    hasSameBlockIds(operationBlockIds, selectedBlockIds)
-    && hasSameBlockIds(placement.targetOperationBlockIds, [placement.targetBlockId])
-  ) {
-    return false
-  }
+  if (isNoOpMove(operationBlockIds, selectedBlockIds, placement)) return false
 
-  editor.transact(() => {
+  editor.transact?.(() => {
     editor.removeBlocks?.(operationBlockIds)
     editor.insertBlocks?.(blocks, placement.referenceBlockId, placement.placement)
   })
   editor.focus?.()
   return true
+}
+
+interface SelectionBounds {
+  firstIndex: number
+  lastIndex: number
+}
+
+function selectionBounds(selected: readonly string[], allBlockIds: readonly string[]): SelectionBounds | null {
+  const firstIndex = allBlockIds.indexOf(selected[0])
+  const lastIndex = allBlockIds.indexOf(selected[selected.length - 1])
+  return firstIndex < 0 || lastIndex < 0 ? null : { firstIndex, lastIndex }
+}
+
+function extendedBlockSelection(
+  bounds: SelectionBounds,
+  allBlockIds: readonly string[],
+  direction: BlockSelectionDirection,
+): string[] {
+  const firstIndex = direction === 'up' ? Math.max(0, bounds.firstIndex - 1) : bounds.firstIndex
+  const lastIndex = direction === 'down' ? Math.min(allBlockIds.length - 1, bounds.lastIndex + 1) : bounds.lastIndex
+  return allBlockIds.slice(firstIndex, lastIndex + 1)
+}
+
+function movedBlockSelection(
+  selected: readonly string[],
+  bounds: SelectionBounds,
+  allBlockIds: readonly string[],
+  direction: BlockSelectionDirection,
+): string[] {
+  const targetIndex = direction === 'up'
+    ? Math.max(0, bounds.firstIndex - 1)
+    : Math.min(allBlockIds.length - 1, bounds.lastIndex + 1)
+  const targetBlockId = allBlockIds.at(targetIndex)
+  return targetBlockId ? [targetBlockId] : [...selected]
+}
+
+export function blockSelectionAfterArrow(
+  selectedBlockIds: readonly string[],
+  allBlockIds: readonly string[],
+  direction: BlockSelectionDirection,
+  extend: boolean,
+): string[] {
+  const selected = uniqueBlockIds(selectedBlockIds).filter((id) => allBlockIds.includes(id))
+  if (selected.length === 0) return fallbackBlockSelection(allBlockIds)
+  const bounds = selectionBounds(selected, allBlockIds)
+  if (!bounds) return fallbackBlockSelection(allBlockIds)
+  return extend
+    ? extendedBlockSelection(bounds, allBlockIds, direction)
+    : movedBlockSelection(selected, bounds, allBlockIds, direction)
+}
+
+function fallbackBlockSelection(allBlockIds: readonly string[]): string[] {
+  return allBlockIds[0] ? [allBlockIds[0]] : []
 }

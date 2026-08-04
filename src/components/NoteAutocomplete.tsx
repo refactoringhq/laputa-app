@@ -5,6 +5,7 @@ import {
   useMemo,
   useEffect,
   type ChangeEvent,
+  type CSSProperties,
   type ComponentType,
   type Dispatch,
   type KeyboardEvent,
@@ -22,6 +23,13 @@ import './WikilinkSuggestionMenu.css'
 
 const MIN_QUERY_LENGTH = 2
 const MAX_RESULTS = 10
+const NOTE_AUTOCOMPLETE_INPUT_STYLE: CSSProperties = {
+  borderRadius: 4,
+  outline: 'none',
+  minWidth: 0,
+  width: '100%',
+  boxSizing: 'border-box',
+}
 
 type AutocompleteKeyAction = 'next' | 'previous' | 'select' | 'close'
 
@@ -74,17 +82,26 @@ function buildMatchedEntry(
   typeEntryMap: Record<string, VaultEntry>,
   showWorkspace: boolean,
 ): MatchedEntry {
-  const isA = entry.isA
-  const typeEntry = Reflect.get(typeEntryMap, isA ?? '') as VaultEntry | undefined
-  const noteType = isA || undefined
   return {
     title: entry.title,
     noteIcon: entry.icon,
-    noteType,
-    typeColor: noteType ? getTypeColor(isA, typeEntry?.color) : undefined,
-    typeLightColor: noteType ? getTypeLightColor(isA, typeEntry?.color) : undefined,
-    TypeIcon: noteType ? getTypeIcon(isA, typeEntry?.icon) : undefined,
+    ...matchedEntryType(entry, typeEntryMap),
     workspace: showWorkspace ? (entry.workspace ?? null) : null,
+  }
+}
+
+function matchedEntryType(
+  entry: VaultEntry,
+  typeEntryMap: Record<string, VaultEntry>,
+): Pick<MatchedEntry, 'noteType' | 'typeColor' | 'typeLightColor' | 'TypeIcon'> {
+  const noteType = entry.isA || undefined
+  if (!noteType) return {}
+  const typeEntry = Reflect.get(typeEntryMap, noteType) as VaultEntry | undefined
+  return {
+    noteType,
+    typeColor: getTypeColor(noteType, typeEntry?.color),
+    typeLightColor: getTypeLightColor(noteType, typeEntry?.color),
+    TypeIcon: getTypeIcon(noteType, typeEntry?.icon),
   }
 }
 
@@ -361,13 +378,7 @@ export function NoteAutocomplete(options: NoteAutocompleteProps) {
         ref={inputRef}
         autoFocus={autoFocus}
         className="h-7 flex-1 rounded border border-border bg-transparent px-2 py-0.5 text-xs text-foreground shadow-none focus-visible:ring-1"
-        style={{
-          borderRadius: 4,
-          outline: 'none',
-          minWidth: 0,
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
+        style={NOTE_AUTOCOMPLETE_INPUT_STYLE}
         placeholder={placeholder}
         value={value}
         onChange={handleChange}

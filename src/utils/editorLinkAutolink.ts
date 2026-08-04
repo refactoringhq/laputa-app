@@ -56,11 +56,6 @@ function isDomainLikePath(value: LinkValue) {
   return firstPathSegment(value).includes('.')
 }
 
-function hostnameFromUrlLikeValue(value: LinkValue) {
-  const withoutUserinfo = value.raw.includes('@') ? value.raw.split('@').pop() ?? value.raw : value.raw
-  return withoutUserinfo.split(/[/?#:]/, 1)[0] ?? withoutUserinfo
-}
-
 function isExplicitWebUrl(value: LinkValue) {
   return isExplicitProtocolUrl(value) || startsWithWebHostPrefix(value)
 }
@@ -148,4 +143,9 @@ export function shouldStripAutoLinkedLocalFileMark(mark: LinkMarkCandidate) {
     stripProtocol(normalizeInput(mark.href)),
   )
   return normalizedHref.raw === normalizedText.raw
+}
+
+function hostnameFromUrlLikeValue(value: LinkValue) {
+  const withoutUserinfo = value.raw.includes('@') ? value.raw.split('@').pop() ?? value.raw : value.raw
+  return withoutUserinfo.split(/[/?#:]/, 1)[0] ?? withoutUserinfo
 }

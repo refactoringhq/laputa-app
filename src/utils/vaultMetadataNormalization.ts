@@ -81,12 +81,6 @@ function fallbackEntryFilename(source: UnknownRecord, index: number): string {
   return stringFrom(source.filename) || filenameFromPath(stringFrom(source.path)) || `untitled-${index + 1}.md`
 }
 
-function resolveEntryPath({ explicitPath, filename, vaultPath }: EntryPathArgs): string {
-  if (explicitPath) return explicitPath
-  const root = vaultPath.replace(/\/+$/, '')
-  return root ? `${root}/${filename}` : filename
-}
-
 function normalizeRelationships(value: unknown): Record<string, string[]> {
   const source = recordFrom(value)
   const result: Record<string, string[]> = {}
@@ -97,29 +91,21 @@ function normalizeRelationships(value: unknown): Record<string, string[]> {
   return result
 }
 
+function normalizePropertyScalar(value: unknown): string | number | boolean | null | undefined {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return undefined
+}
+
 function normalizeProperties(value: unknown): VaultEntry['properties'] {
   const source = recordFrom(value)
   const result: VaultEntry['properties'] = {}
   for (const [key, rawValue] of Object.entries(source)) {
-    if (Array.isArray(rawValue)) {
-      const values = rawValue.filter((item): item is string | number | boolean => (
-        typeof item === 'string'
-        || typeof item === 'boolean'
-        || (typeof item === 'number' && Number.isFinite(item))
-      ))
-      if (values.length === rawValue.length) {
-        Reflect.set(result, key, values.length === 1 ? values[0] : values)
-      }
-      continue
-    }
-    if (
-      rawValue === null
-      || typeof rawValue === 'string'
-      || typeof rawValue === 'boolean'
-      || (typeof rawValue === 'number' && Number.isFinite(rawValue))
-    ) {
-      Reflect.set(result, key, rawValue)
-    }
+    const normalized = Array.isArray(rawValue)
+      ? normalizePropertyArray(rawValue)
+      : normalizePropertyScalar(rawValue)
+    if (normalized === undefined) continue
+    Reflect.set(result, key, Array.isArray(normalized) && normalized.length === 1 ? normalized[0] : normalized)
   }
   return result
 }
@@ -260,4 +246,19 @@ export function normalizeVaultEntry(rawEntry: unknown, vaultPath = '', index = 0
 export function normalizeViewFiles(rawViews: unknown): ViewFile[] {
   if (!Array.isArray(rawViews)) return []
   return rawViews.map((rawView, index) => normalizeViewFile({ rawView, index }))
+}
+
+function resolveEntryPath({ explicitPath, filename, vaultPath }: EntryPathArgs): string {
+  if (explicitPath) return explicitPath
+  const root = vaultPath.replace(/\/+$/, '')
+  return root ? `${root}/${filename}` : filename
+}
+
+function normalizePropertyArray(values: unknown[]): Array<string | number | boolean> | undefined {
+  const normalized = values.filter((item): item is string | number | boolean => (
+    typeof item === 'string'
+    || typeof item === 'boolean'
+    || (typeof item === 'number' && Number.isFinite(item))
+  ))
+  return normalized.length === values.length ? normalized : undefined
 }

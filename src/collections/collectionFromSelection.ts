@@ -24,24 +24,12 @@ function identityPart(value: string | undefined): string {
   return value ?? ''
 }
 
-function selectedView(selection: SidebarSelection, views?: ViewFile[]): ViewFile | undefined {
-  return selection.kind === 'view'
-    ? views?.find((view) => viewMatchesSelection(view, selection))
-    : undefined
-}
-
 export function collectionFromSelection(
   selection: SidebarSelection,
   context: CollectionContext = {},
 ): CollectionDefinition {
   if (selection.kind === 'filter') {
-    return {
-      id: `builtin:${selection.filter}`,
-      label: BUILTIN_LABELS[selection.filter],
-      origin: 'builtin',
-      selection,
-      presentation: defaultListPresentation(),
-    }
+    return builtinCollection(selection)
   }
 
   if (selection.kind === 'sectionGroup') {
@@ -84,5 +72,21 @@ export function collectionFromSelection(
     presentation: view ? presentationFromViewDefinition(view.definition) : defaultListPresentation(),
     filter: view?.definition.filters,
     view,
+  }
+}
+
+function selectedView(selection: SidebarSelection, views?: ViewFile[]): ViewFile | undefined {
+  return selection.kind === 'view'
+    ? views?.find((view) => viewMatchesSelection(view, selection))
+    : undefined
+}
+
+function builtinCollection(selection: Extract<SidebarSelection, { kind: 'filter' }>): CollectionDefinition {
+  return {
+    id: `builtin:${selection.filter}`,
+    label: BUILTIN_LABELS[selection.filter],
+    origin: 'builtin',
+    selection,
+    presentation: defaultListPresentation(),
   }
 }

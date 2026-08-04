@@ -58,16 +58,6 @@ function propertyField(value: VaultPropertyValue): ResolvedField {
   return scalarField(value)
 }
 
-function resolveRelationshipField(entry: VaultEntry, lower: string): ResolvedField | null {
-  const relKey = findCaseInsensitiveKey(entry.relationships, lower)
-  return relKey ? arrayField(Reflect.get(entry.relationships, relKey) as string[], 'relationship') : null
-}
-
-function resolvePropertyField(entry: VaultEntry, lower: string): ResolvedField | null {
-  const propKey = findCaseInsensitiveKey(entry.properties, lower)
-  return propKey ? propertyField(Reflect.get(entry.properties, propKey) as VaultPropertyValue) : null
-}
-
 function resolveField(entry: VaultEntry, field: string): ResolvedField {
   const lower = field.toLowerCase()
   return BUILT_IN_FIELD_READERS.get(lower)?.(entry)
@@ -93,17 +83,15 @@ function usesRegex(cond: FilterCondition): boolean {
     && (cond.op === 'contains' || cond.op === 'not_contains' || cond.op === 'equals' || cond.op === 'not_equals')
 }
 
+function resolvedFieldIsEmpty(resolved: ReturnType<typeof resolveField>): boolean {
+  if (resolved.kind === 'array') return resolved.values.length === 0
+  return resolved.value == null || resolved.value === '' || resolved.value === false
+}
+
 function evaluateEmptyCondition(op: FilterCondition['op'], resolved: ReturnType<typeof resolveField>): boolean | null {
-  if (op === 'is_empty') {
-    if (resolved.kind === 'array') return resolved.values.length === 0
-    const s = resolved.value
-    return s == null || s === '' || s === false
-  }
-  if (op === 'is_not_empty') {
-    if (resolved.kind === 'array') return resolved.values.length > 0
-    const s = resolved.value
-    return s != null && s !== '' && s !== false
-  }
+  const isEmpty = resolvedFieldIsEmpty(resolved)
+  if (op === 'is_empty') return isEmpty
+  if (op === 'is_not_empty') return !isEmpty
   return null
 }
 
@@ -248,4 +236,14 @@ function evaluateCondition(cond: FilterCondition, entry: VaultEntry): boolean {
   }
 
   return evaluateScalarCondition({ cond, scalar: resolved.value, condVal, regex })
+}
+
+function resolveRelationshipField(entry: VaultEntry, lower: string): ResolvedField | null {
+  const relKey = findCaseInsensitiveKey(entry.relationships, lower)
+  return relKey ? arrayField(Reflect.get(entry.relationships, relKey) as string[], 'relationship') : null
+}
+
+function resolvePropertyField(entry: VaultEntry, lower: string): ResolvedField | null {
+  const propKey = findCaseInsensitiveKey(entry.properties, lower)
+  return propKey ? propertyField(Reflect.get(entry.properties, propKey) as VaultPropertyValue) : null
 }

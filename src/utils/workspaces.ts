@@ -107,11 +107,6 @@ export function workspaceLabelForEntry(entry: Pick<VaultEntry, 'workspace'>): st
   return entry.workspace?.label ?? null
 }
 
-export function workspaceDisplayPrefix(entry: Pick<VaultEntry, 'workspace'>): string | null {
-  const workspace = entry.workspace ?? null
-  return workspace ? `${workspace.label} / ` : null
-}
-
 export function mountedWorkspacePaths(vaults: VaultOption[]): string[] {
   return vaults
     .filter((vault) => vault.available !== false && vault.mounted !== false)
@@ -201,4 +196,9 @@ export function writableWorkspacePaths<T extends { path: string; available?: boo
     .filter(isWritableWorkspace)
     .map((workspace) => workspace.path)
     .filter(isNonBlankWorkspacePath)
+}
+
+export function workspaceDisplayPrefix(entry: Pick<VaultEntry, 'workspace'>): string | null {
+  const workspace = entry.workspace ?? null
+  return workspace ? `${workspace.label} / ` : null
 }

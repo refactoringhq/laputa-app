@@ -61,12 +61,20 @@ function isPlainTextInput(element: HTMLInputElement): boolean {
   return plainTextTypes.has(element.type)
 }
 
-function insertIntoTextControl(element: HTMLInputElement | HTMLTextAreaElement, text: string): boolean {
+function isWritableTextControl(element: HTMLInputElement | HTMLTextAreaElement): boolean {
   if (element.readOnly || element.disabled) return false
-  if (element instanceof HTMLInputElement && !isPlainTextInput(element)) return false
+  if (element instanceof HTMLTextAreaElement) return true
+  return isPlainTextInput(element)
+}
 
+function textControlSelection(element: HTMLInputElement | HTMLTextAreaElement): [number, number] {
   const start = element.selectionStart ?? element.value.length
-  const end = element.selectionEnd ?? start
+  return [start, element.selectionEnd ?? start]
+}
+
+function insertIntoTextControl(element: HTMLInputElement | HTMLTextAreaElement, text: string): boolean {
+  if (!isWritableTextControl(element)) return false
+  const [start, end] = textControlSelection(element)
   element.setRangeText(text, start, end, 'end')
   element.dispatchEvent(inputEvent(text))
   return true
@@ -91,17 +99,6 @@ function insertIntoContentEditable(element: HTMLElement, text: string): boolean 
   selection.addRange(range)
   element.dispatchEvent(inputEvent(text))
   return true
-}
-
-function insertIntoFocusedEditable(text: string, element: HTMLElement | null): PlainTextPasteSurface | null {
-  if (!element) return null
-  if (isCommandPaletteElement(element)) return null
-
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    return insertIntoTextControl(element, text) ? 'focused_input' : null
-  }
-
-  return insertIntoContentEditable(element, text) ? 'focused_contenteditable' : null
 }
 
 function isEditableHTMLElementForPlainTextPaste(element: HTMLElement | null): boolean {
@@ -194,4 +191,12 @@ async function readClipboardText(): Promise<string> {
 export async function requestPlainTextPaste(): Promise<boolean> {
   const text = await readClipboardText()
   return insertPlainTextFromClipboardText(text)
+}
+
+function insertIntoFocusedEditable(text: string, element: HTMLElement | null): PlainTextPasteSurface | null {
+  if (!element || isCommandPaletteElement(element)) return null
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    return insertIntoTextControl(element, text) ? 'focused_input' : null
+  }
+  return insertIntoContentEditable(element, text) ? 'focused_contenteditable' : null
 }

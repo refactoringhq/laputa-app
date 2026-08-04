@@ -83,35 +83,6 @@ function manualConfigText(
   return error ?? snippet ?? t('mcp.setup.manual.unavailable')
 }
 
-function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
-  const t = createTranslator(props.locale)
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="m-0 text-sm font-medium text-foreground">{props.title}</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={props.onCopy}
-          disabled={!props.onCopy || props.loading}
-          data-testid={props.copyTestId}
-        >
-          <Copy size={14} />
-          {props.copyLabel}
-        </Button>
-      </div>
-      <pre
-        className="max-h-48 overflow-auto rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
-        data-testid={props.snippetTestId}
-      >
-        {manualConfigText(props, t)}
-      </pre>
-    </div>
-  )
-}
-
 function McpSetupActions(options: McpSetupActionsProps) {
   const {
     buttonsDisabled,
@@ -255,5 +226,33 @@ export function McpSetupDialog(options: McpSetupDialogProps) {
         />
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ManualMcpConfigSection(props: ManualMcpConfigSectionProps) {
+  const t = createTranslator(props.locale)
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="m-0 text-sm font-medium text-foreground">{props.title}</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={props.onCopy}
+          disabled={!props.onCopy || props.loading}
+          data-testid={props.copyTestId}
+        >
+          <Copy size={14} />
+          {props.copyLabel}
+        </Button>
+      </div>
+      <pre
+        className="max-h-48 overflow-auto rounded-md border border-border bg-background px-3 py-3 font-mono text-xs leading-5 text-foreground"
+        data-testid={props.snippetTestId}
+      >
+        {manualConfigText(props, t)}
+      </pre>
+    </div>
   )
 }
