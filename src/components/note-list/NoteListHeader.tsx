@@ -297,31 +297,10 @@ function SearchRow({ search, isSearching, searchInputRef, locale, onSearchChange
 }
 
 export function NoteListHeader(options: NoteListHeaderProps) {
-  const {
-    title,
-    typeDocument,
-    isEntityView,
-    isChangesView = false,
-    listSort,
-    listDirection,
-    customProperties,
-    sidebarCollapsed,
-    searchVisible,
-    search,
-    isSearching,
-    searchInputRef,
-    propertyPicker,
-    gitRepositories = [],
-    selectedGitRepositoryPath = '',
-    locale = 'en',
-    onSortChange,
-    onCreateNote,
-    onOpenType,
-    onToggleSearch,
-    onSearchChange,
-    onSearchKeyDown,
-    onGitRepositoryChange,
-} = options
+  const { title, typeDocument, isEntityView, isChangesView = false, listSort, listDirection, customProperties } = options
+  const { sidebarCollapsed, searchVisible, search, isSearching, searchInputRef, propertyPicker } = options
+  const { gitRepositories = [], selectedGitRepositoryPath = '', locale = 'en' } = options
+  const { onSortChange, onCreateNote, onOpenType, onToggleSearch, onSearchChange, onSearchKeyDown, onGitRepositoryChange } = options
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapsedSidebarPadding = sidebarCollapsed && isMac()
     ? `var(--tolaria-macos-traffic-light-padding, ${MACOS_TRAFFIC_LIGHT_SAFE_PADDING}px)`

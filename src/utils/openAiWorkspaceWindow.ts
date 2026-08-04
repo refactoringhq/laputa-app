@@ -278,37 +278,48 @@ export async function closePreloadedAiWorkspaceWindow(): Promise<void> {
   if (!visible) await closeWindow(existingWindow)
 }
 
+async function revealAiWorkspaceContext(
+  existingWindow: ExistingAiWorkspaceWindow,
+  context: AiWorkspaceWindowContext,
+): Promise<boolean> {
+  const visible = await revealAiWorkspaceWindow(existingWindow).catch(() => false)
+  if (!visible) return false
+  await emitAiWorkspaceContext(context)
+  return true
+}
+
+type ExistingWindowResult = 'closed' | 'revealed' | 'retry'
+
+async function reuseExistingAiWorkspaceWindow(
+  existingWindow: ExistingAiWorkspaceWindow,
+  context: AiWorkspaceWindowContext,
+): Promise<ExistingWindowResult> {
+  const visible = await visibleWindowState(existingWindow)
+  if (!preloadedContextKey && !visible) {
+    await closeWindow(existingWindow)
+    return 'closed'
+  }
+  if (preloadedContextKey && preloadedContextKey !== aiWorkspaceContextKey(context)) {
+    preloadedContextKey = null
+    await closeWindow(existingWindow)
+    return 'closed'
+  }
+
+  preloadedContextKey = null
+  if (await revealAiWorkspaceContext(existingWindow, context)) return 'revealed'
+  return 'retry'
+}
+
 export async function openAiWorkspaceWindow(context: AiWorkspaceWindowContext = {}): Promise<boolean> {
   if (!isTauri()) return false
 
   const existingWindow = await getExistingAiWorkspaceWindow()
-  let staleExistingWindowClosed = false
-  if (existingWindow) {
-    const visible = await visibleWindowState(existingWindow)
-    if (!preloadedContextKey && !visible) {
-      await closeWindow(existingWindow)
-      staleExistingWindowClosed = true
-    } else if (preloadedContextKey && preloadedContextKey !== aiWorkspaceContextKey(context)) {
-      preloadedContextKey = null
-      await closeWindow(existingWindow)
-      staleExistingWindowClosed = true
-    } else {
-      preloadedContextKey = null
-      const existingWindowIsVisible = await revealAiWorkspaceWindow(existingWindow).catch(() => false)
-      if (existingWindowIsVisible) {
-        await emitAiWorkspaceContext(context)
-        return true
-      }
-    }
-  }
+  const existingResult = existingWindow ? await reuseExistingAiWorkspaceWindow(existingWindow, context) : 'retry'
+  if (existingResult === 'revealed') return true
 
-  const currentWindow = staleExistingWindowClosed ? null : await getExistingAiWorkspaceWindow()
+  const currentWindow = existingResult === 'closed' ? null : await getExistingAiWorkspaceWindow()
   if (currentWindow) {
-    const existingWindowIsVisible = await revealAiWorkspaceWindow(currentWindow).catch(() => false)
-    if (existingWindowIsVisible) {
-      await emitAiWorkspaceContext(context)
-      return true
-    }
+    if (await revealAiWorkspaceContext(currentWindow, context)) return true
     await closeWindow(currentWindow)
   }
 

@@ -351,16 +351,8 @@ function useClipboardEventHandlers(options: Pick<UseSheetClipboardActionsOptions
 }
 
 export function useSheetClipboardActions(options: UseSheetClipboardActionsOptions) {
-  const {
-    refreshWorkbook,
-    scheduleSelectionChromePatch,
-    scheduleSerialize,
-    setFormulaAutocomplete,
-    setSheetContextMenu,
-    setWikilinkAutocomplete,
-    workbookRef,
-    writeCellInputAt,
-} = options
+  const { refreshWorkbook, scheduleSelectionChromePatch, scheduleSerialize, setFormulaAutocomplete } = options
+  const { setSheetContextMenu, setWikilinkAutocomplete, workbookRef, writeCellInputAt } = options
   const pasteJobRef = useRef(0)
   const pasteIdleRef = useRef<IdleHandle | null>(null)
 

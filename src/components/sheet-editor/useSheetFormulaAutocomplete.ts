@@ -78,6 +78,28 @@ function useFormulaSuggestion({
   }, [formulaAutocomplete, formulaInputRef, scheduleSerialize, setFormulaAutocomplete, workbookRef])
 }
 
+type FormulaAutocompleteAction = NonNullable<ReturnType<typeof autocompleteKeyAction>>
+type ActiveFormulaAutocomplete = NonNullable<UseSheetInlineAutocompletesOptions['formulaAutocomplete']>
+
+function runFormulaAutocompleteAction(
+  action: FormulaAutocompleteAction,
+  eventKey: string,
+  formulaAutocomplete: ActiveFormulaAutocomplete,
+  setFormulaAutocomplete: UseSheetInlineAutocompletesOptions['setFormulaAutocomplete'],
+  applyAutocompleteSuggestion: (suggestion: SheetFormulaSuggestion) => void,
+) {
+  if (action === 'move') {
+    moveAutocompleteSelection(setFormulaAutocomplete, eventKey, (state) => state.suggestions.length)
+    return
+  }
+  if (action === 'apply') {
+    const suggestion = formulaAutocomplete.suggestions[formulaAutocomplete.selectedIndex]
+    if (suggestion) applyAutocompleteSuggestion(suggestion)
+    return
+  }
+  setFormulaAutocomplete(null)
+}
+
 function useFormulaKeys(
   options: UseSheetInlineAutocompletesOptions,
   applyAutocompleteSuggestion: (suggestion: SheetFormulaSuggestion) => void,
@@ -94,14 +116,7 @@ function useFormulaKeys(
     if (!action) return
 
     stopAutocompleteKey(event)
-    if (action === 'move') {
-      moveAutocompleteSelection(setFormulaAutocomplete, event.key, (state) => state.suggestions.length)
-    } else if (action === 'apply') {
-      const suggestion = formulaAutocomplete.suggestions[formulaAutocomplete.selectedIndex]
-      if (suggestion) applyAutocompleteSuggestion(suggestion)
-    } else {
-      setFormulaAutocomplete(null)
-    }
+    runFormulaAutocompleteAction(action, event.key, formulaAutocomplete, setFormulaAutocomplete, applyAutocompleteSuggestion)
   }, [applyAutocompleteSuggestion, formulaAutocomplete, formulaInputRef, setFormulaAutocomplete, sheetElementRef])
 }
 

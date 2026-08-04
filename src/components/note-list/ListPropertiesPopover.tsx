@@ -275,6 +275,10 @@ function handleEscapeKey(event: KeyboardEvent<HTMLInputElement | HTMLDivElement>
   closePopover()
 }
 
+function selectedPropertiesSet(currentDisplay: string[], availableProperties: string[]) {
+  return new Set(getSelectedProperties(currentDisplay, availableProperties))
+}
+
 function useListPropertiesPopoverState({
   scope,
   availableProperties,
@@ -295,10 +299,7 @@ function useListPropertiesPopoverState({
     [availableProperties, currentDisplay],
   )
   const filteredItems = useMemo(() => filterOrderedItems(orderedItems, query), [orderedItems, query])
-  const selectedSet = useMemo(
-    () => new Set(getSelectedProperties(currentDisplay, availableProperties)),
-    [availableProperties, currentDisplay],
-  )
+  const selectedSet = useMemo(() => selectedPropertiesSet(currentDisplay, availableProperties), [availableProperties, currentDisplay])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
@@ -333,16 +334,13 @@ function useListPropertiesPopoverState({
     [availableProperties, currentDisplay, onSave],
   )
 
-  const handleSearchKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>) => {
-      handleEscapeKey(event, closePopover)
-    },
-    [closePopover],
-  )
+  const handleSearchKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
+    handleEscapeKey(event, closePopover)
+  }, [closePopover])
 
   const handlePanelKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-    handleEscapeKey(event, closePopover)
+      handleEscapeKey(event, closePopover)
     },
     [closePopover],
   )
@@ -369,38 +367,11 @@ function useListPropertiesPopoverState({
   }
 }
 
-export function ListPropertiesPopover({
-  scope,
-  availableProperties,
-  currentDisplay,
-  onSave,
-  triggerTitle,
-  triggerClassName,
-  locale = 'en',
-}: ListPropertiesPopoverProps) {
-  const {
-    open,
-    query,
-    inputRef,
-    listboxId,
-    filteredItems,
-    selectedSet,
-    sensors,
-    setQuery,
-    handleSearchKeyDown,
-    handlePanelKeyDown,
-    handleDragEnd,
-    handleOpenChange,
-    handleToggle,
-  } = useListPropertiesPopoverState({
-    scope,
-    availableProperties,
-    currentDisplay,
-    onSave,
-  })
+export function ListPropertiesPopover({ scope, availableProperties, currentDisplay, onSave, triggerTitle, triggerClassName, locale = 'en' }: ListPropertiesPopoverProps) {
+  const state = useListPropertiesPopoverState({ scope, availableProperties, currentDisplay, onSave })
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={state.open} onOpenChange={state.handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -415,19 +386,19 @@ export function ListPropertiesPopover({
       </Button>
       </PopoverTrigger>
       <ListPropertiesPopoverPanel
-        inputRef={inputRef}
-        query={query}
-        open={open}
-        listboxId={listboxId}
-        filteredItems={filteredItems}
-        selectedSet={selectedSet}
-        sensors={sensors}
+        inputRef={state.inputRef}
+        query={state.query}
+        open={state.open}
+        listboxId={state.listboxId}
+        filteredItems={state.filteredItems}
+        selectedSet={state.selectedSet}
+        sensors={state.sensors}
         locale={locale}
-        onQueryChange={setQuery}
-        onSearchKeyDown={handleSearchKeyDown}
-        onPanelKeyDown={handlePanelKeyDown}
-        onDragEnd={handleDragEnd}
-        onToggle={handleToggle}
+        onQueryChange={state.setQuery}
+        onSearchKeyDown={state.handleSearchKeyDown}
+        onPanelKeyDown={state.handlePanelKeyDown}
+        onDragEnd={state.handleDragEnd}
+        onToggle={state.handleToggle}
       />
     </Popover>
   )

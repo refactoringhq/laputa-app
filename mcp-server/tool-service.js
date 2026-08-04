@@ -220,15 +220,13 @@ function yamlScalar(value) {
   return JSON.stringify(value)
 }
 
+function trimmedString(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 function fallbackCreateNoteContent(args = {}) {
-  const title = typeof args.title === 'string' && args.title.trim()
-    ? args.title.trim()
-    : path.basename(notePathArg(args), '.md')
-  const type = typeof args.type === 'string' && args.type.trim()
-    ? args.type.trim()
-    : typeof args.is_a === 'string' && args.is_a.trim()
-      ? args.is_a.trim()
-      : 'Note'
+  const title = trimmedString(args.title) || path.basename(notePathArg(args), '.md')
+  const type = trimmedString(args.type) || trimmedString(args.is_a) || 'Note'
   return `---\ntype: ${yamlScalar(type)}\n---\n\n# ${title}\n`
 }
 

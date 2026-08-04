@@ -25,6 +25,17 @@ function FrontmatterWarningsButton({ locale, onOpenRawEditor }: { locale: AppLoc
   )
 }
 
+function propertiesIcon(testId?: string) {
+  return (
+    <GearSix
+      size={16}
+      weight="regular"
+      className="shrink-0 text-muted-foreground"
+      data-testid={testId}
+    />
+  )
+}
+
 export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en', onToggle, onOpenRawEditor }: {
   collapsed: boolean
   frontmatterWarnings?: FrontmatterWarnings
@@ -35,14 +46,6 @@ export function InspectorHeader({ collapsed, frontmatterWarnings, locale = 'en',
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const propertiesTitle = translate(locale, 'inspector.title.properties')
   const showWarnings = Boolean(frontmatterWarnings && hasFrontmatterWarnings(frontmatterWarnings) && onOpenRawEditor)
-  const propertiesIcon = (testId?: string) => (
-    <GearSix
-      size={16}
-      weight="regular"
-      className="shrink-0 text-muted-foreground"
-      data-testid={testId}
-    />
-  )
   const toggleLabel = translate(locale, collapsed ? 'inspector.title.propertiesShortcut' : 'inspector.title.closePropertiesShortcut')
 
   return (

@@ -387,15 +387,7 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
   const { contentsByPath, dependencies, dependencyCount } = useExternalSheetContents(options)
   const { hasExternalFormulaReferences, hasExternalFrontmatterReferences, hasExternalLineReferences, nativeWorkerEnabled } =
     useExternalFormulaReferenceState(content, dependencies)
-  const nativeSignature = useMemo(
-    () =>
-      sheetExternalFormulaWorkerSignature({
-    content,
-    dependencies,
-    path,
-      }),
-    [content, dependencies, path],
-  )
+  const nativeSignature = useMemo(() => sheetExternalFormulaWorkerSignature({ content, dependencies, path }), [content, dependencies, path])
   const nativeResolution = useNativeExternalFormulaResolution({
     ...options,
     dependencies,
@@ -404,16 +396,7 @@ export function useSheetExternalFormulaResolution(options: UseSheetExternalFormu
     hasExternalLineReferences,
     nativeSignature,
   })
-  const externalFormulaContext = useMemo(
-    () =>
-      sheetExternalFormulaContext({
-    contentsByPath,
-    currentPath: path,
-    entries,
-    sourceEntry,
-      }),
-    [contentsByPath, entries, path, sourceEntry],
-  )
+  const externalFormulaContext = useMemo(() => sheetExternalFormulaContext({ contentsByPath, currentPath: path, entries, sourceEntry }), [contentsByPath, entries, path, sourceEntry])
   const nativeExternalFormulaInputsForBuild = resolvedNativeInputsForBuild(nativeResolution, nativeSignature)
   const shouldUseJsResolver = shouldUseJsExternalFormulaResolver({
     hasExternalFormulaReferences,

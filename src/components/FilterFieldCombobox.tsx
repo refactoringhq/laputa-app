@@ -270,6 +270,19 @@ function FilterFieldPopoverPanel(functionOptions: {
   )
 }
 
+function currentValueHighlightIndex(fields: FilterFieldName[], value: FilterFieldName) {
+  return initialHighlightIndex({
+    options: flattenGroups(buildFieldGroups({ fields, currentValue: value, query: '' })),
+    currentValue: value,
+  })
+}
+
+function filterFieldOptions(fields: FilterFieldName[], value: FilterFieldName, query: string, hasTyped: boolean) {
+  const effectiveQuery = hasTyped ? query : ''
+  const fieldGroups = buildFieldGroups({ fields, currentValue: value, query: effectiveQuery })
+  return { fieldGroups, options: flattenGroups(fieldGroups) }
+}
+
 export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComboboxProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState(value)
@@ -279,22 +292,12 @@ export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComb
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listboxId = useId()
-  const effectiveQuery = hasTyped ? query : ''
-  const fieldGroups = useMemo(
-    () => buildFieldGroups({ fields, currentValue: value, query: effectiveQuery }),
-    [fields, value, effectiveQuery],
-  )
-  const options = useMemo(() => flattenGroups(fieldGroups), [fieldGroups])
+  const { fieldGroups, options } = useMemo(() => filterFieldOptions(fields, value, query, hasTyped), [fields, value, query, hasTyped])
 
   const resetToCurrentValue = useCallback(() => {
     setQuery(value)
     setHasTyped(false)
-    setHighlightedIndex(
-      initialHighlightIndex({
-        options: flattenGroups(buildFieldGroups({ fields, currentValue: value, query: '' })),
-        currentValue: value,
-      }),
-    )
+    setHighlightedIndex(currentValueHighlightIndex(fields, value))
   }, [fields, value])
 
   const openCombobox = useCallback(() => {

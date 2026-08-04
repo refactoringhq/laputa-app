@@ -87,15 +87,27 @@ function refreshVaultTool(args) {
   return { ok: true }
 }
 
+function searchNotesTool(args) {
+  return toolService.searchNotes(args)
+}
+
+function vaultContextTool(args) {
+  return toolService.vaultContext(args)
+}
+
+function listVaultsTool() {
+  return toolService.listVaults()
+}
+
 const TOOL_EXECUTORS = [
   ['open_note', readNoteTool],
   ['read_note', readNoteTool],
   ['create_note', createNoteTool],
   ['update_note', updateNoteTool],
   ['append_to_note', appendToNoteTool],
-  ['search_notes', (args) => toolService.searchNotes(args)],
-  ['vault_context', (args) => toolService.vaultContext(args)],
-  ['list_vaults', () => toolService.listVaults()],
+  ['search_notes', searchNotesTool],
+  ['vault_context', vaultContextTool],
+  ['list_vaults', listVaultsTool],
   ['ui_open_note', uiOpenNoteTool],
   ['ui_open_tab', uiOpenTabTool],
   ['ui_highlight', highlightTool],
@@ -105,8 +117,9 @@ const TOOL_EXECUTORS = [
 ]
 
 function callToolHandler(tool, args) {
-  const executor = TOOL_EXECUTORS.find(([name]) => name === tool)?.[1]
-  return executor ? executor(args) : UNKNOWN_TOOL
+  const match = TOOL_EXECUTORS.find(([name]) => name === tool)
+  if (!match) return UNKNOWN_TOOL
+  return match[1](args)
 }
 
 async function handleMessage(data) {

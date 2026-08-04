@@ -170,15 +170,7 @@ function useAiPanelActions({
 export function useAiPanelController(options: UseAiPanelControllerArgs): AiPanelController {
   const { vaultPath, vaultPaths, defaultAiAgent, defaultAiTarget, defaultAiAgentReady, defaultAiAgentReadiness, activeEntry, activeNoteContent, entries, openTabs, noteList, noteListFilter, locale = 'en', model, onOpenNote, onFileCreated, onFileModified, onVaultChanged, sessionId } = options
   const [input, setInput] = useState('')
-  const { linkedEntries, contextPrompt } = useAiPanelContextSnapshot({
-    activeEntry,
-    activeNoteContent,
-    entries,
-    input,
-    openTabs,
-    noteList,
-    noteListFilter,
-  })
+  const { linkedEntries, contextPrompt } = useAiPanelContextSnapshot({ activeEntry, activeNoteContent, entries, input, openTabs, noteList, noteListFilter })
 
   const { agent, permissionMode } = usePanelAgent({
     vaultPath,
