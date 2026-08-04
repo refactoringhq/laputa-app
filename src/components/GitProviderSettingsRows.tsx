@@ -102,6 +102,120 @@ function providerResultMessage(result: GitProviderProbe | null, t: Translate): s
   return t('settings.git.providerTestFailed', { message: result.message })
 }
 
+async function testSelectedProvider(
+  provider: GitProviderId,
+  distro: string | null,
+  t: Translate,
+) {
+  try {
+    return await invokeGitProviderCommand<GitProviderProbe>('test_git_provider', {
+      provider,
+      distro: provider === 'wsl' ? distro : null,
+      vaultPath: null,
+    })
+  } catch (error) {
+    return {
+      provider,
+      label: provider === 'wsl' ? t('settings.git.providerWsl') : t('settings.git.providerNative'),
+      available: false,
+      version: null,
+      distro: provider === 'wsl' ? distro : null,
+      path: null,
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+interface GitProviderSelectionRowsProps {
+  distroOptions: Array<{ label: string; value: string }>
+  gitProvider: GitProviderId
+  gitWslDistro: string | null
+  onDistroChange: (value: string) => void
+  onProviderChange: (value: string) => void
+  t: Translate
+}
+
+function GitProviderSelectionRows({
+  distroOptions,
+  gitProvider,
+  gitWslDistro,
+  onDistroChange,
+  onProviderChange,
+  t,
+}: GitProviderSelectionRowsProps) {
+  return (
+    <>
+      <SettingsRow label={t('settings.git.provider')} description={t('settings.git.providerDescription')} controlWidth="default" testId="settings-git-provider-row">
+        <SelectControl value={gitProvider} onValueChange={onProviderChange} options={providerOptions(t)} testId="settings-git-provider" ariaLabel={t('settings.git.provider')} />
+      </SettingsRow>
+      {gitProvider === 'wsl' ? (
+        <SettingsRow label={t('settings.git.wslDistro')} description={t('settings.git.wslDistroDescription')} controlWidth="wide" testId="settings-git-wsl-distro-row">
+          <SelectControl value={gitWslDistro ?? DEFAULT_WSL_DISTRO_VALUE} onValueChange={onDistroChange} options={distroOptions} testId="settings-git-wsl-distro" ariaLabel={t('settings.git.wslDistro')} />
+        </SettingsRow>
+      ) : null}
+    </>
+  )
+}
+
+function loadGitProviderStatus(setStatus: (status: GitProviderStatus) => void) {
+  let cancelled = false
+  invokeGitProviderCommand<GitProviderStatus>('git_provider_status', {})
+    .then((status) => {
+      if (!cancelled) setStatus(status)
+    })
+    .catch(() => {
+      if (!cancelled) setStatus(DEFAULT_PROVIDER_STATUS)
+    })
+  return () => {
+    cancelled = true
+  }
+}
+
+function selectDefaultWslDistro(
+  provider: GitProviderId,
+  distro: string | null,
+  status: GitProviderStatus,
+  setDistro: (value: string | null) => void,
+) {
+  if (provider !== 'wsl' || distro) return
+  const availableDistro = firstAvailableWslDistro(status)
+  if (availableDistro) setDistro(availableDistro)
+}
+
+interface ChangeGitProviderOptions {
+  clearResult: () => void
+  currentProvider: GitProviderId
+  setDistro: (value: string | null) => void
+  setProvider: (value: GitProviderId) => void
+  value: string
+}
+
+function changeGitProvider({
+  clearResult,
+  currentProvider,
+  setDistro,
+  setProvider,
+  value,
+}: ChangeGitProviderOptions) {
+  const nextProvider: GitProviderId = value === 'wsl' ? 'wsl' : 'native'
+  if (nextProvider !== currentProvider) trackGitProviderChanged(nextProvider)
+  setProvider(nextProvider)
+  clearResult()
+  if (nextProvider === 'native') setDistro(null)
+}
+
+function changeWslDistro(
+  value: string,
+  currentDistro: string | null,
+  setDistro: (value: string | null) => void,
+  clearResult: () => void,
+) {
+  const nextDistro = value === DEFAULT_WSL_DISTRO_VALUE ? null : value
+  if (nextDistro !== currentDistro) trackGitWslDistroChanged(nextDistro !== null)
+  clearResult()
+  setDistro(nextDistro)
+}
+
 export function GitProviderSettingsRows({
   gitProvider,
   gitWslDistro,
@@ -118,102 +232,47 @@ export function GitProviderSettingsRows({
     t,
   }), [gitWslDistro, providerStatus, t])
   const providerTestMessage = providerResultMessage(providerTestResult, t)
+  const clearProviderTestResult = () => setProviderTestResult(null)
+
+  useEffect(() => loadGitProviderStatus(setProviderStatus), [])
 
   useEffect(() => {
-    let cancelled = false
-    invokeGitProviderCommand<GitProviderStatus>('git_provider_status', {})
-      .then((status) => {
-        if (!cancelled) setProviderStatus(status)
-      })
-      .catch(() => {
-        if (!cancelled) setProviderStatus(DEFAULT_PROVIDER_STATUS)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (gitProvider !== 'wsl' || gitWslDistro) return
-    const distro = firstAvailableWslDistro(providerStatus)
-    if (distro) setGitWslDistro(distro)
+    selectDefaultWslDistro(gitProvider, gitWslDistro, providerStatus, setGitWslDistro)
   }, [gitProvider, gitWslDistro, providerStatus, setGitWslDistro])
 
   const handleProviderChange = (value: string) => {
-    const nextProvider: GitProviderId = value === 'wsl' ? 'wsl' : 'native'
-    if (nextProvider !== gitProvider) trackGitProviderChanged(nextProvider)
-    setGitProvider(nextProvider)
-    setProviderTestResult(null)
-    if (nextProvider === 'native') setGitWslDistro(null)
+    changeGitProvider({
+      clearResult: clearProviderTestResult,
+      currentProvider: gitProvider,
+      setDistro: setGitWslDistro,
+      setProvider: setGitProvider,
+      value,
+    })
   }
 
   const handleDistroChange = (value: string) => {
-    const nextDistro = value === DEFAULT_WSL_DISTRO_VALUE ? null : value
-    if (nextDistro !== gitWslDistro) trackGitWslDistroChanged(nextDistro !== null)
-    setProviderTestResult(null)
-    setGitWslDistro(nextDistro)
+    changeWslDistro(value, gitWslDistro, setGitWslDistro, clearProviderTestResult)
   }
 
   const handleTestProvider = async () => {
     setTestingProvider(true)
     setProviderTestResult(null)
-    try {
-      const result = await invokeGitProviderCommand<GitProviderProbe>('test_git_provider', {
-        provider: gitProvider,
-        distro: gitProvider === 'wsl' ? gitWslDistro : null,
-        vaultPath: null,
-      })
-      setProviderTestResult(result)
-      trackGitProviderTested(gitProvider, result.available)
-    } catch (error) {
-      setProviderTestResult({
-        provider: gitProvider,
-        label: gitProvider === 'wsl' ? t('settings.git.providerWsl') : t('settings.git.providerNative'),
-        available: false,
-        version: null,
-        distro: gitProvider === 'wsl' ? gitWslDistro : null,
-        path: null,
-        message: error instanceof Error ? error.message : String(error),
-      })
-      trackGitProviderTested(gitProvider, false)
-    } finally {
-      setTestingProvider(false)
-    }
+    const result = await testSelectedProvider(gitProvider, gitWslDistro, t)
+    setProviderTestResult(result)
+    trackGitProviderTested(gitProvider, result.available)
+    setTestingProvider(false)
   }
 
   return (
     <>
-      <SettingsRow
-        label={t('settings.git.provider')}
-        description={t('settings.git.providerDescription')}
-        controlWidth="default"
-        testId="settings-git-provider-row"
-      >
-        <SelectControl
-          value={gitProvider}
-          onValueChange={handleProviderChange}
-          options={providerOptions(t)}
-          testId="settings-git-provider"
-          ariaLabel={t('settings.git.provider')}
-        />
-      </SettingsRow>
-
-      {gitProvider === 'wsl' ? (
-        <SettingsRow
-          label={t('settings.git.wslDistro')}
-          description={t('settings.git.wslDistroDescription')}
-          controlWidth="wide"
-          testId="settings-git-wsl-distro-row"
-        >
-          <SelectControl
-            value={gitWslDistro ?? DEFAULT_WSL_DISTRO_VALUE}
-            onValueChange={handleDistroChange}
-            options={distroOptions}
-            testId="settings-git-wsl-distro"
-            ariaLabel={t('settings.git.wslDistro')}
-          />
-        </SettingsRow>
-      ) : null}
+      <GitProviderSelectionRows
+        distroOptions={distroOptions}
+        gitProvider={gitProvider}
+        gitWslDistro={gitWslDistro}
+        onDistroChange={handleDistroChange}
+        onProviderChange={handleProviderChange}
+        t={t}
+      />
 
       <SettingsRow
         label={t('settings.git.providerTest')}

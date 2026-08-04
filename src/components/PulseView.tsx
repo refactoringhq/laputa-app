@@ -23,9 +23,7 @@ import {
   Pulse,
 } from '@phosphor-icons/react'
 
-function tauriCall<T>(command: string, args: Record<string, unknown>): Promise<T> {
-  return isTauri() ? invoke<T>(command, args) : mockInvoke<T>(command, args)
-}
+const tauriCall = isTauri() ? invoke : mockInvoke
 
 interface PulseViewProps {
   vaultPath: string

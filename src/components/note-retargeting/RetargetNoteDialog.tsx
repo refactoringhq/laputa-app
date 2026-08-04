@@ -43,6 +43,57 @@ function nextHighlightIndex(current: number, total: number, direction: 'next' | 
   return direction === 'next' ? (current + 1) % total : (current - 1 + total) % total
 }
 
+interface RetargetOptionsProps {
+  effectiveHighlightedIndex: number
+  emptyMessage: string
+  options: RetargetOption[]
+  onHighlight: (index: number) => void
+  onSelect: (id: string) => void
+  testIdPrefix: string
+}
+
+function RetargetOptions({
+  effectiveHighlightedIndex,
+  emptyMessage,
+  options,
+  onHighlight,
+  onSelect,
+  testIdPrefix,
+}: RetargetOptionsProps) {
+  if (options.length === 0) {
+    return <div className="px-4 py-6 text-sm text-muted-foreground" data-testid={`${testIdPrefix}-empty`}>{emptyMessage}</div>
+  }
+  return (
+    <div className="p-1" data-testid={`${testIdPrefix}-options`}>
+      {options.map((option, index) => (
+        <Button
+          key={option.id}
+          type="button"
+          variant="ghost"
+          className={cn(
+            'h-auto w-full justify-start rounded-md px-3 py-2 text-left',
+            effectiveHighlightedIndex === index && 'bg-accent text-accent-foreground',
+          )}
+          data-testid={`${testIdPrefix}-option:${option.id}`}
+          onMouseMove={() => onHighlight(index)}
+          onClick={() => onSelect(option.id)}
+        >
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <span className="mt-0.5 shrink-0 text-muted-foreground">
+              {option.current ? <Check size={14} weight="bold" /> : <StackSimple size={14} />}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-sm font-medium text-foreground">{option.label}</span>
+              {option.detail && <span className="truncate text-xs text-muted-foreground">{option.detail}</span>}
+            </span>
+          </div>
+          {option.current && <span className="shrink-0 text-xs font-medium text-muted-foreground">Current</span>}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
 export function RetargetNoteDialog(functionOptions: RetargetNoteDialogProps) {
   const { open, title, description, searchPlaceholder, emptyMessage, options, onClose, onSelect, testIdPrefix } =
     functionOptions
@@ -109,43 +160,14 @@ export function RetargetNoteDialog(functionOptions: RetargetNoteDialogProps) {
           data-testid={`${testIdPrefix}-search`}
         />
         <ScrollArea className="max-h-80 rounded-md border">
-          {filteredOptions.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-muted-foreground" data-testid={`${testIdPrefix}-empty`}>
-              {emptyMessage}
-            </div>
-          ) : (
-            <div className="p-1" data-testid={`${testIdPrefix}-options`}>
-              {filteredOptions.map((option, index) => (
-                <Button
-                  key={option.id}
-                  type="button"
-                  variant="ghost"
-                  className={cn(
-                    'h-auto w-full justify-start rounded-md px-3 py-2 text-left',
-                    effectiveHighlightedIndex === index && 'bg-accent text-accent-foreground',
-                  )}
-                  data-testid={`${testIdPrefix}-option:${option.id}`}
-                  onMouseMove={() => setHighlightedIndex(index)}
-                  onClick={() => {
-                    void submitSelection(option.id)
-                  }}
-                >
-                  <div className="flex min-w-0 flex-1 items-start gap-2">
-                    <span className="mt-0.5 shrink-0 text-muted-foreground">
-                      {option.current ? <Check size={14} weight="bold" /> : <StackSimple size={14} />}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm font-medium text-foreground">{option.label}</span>
-                      {option.detail && <span className="truncate text-xs text-muted-foreground">{option.detail}</span>}
-                    </span>
-                  </div>
-                  {option.current && (
-                    <span className="shrink-0 text-xs font-medium text-muted-foreground">Current</span>
-                  )}
-                </Button>
-              ))}
-            </div>
-          )}
+          <RetargetOptions
+            effectiveHighlightedIndex={effectiveHighlightedIndex}
+            emptyMessage={emptyMessage}
+            options={filteredOptions}
+            onHighlight={setHighlightedIndex}
+            onSelect={(id) => { void submitSelection(id) }}
+            testIdPrefix={testIdPrefix}
+          />
         </ScrollArea>
       </DialogContent>
     </Dialog>
