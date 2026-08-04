@@ -224,6 +224,7 @@ const MENU_LABEL_KEYS = {
 } as const
 
 export type AppCommandMenuLabelKey = (typeof MENU_LABEL_KEYS)[keyof typeof MENU_LABEL_KEYS]
+const MENU_LABEL_KEY_BY_LABEL = new Map<string, AppCommandMenuLabelKey>(Object.entries(MENU_LABEL_KEYS))
 export type AppCommandMenuTranslator = (key: AppCommandMenuLabelKey) => string
 
 export const APP_COMMAND_IDS = Object.fromEntries(
@@ -266,9 +267,11 @@ function resolvePlatformLabel(label: PlatformLabel): string {
   return label.default
 }
 
-function localizeMenuLabel(label: string, t?: AppCommandMenuTranslator): string {
-  const key = Reflect.get(MENU_LABEL_KEYS, label) as AppCommandMenuLabelKey | undefined
-  return key && t ? t(key) : label
+function localizeMenuLabel(label: string, t: AppCommandMenuTranslator | undefined): string {
+  const key = MENU_LABEL_KEY_BY_LABEL.get(label)
+  if (!key) return label
+  if (!t) return label
+  return t(key)
 }
 
 function formatAcceleratorDisplay(accelerator: string): string {
@@ -378,16 +381,14 @@ const COMMAND_OR_CTRL_SHIFT_COMBOS: readonly AppCommandShortcutCombo[] = ['comma
 const NO_SHORTCUT_COMBOS: readonly AppCommandShortcutCombo[] = []
 
 function normalizeShortcutKey(key: string): string {
-  return key.length === 1 ? key.toLowerCase() : key
+  if (key.length === 1) return key.toLowerCase()
+  return key
 }
 
 function isPlatformRedoAlternate(event: ShortcutEventLike): boolean {
-  return !isMac()
-    && !event.altKey
-    && !event.metaKey
-    && event.ctrlKey
-    && !event.shiftKey
-    && normalizeShortcutKey(event.key) === 'y'
+  const blocked = [isMac(), event.altKey, event.metaKey, event.shiftKey, !event.ctrlKey]
+  if (blocked.includes(true)) return false
+  return normalizeShortcutKey(event.key) === 'y'
 }
 
 for (const [id, definition] of Object.entries(APP_COMMAND_DEFINITIONS) as Array<[AppCommandId, AppCommandDefinition]>) {
@@ -449,17 +450,29 @@ export function getShortcutEventInit(
   }
 }
 
-export function shortcutCombosForEvent({
-  altKey,
-  ctrlKey,
-  metaKey,
-  shiftKey,
-}: Pick<ShortcutEventLike, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): readonly AppCommandShortcutCombo[] {
-  if (altKey || (!metaKey && !ctrlKey)) return NO_SHORTCUT_COMBOS
-  if (isMac() && ctrlKey) return NO_SHORTCUT_COMBOS
-  if (shiftKey) {
-    return metaKey && !ctrlKey ? COMMAND_SHIFT_COMBOS : COMMAND_OR_CTRL_SHIFT_COMBOS
+interface ShortcutModifierState {
+  altKey: boolean
+  ctrlKey: boolean
+  metaKey: boolean
+  shiftKey: boolean
+}
+
+function shiftedShortcutCombos(metaKey: boolean, ctrlKey: boolean): readonly AppCommandShortcutCombo[] {
+  if (!metaKey) return COMMAND_OR_CTRL_SHIFT_COMBOS
+  if (ctrlKey) return COMMAND_OR_CTRL_SHIFT_COMBOS
+  return COMMAND_SHIFT_COMBOS
+}
+
+export function shortcutCombosForEvent(event: ShortcutModifierState): readonly AppCommandShortcutCombo[] {
+  const { altKey, ctrlKey, metaKey, shiftKey } = event
+  if (altKey) return NO_SHORTCUT_COMBOS
+  if (!metaKey) {
+    if (!ctrlKey) return NO_SHORTCUT_COMBOS
   }
+  if (isMac()) {
+    if (ctrlKey) return NO_SHORTCUT_COMBOS
+  }
+  if (shiftKey) return shiftedShortcutCombos(metaKey, ctrlKey)
   return COMMAND_ONLY_COMBOS
 }
 

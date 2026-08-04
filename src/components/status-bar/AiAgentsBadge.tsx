@@ -353,6 +353,32 @@ function ModelTargetMenuSection({
   )
 }
 
+interface AiAgentsBadgeMenuProps {
+  compact: boolean
+  locale: AppLocale
+  options: AiAgentsBadgeProps
+  selectedAgentReady: boolean
+  selectedTarget: AiTarget
+  showSwitcherCue: boolean
+  showWarning: boolean
+  tooltip: string
+}
+
+function AiAgentsBadgeMenu(menuOptions: AiAgentsBadgeMenuProps) {
+  const { compact, locale, options, selectedAgentReady, selectedTarget, showSwitcherCue, showWarning, tooltip } = menuOptions
+  return (
+    <>
+      <CompactSeparator compact={compact} />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild={true}>
+          <AiAgentsBadgeButton ariaLabel={translate(locale, 'status.ai.openOptions')} compact={compact} defaultAgent={options.defaultAgent} selectedTarget={selectedTarget} showSwitcherCue={showSwitcherCue} showWarning={showWarning} title={tooltip} />
+        </DropdownMenuTrigger>
+        <AgentMenuContent statuses={options.statuses} guidanceStatus={options.guidanceStatus} defaultAgent={options.defaultAgent} defaultTarget={options.defaultTarget} providers={options.providers ?? []} onSetDefaultAgent={options.onSetDefaultAgent} onSetDefaultTarget={options.onSetDefaultTarget} onRestoreGuidance={options.onRestoreGuidance} selectedTarget={selectedTarget} selectedAgentReady={selectedAgentReady} locale={locale} />
+      </DropdownMenu>
+    </>
+  )
+}
+
 export function AiAgentsBadge(options: AiAgentsBadgeProps) {
   const {
     statuses,
@@ -360,9 +386,6 @@ export function AiAgentsBadge(options: AiAgentsBadgeProps) {
     defaultAgent,
     defaultTarget,
     providers = [],
-    onSetDefaultAgent,
-    onSetDefaultTarget,
-    onRestoreGuidance,
     onOpenWorkspace,
     compact = false,
     locale = 'en',
@@ -404,35 +427,5 @@ export function AiAgentsBadge(options: AiAgentsBadgeProps) {
     )
   }
 
-  return (
-    <>
-      <CompactSeparator compact={compact} />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild={true}>
-          <AiAgentsBadgeButton
-            ariaLabel={translate(locale, 'status.ai.openOptions')}
-            compact={compact}
-            defaultAgent={defaultAgent}
-            selectedTarget={selectedTarget}
-            showSwitcherCue={showSwitcherCue}
-            showWarning={showWarning}
-            title={tooltip}
-          />
-        </DropdownMenuTrigger>
-        <AgentMenuContent
-          statuses={statuses}
-          guidanceStatus={guidanceStatus}
-          defaultAgent={defaultAgent}
-          defaultTarget={defaultTarget}
-          providers={providers}
-          onSetDefaultAgent={onSetDefaultAgent}
-          onSetDefaultTarget={onSetDefaultTarget}
-          onRestoreGuidance={onRestoreGuidance}
-          selectedTarget={selectedTarget}
-          selectedAgentReady={selectedAgentReady}
-          locale={locale}
-        />
-      </DropdownMenu>
-    </>
-  )
+  return <AiAgentsBadgeMenu compact={compact} locale={locale} options={options} selectedAgentReady={selectedAgentReady} selectedTarget={selectedTarget} showSwitcherCue={showSwitcherCue} showWarning={showWarning} tooltip={tooltip} />
 }

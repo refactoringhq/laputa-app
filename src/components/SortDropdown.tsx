@@ -308,21 +308,17 @@ function SortDropdownMenu(options: {
   )
 }
 
-export function SortDropdown({
-  groupLabel,
-  current,
-  direction,
-  customProperties,
-  locale = 'en',
-  onChange,
-}: {
+interface SortDropdownProps {
   groupLabel: string
   current: SortOption
   direction: SortDirection
   customProperties?: string[]
   locale?: AppLocale
   onChange: (groupLabel: string, option: SortOption, direction: SortDirection) => void
-}) {
+}
+
+export function SortDropdown(options: SortDropdownProps) {
+  const { groupLabel, current, direction, customProperties, locale = 'en', onChange } = options
   const sortItems = useMemo(() => buildSortItems(locale, customProperties), [customProperties, locale])
   const { open, toggleMenu, containerRef, menuRef, triggerRef, sortButtonRefs, handleSelect, handleMenuKeyDown } =
     useSortDropdownState({

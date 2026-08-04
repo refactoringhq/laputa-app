@@ -33,6 +33,30 @@ function FolderMenuLabel({ children }: { children: ReactNode }) {
   return <span className="min-w-0 flex-1 truncate text-left">{children}</span>
 }
 
+function FolderMenuAction({
+  destructive = false,
+  icon,
+  label,
+  onClick,
+  testId,
+}: {
+  destructive?: boolean
+  icon: ReactNode
+  label: ReactNode
+  onClick: () => void
+  testId?: string
+}) {
+  const className = destructive
+    ? `${folderContextMenuButtonClass} text-destructive hover:text-destructive`
+    : folderContextMenuButtonClass
+  return (
+    <Button type="button" variant="ghost" className={className} onClick={onClick} data-testid={testId}>
+      {icon}
+      <FolderMenuLabel>{label}</FolderMenuLabel>
+    </Button>
+  )
+}
+
 export function FolderContextMenu(props: FolderContextMenuProps) {
   const {
     menu,
@@ -60,75 +84,27 @@ export function FolderContextMenu(props: FolderContextMenuProps) {
       data-testid="folder-context-menu"
     >
       {onCreateNote && (
-        <Button
-          type="button"
-          variant="ghost"
-          className={folderContextMenuButtonClass}
+        <FolderMenuAction
+          icon={<Plus size={14} className="shrink-0" />}
+          label={translate(locale, 'sidebar.action.createNoteInFolderMenu')}
           onClick={() => onCreateNote(menu.path, menu.rootPath)}
-          data-testid="create-note-in-folder-menu-item"
-        >
-          <Plus size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.createNoteInFolderMenu')}</FolderMenuLabel>
-        </Button>
+          testId="create-note-in-folder-menu-item"
+        />
       )}
       {onCreateFolder && (
-        <Button
-          type="button"
-          variant="ghost"
-          className={folderContextMenuButtonClass}
-          onClick={() => onCreateFolder(menu.path, menu.rootPath)}
-          data-testid="create-folder-in-folder-menu-item"
-        >
-          <FolderPlus size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.createFolderInFolderMenu')}</FolderMenuLabel>
-        </Button>
+        <FolderMenuAction icon={<FolderPlus size={14} className="shrink-0" />} label={translate(locale, 'sidebar.action.createFolderInFolderMenu')} onClick={() => onCreateFolder(menu.path, menu.rootPath)} testId="create-folder-in-folder-menu-item" />
       )}
       {onReveal && (
-        <Button
-          type="button"
-          variant="ghost"
-          className={folderContextMenuButtonClass}
-          onClick={() => onReveal(menu.path)}
-          data-testid="reveal-folder-menu-item"
-        >
-          <FolderOpen size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.revealFolderMenu')}</FolderMenuLabel>
-        </Button>
+        <FolderMenuAction icon={<FolderOpen size={14} className="shrink-0" />} label={translate(locale, 'sidebar.action.revealFolderMenu')} onClick={() => onReveal(menu.path)} testId="reveal-folder-menu-item" />
       )}
       {onCopyPath && (
-        <Button
-          type="button"
-          variant="ghost"
-          className={folderContextMenuButtonClass}
-          onClick={() => onCopyPath(menu.path)}
-          data-testid="copy-folder-path-menu-item"
-        >
-          <ClipboardText size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.copyFolderPathMenu')}</FolderMenuLabel>
-        </Button>
+        <FolderMenuAction icon={<ClipboardText size={14} className="shrink-0" />} label={translate(locale, 'sidebar.action.copyFolderPathMenu')} onClick={() => onCopyPath(menu.path)} testId="copy-folder-path-menu-item" />
       )}
       {canMutateFolder && (
-        <Button
-          type="button"
-          variant="ghost"
-          className={folderContextMenuButtonClass}
-          onClick={() => onRename(menu.path)}
-        >
-          <PencilSimple size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.renameFolderMenu')}</FolderMenuLabel>
-        </Button>
+        <FolderMenuAction icon={<PencilSimple size={14} className="shrink-0" />} label={translate(locale, 'sidebar.action.renameFolderMenu')} onClick={() => onRename(menu.path)} />
       )}
       {canMutateFolder && (
-        <Button
-          type="button"
-          variant="ghost"
-          className={`${folderContextMenuButtonClass} text-destructive hover:text-destructive`}
-          onClick={() => onDelete?.(menu.path)}
-          data-testid="delete-folder-menu-item"
-        >
-          <Trash size={14} className="shrink-0" />
-          <FolderMenuLabel>{translate(locale, 'sidebar.action.deleteFolderMenu')}</FolderMenuLabel>
-        </Button>
+        <FolderMenuAction destructive icon={<Trash size={14} className="shrink-0" />} label={translate(locale, 'sidebar.action.deleteFolderMenu')} onClick={() => onDelete?.(menu.path)} testId="delete-folder-menu-item" />
       )}
     </div>
   )

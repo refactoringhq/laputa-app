@@ -218,6 +218,71 @@ interface CommitDialogProps {
   onClose: () => void
 }
 
+interface CommitDialogViewOptions {
+  actionLabel: string
+  authorIdentity: GitAuthorIdentity | null
+  copy: ReturnType<typeof getDialogCopy>
+  inputRef: React.RefObject<HTMLTextAreaElement | null>
+  isGeneratingMessage: boolean
+  locale: AppLocale
+  message: string
+  modifiedCount: number
+  onClose: () => void
+  onGenerateMessage?: () => Promise<string> | string
+  onGeneratedMessage: (generated: string) => void
+  onKeyDown: (event: React.KeyboardEvent) => void
+  onMessageChange: (message: string) => void
+  onOpenChange: (open: boolean) => void
+  onRepositoryChange?: (path: string) => void
+  onSubmit: () => void
+  open: boolean
+  repositories: GitRepositoryOption[]
+  selectedRepositoryPath: string
+}
+
+function CommitDialogView({ options }: { options: CommitDialogViewOptions }) {
+  const { actionLabel, authorIdentity, copy, inputRef, isGeneratingMessage, locale, message, modifiedCount, onClose, onGenerateMessage, onGeneratedMessage, onKeyDown, onMessageChange, onOpenChange, onRepositoryChange, onSubmit, open, repositories, selectedRepositoryPath } = options
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{copy.title}</DialogTitle>
+            <Badge variant="secondary" className="text-xs">{changedFilesLabel(modifiedCount)}</Badge>
+          </div>
+          <DialogDescription>{copy.description}</DialogDescription>
+        </DialogHeader>
+        {onRepositoryChange && selectedRepositoryPath && (
+          <GitRepositorySelect label={translate(locale, 'git.repository.select')} repositories={repositories} selectedPath={selectedRepositoryPath} onChange={onRepositoryChange} testId="commit-repository-select" />
+        )}
+        <CommitAuthorIdentity identity={authorIdentity} locale={locale} />
+        <Textarea ref={inputRef} className="min-h-[84px] resize-y bg-[var(--bg-input)] py-2.5 text-[13px]" placeholder="Commit message..." value={message} onChange={(event) => onMessageChange(event.target.value)} onKeyDown={onKeyDown} rows={3} />
+        <CommitDialogActions {...copy} actionLabel={actionLabel} isGeneratingMessage={isGeneratingMessage} locale={locale} message={message} modifiedCount={modifiedCount} onClose={onClose} onGenerateMessage={onGenerateMessage} onGeneratedMessage={onGeneratedMessage} onSubmit={onSubmit} />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function createCommitDialogHandlers(options: {
+  message: string
+  onClose: () => void
+  onCommit: (message: string) => void
+}) {
+  const handleSubmit = () => {
+    const trimmed = options.message.trim()
+    if (trimmed) options.onCommit(trimmed)
+  }
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (isSubmitShortcut(event)) {
+      event.preventDefault()
+      handleSubmit()
+      return
+    }
+    if (isCloseShortcut(event)) options.onClose()
+  }
+  return { handleKeyDown, handleSubmit }
+}
+
 export function CommitDialog(props: CommitDialogProps) {
   const {
     open,
@@ -260,74 +325,32 @@ export function CommitDialog(props: CommitDialogProps) {
     setMessage,
   })
 
-  const handleSubmit = () => {
-    const trimmed = message.trim()
-    if (!trimmed) return
-    onCommit(trimmed)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isSubmitShortcut(e)) {
-      e.preventDefault()
-      handleSubmit()
-    } else if (isCloseShortcut(e)) {
-      onClose()
-    }
-  }
+  const { handleKeyDown, handleSubmit } = createCommitDialogHandlers({ message, onClose, onCommit })
 
   const handleGeneratedMessage = (generated: string) => {
     setMessage(generated)
     focusMessageInput(inputRef)
   }
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose()
-      }}
-    >
-      <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>{copy.title}</DialogTitle>
-            <Badge variant="secondary" className="text-xs">
-              {changedFilesLabel(modifiedCount)}
-            </Badge>
-          </div>
-          <DialogDescription>{copy.description}</DialogDescription>
-        </DialogHeader>
-        {onRepositoryChange && selectedRepositoryPath && (
-          <GitRepositorySelect
-            label={translate(locale, 'git.repository.select')}
-            repositories={repositories}
-            selectedPath={selectedRepositoryPath}
-            onChange={onRepositoryChange}
-            testId="commit-repository-select"
-          />
-        )}
-        <CommitAuthorIdentity identity={authorIdentity} locale={locale} />
-        <Textarea
-          ref={inputRef}
-          className="min-h-[84px] resize-y bg-[var(--bg-input)] py-2.5 text-[13px]"
-          placeholder="Commit message..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={3}
-        />
-        <CommitDialogActions
-          {...copy}
-          isGeneratingMessage={isGeneratingMessage}
-          locale={locale}
-          message={message}
-          modifiedCount={modifiedCount}
-          onClose={onClose}
-          onGenerateMessage={onGenerateMessage}
-          onGeneratedMessage={handleGeneratedMessage}
-          onSubmit={handleSubmit}
-        />
-      </DialogContent>
-    </Dialog>
-  )
+  return <CommitDialogView options={{
+    actionLabel: copy.actionLabel,
+    authorIdentity,
+    copy,
+    inputRef,
+    isGeneratingMessage,
+    locale,
+    message,
+    modifiedCount,
+    onClose,
+    onGenerateMessage,
+    onGeneratedMessage: handleGeneratedMessage,
+    onKeyDown: handleKeyDown,
+    onMessageChange: setMessage,
+    onOpenChange: (isOpen) => { if (!isOpen) onClose() },
+    onRepositoryChange,
+    onSubmit: handleSubmit,
+    open,
+    repositories,
+    selectedRepositoryPath,
+  }} />
 }
