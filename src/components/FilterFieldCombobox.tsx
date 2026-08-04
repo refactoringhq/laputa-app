@@ -291,8 +291,8 @@ export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComb
     setHasTyped(false)
     setHighlightedIndex(
       initialHighlightIndex({
-      options: flattenGroups(buildFieldGroups({ fields, currentValue: value, query: '' })),
-      currentValue: value,
+        options: flattenGroups(buildFieldGroups({ fields, currentValue: value, query: '' })),
+        currentValue: value,
       }),
     )
   }, [fields, value])
@@ -310,11 +310,11 @@ export function FilterFieldCombobox({ value, fields, onChange }: FilterFieldComb
 
   const selectOption = useCallback(
     (nextValue: FilterFieldName) => {
-    onChange(nextValue)
-    setQuery(nextValue)
-    setHasTyped(false)
-    setHighlightedIndex(-1)
-    setOpen(false)
+      onChange(nextValue)
+      setQuery(nextValue)
+      setHasTyped(false)
+      setHighlightedIndex(-1)
+      setOpen(false)
     },
     [onChange],
   )

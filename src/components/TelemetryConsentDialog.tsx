@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { ShieldCheck } from '@phosphor-icons/react'
 import { OnboardingShell } from './OnboardingShell'
 import { Button } from './ui/button'
@@ -7,20 +8,22 @@ interface TelemetryConsentDialogProps {
   onDecline: () => void
 }
 
+const telemetryConsentContentStyle: CSSProperties = {
+  width: 'min(440px, 100%)',
+  padding: 32,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 20,
+  alignItems: 'center',
+}
+
 export function TelemetryConsentDialog({ onAccept, onDecline }: TelemetryConsentDialogProps) {
   return (
     <OnboardingShell
       className="fixed inset-0 z-50"
       contentClassName="w-full rounded-lg border border-border bg-background shadow-[0_18px_55px_var(--shadow-dialog)]"
       style={{ background: 'var(--shadow-overlay)' }}
-      contentStyle={{
-        width: 'min(440px, 100%)',
-        padding: 32,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 20,
-        alignItems: 'center',
-      }}
+      contentStyle={telemetryConsentContentStyle}
       testId="telemetry-consent-shell"
     >
 
@@ -50,22 +53,17 @@ export function TelemetryConsentDialog({ onAccept, onDecline }: TelemetryConsent
         </div>
 
         <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 4 }}>
-          <Button
-            type="button"
-            variant="outline"
+          <Button type="button" variant="outline"
             style={{ flex: 1, fontSize: 13, padding: '10px 16px' }}
             onClick={onDecline}
             data-testid="telemetry-decline"
-            autoFocus
-          >
+            autoFocus>
             No thanks
           </Button>
-          <Button
-            type="button"
+          <Button type="button"
             style={{ flex: 1, fontSize: 13, padding: '10px 16px', fontWeight: 500 }}
             onClick={onAccept}
-            data-testid="telemetry-accept"
-          >
+            data-testid="telemetry-accept">
             Allow anonymous reporting
           </Button>
         </div>

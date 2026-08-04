@@ -190,14 +190,7 @@ export function hideWorkspaceMetadata(entries: VaultEntry[]): VaultEntry[] {
   return entries.map((entry) => entry.workspace ? { ...entry, workspace: undefined } : entry)
 }
 
-export function useWorkspaceGraphState({
-  allVaults,
-  defaultWorkspacePath,
-  resolvedPath,
-  settings,
-  vaultSwitcherLoaded,
-  windowMode,
-}: WorkspaceGraphConfig): WorkspaceGraphState {
+export function useWorkspaceGraphState({ allVaults, defaultWorkspacePath, resolvedPath, settings, vaultSwitcherLoaded, windowMode }: WorkspaceGraphConfig): WorkspaceGraphState {
   const multiWorkspaceEnabled = settings.multi_workspace_enabled === true
   const workspaceGraphLoadingEnabled = !windowMode
   const graphDefaultWorkspacePath = workspaceGraphDefaultPath({

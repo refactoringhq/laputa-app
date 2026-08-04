@@ -317,25 +317,25 @@ function useListPropertiesPopoverState({
 
   const handleToggle = useCallback(
     (key: string) => {
-    const nextSelected = toggleDisplayProperty(currentDisplay, selectedSet, key)
-    onSave(nextSelected)
+      const nextSelected = toggleDisplayProperty(currentDisplay, selectedSet, key)
+      onSave(nextSelected)
     },
     [currentDisplay, onSave, selectedSet],
   )
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-    const reordered = reorderDisplayProperties(event, currentDisplay, availableProperties)
-    if (!reordered) return
+      const reordered = reorderDisplayProperties(event, currentDisplay, availableProperties)
+      if (!reordered) return
 
-    onSave(reordered)
+      onSave(reordered)
     },
     [availableProperties, currentDisplay, onSave],
   )
 
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-    handleEscapeKey(event, closePopover)
+      handleEscapeKey(event, closePopover)
     },
     [closePopover],
   )

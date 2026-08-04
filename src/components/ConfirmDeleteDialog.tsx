@@ -62,14 +62,7 @@ function isConfirmShortcut(event: ConfirmShortcutEvent) {
   )
 }
 
-export const ConfirmDeleteDialog = memo(function ConfirmDeleteDialog({
-  open,
-  title,
-  message,
-  confirmLabel = 'Delete permanently',
-  onConfirm,
-  onCancel,
-}: ConfirmDeleteDialogProps) {
+export const ConfirmDeleteDialog = memo(function ConfirmDeleteDialog({ open, title, message, confirmLabel = 'Delete permanently', onConfirm, onCancel }: ConfirmDeleteDialogProps) {
   const confirmingRef = useRef(false)
   const cancelFocusIsIntentionalRef = useRef(false)
 
@@ -161,13 +154,7 @@ export const ConfirmDeleteDialog = memo(function ConfirmDeleteDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <DialogFooter>
-            <Button
-              type="submit"
-              variant="destructive"
-              data-testid="confirm-delete-btn"
-              data-confirm-delete-primary="true"
-              autoFocus
-            >
+            <Button type="submit" variant="destructive" data-testid="confirm-delete-btn" data-confirm-delete-primary="true" autoFocus>
               {confirmLabel}
             </Button>
             <Button

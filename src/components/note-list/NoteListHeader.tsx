@@ -208,14 +208,7 @@ function HeaderActions(options: Pick<
   )
 }
 
-function SearchRow({
-  search,
-  isSearching,
-  searchInputRef,
-  locale,
-  onSearchChange,
-  onSearchKeyDown,
-}: Pick<
+function SearchRow({ search, isSearching, searchInputRef, locale, onSearchChange, onSearchKeyDown }: Pick<
   NoteListHeaderProps,
   | 'search'
   | 'isSearching'

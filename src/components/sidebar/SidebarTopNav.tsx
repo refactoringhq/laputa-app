@@ -15,16 +15,7 @@ interface SidebarTopNavProps {
 }
 
 export function SidebarTopNav(options: SidebarTopNavProps) {
-  const {
-    selection,
-    onSelect,
-    showInbox,
-    inboxCount,
-    activeCount,
-    archivedCount,
-    locale = 'en',
-    loading = false,
-  } = options
+  const { selection, onSelect, showInbox, inboxCount, activeCount, archivedCount, locale = 'en', loading = false } = options
   return (
     <div className="border-b border-border" data-testid="sidebar-top-nav" style={{ padding: '4px 6px' }}>
       {showInbox && (

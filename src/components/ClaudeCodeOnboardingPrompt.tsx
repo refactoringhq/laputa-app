@@ -38,17 +38,11 @@ function getPromptCopy(status: ClaudeCodeStatus) {
   }
 }
 
-export function ClaudeCodeOnboardingPrompt({
-  status,
-  onContinue,
-}: ClaudeCodeOnboardingPromptProps) {
+export function ClaudeCodeOnboardingPrompt({ status, onContinue }: ClaudeCodeOnboardingPromptProps) {
   const copy = getPromptCopy(status)
 
   return (
-    <div
-      className="flex h-full w-full items-center justify-center bg-sidebar px-6 py-10"
-      data-testid="claude-onboarding-screen"
-    >
+    <div className="flex h-full w-full items-center justify-center bg-sidebar px-6 py-10" data-testid="claude-onboarding-screen">
       <Card className="w-full max-w-2xl border-border bg-background shadow-sm">
         <CardHeader className="items-center gap-5 text-center">
           <div className={`flex size-16 items-center justify-center rounded-2xl ${copy.accentClassName}`}>

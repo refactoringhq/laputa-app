@@ -175,11 +175,7 @@ function CheckingAgents({ locale }: { locale: AppLocale }) {
   )
 }
 
-export function AiAgentsOnboardingPrompt({
-  statuses,
-  onContinue,
-  locale = 'en',
-}: AiAgentsOnboardingPromptProps) {
+export function AiAgentsOnboardingPrompt({ statuses, onContinue, locale = 'en' }: AiAgentsOnboardingPromptProps) {
   const copy = getPromptCopy(statuses, locale)
   const checking = isAiAgentsStatusChecking(statuses)
   const installedAgents = installedAgentDefinitions(statuses)
@@ -191,10 +187,7 @@ export function AiAgentsOnboardingPrompt({
       contentClassName="w-full max-w-2xl"
       testId="ai-agents-onboarding-screen"
     >
-      <Card
-        className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-border bg-background shadow-sm"
-        data-testid="ai-agents-onboarding-card"
-      >
+      <Card className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-border bg-background shadow-sm" data-testid="ai-agents-onboarding-card">
         <CardHeader className="shrink-0 items-center gap-5 text-center">
           <div className={`flex size-16 items-center justify-center rounded-2xl ${copy.accentClassName}`}>
             {copy.icon}
