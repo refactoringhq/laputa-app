@@ -109,10 +109,8 @@ function IconSection({ selectedIcon, search, filteredIcons, locale, onSearchChan
     <>
       <div className="font-mono-overline mb-2 text-muted-foreground">{translate(locale, 'customize.icon')}</div>
       <div className="relative mb-2">
-        <MagnifyingGlass
-          size={14}
-          className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-        />
+        <MagnifyingGlass size={14}
+          className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <Input
           type="text"
           value={search}

@@ -23,6 +23,13 @@ interface EnrichSuggestionOptions {
   showWorkspace?: boolean
 }
 
+interface SuggestionTypeMetadata {
+  noteType: string | undefined
+  typeColor: string | undefined
+  typeLightColor: string | undefined
+  TypeIcon: ReturnType<typeof getTypeIcon> | undefined
+}
+
 export function hasMultipleSuggestionWorkspaces(items: { entry?: VaultEntry }[]): boolean {
   return new Set(items.map((item) => item.entry?.workspace?.alias).filter(Boolean)).size > 1
 }
@@ -31,6 +38,24 @@ export function hasMultipleSuggestionWorkspaces(items: { entry?: VaultEntry }[])
 function buildTarget(item: BaseSuggestionItem, vaultPath: string, sourceEntry?: VaultEntry): string {
   if (item.entry) return canonicalWikilinkTargetForEntry(item.entry, vaultPath, sourceEntry)
   return relativePathStem(item.path, vaultPath)
+}
+
+function suggestionTypeMetadata(
+  entryType: string | null | undefined,
+  typeEntryMap: Record<string, VaultEntry>,
+): SuggestionTypeMetadata {
+  const noteType = entryType ?? undefined
+  if (!noteType) {
+    return { noteType, typeColor: undefined, typeLightColor: undefined, TypeIcon: undefined }
+  }
+
+  const typeEntry = Reflect.get(typeEntryMap, noteType) as VaultEntry | undefined
+  return {
+    noteType,
+    typeColor: getTypeColor(noteType, typeEntry?.color),
+    typeLightColor: getTypeLightColor(noteType, typeEntry?.color),
+    TypeIcon: getTypeIcon(noteType, typeEntry?.icon),
+  }
 }
 
 /** Add onItemClick to raw suggestion candidates.
@@ -63,14 +88,9 @@ export function enrichSuggestionItems(
   const final = disambiguateTitles(deduplicateByPath(sliced))
   const showWorkspace = options.showWorkspace ?? hasMultipleSuggestionWorkspaces(final)
   return final.map(({ entry, entryType, ...rest }) => {
-    const noteType = entryType ?? undefined
-    const te = noteType ? Reflect.get(typeEntryMap, noteType) as VaultEntry | undefined : undefined
     return {
       ...rest,
-      noteType,
-      typeColor: noteType ? getTypeColor(noteType, te?.color) : undefined,
-      typeLightColor: noteType ? getTypeLightColor(noteType, te?.color) : undefined,
-      TypeIcon: noteType ? getTypeIcon(noteType, te?.icon) : undefined,
+      ...suggestionTypeMetadata(entryType, typeEntryMap),
       workspace: showWorkspace ? entry?.workspace ?? null : null,
     }
   })

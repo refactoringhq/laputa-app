@@ -193,19 +193,6 @@ function streamCallbacks(onText: (text: string) => void): AgentStreamCallbacks {
   }
 }
 
-function stripDecorations(message: string): string {
-  return message
-    .split('\n')
-    .map((line) => line.trim())
-    .find(Boolean)
-    ?.replace(/^[-*]\s*/, '')
-    .replace(/^(commit message|message|summary)\s*[:-]\s*/i, '')
-    .replace(/^["'`“”‘’\s]+|["'`“”‘’\s]+$/g, '')
-    .replace(/[.!?;:]+$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim() ?? ''
-}
-
 export function normalizeCommitMessageDraft(message: string): string | null {
   const cleaned = stripDecorations(message)
   if (!cleaned) return null
@@ -277,4 +264,17 @@ export async function generateCommitMessageDraft({
   }
 
   return { aiAttempted: true, fileCount, message: fallback, source: 'fallback' }
+}
+
+function stripDecorations(message: string): string {
+  const firstLine = message.split('\n').map((line) => line.trim()).find(Boolean)
+  if (!firstLine) return ''
+
+  return firstLine
+    .replace(/^[-*]\s*/, '')
+    .replace(/^(commit message|message|summary)\s*[:-]\s*/i, '')
+    .replace(/^["'`“”‘’\s]+|["'`“”‘’\s]+$/g, '')
+    .replace(/[.!?;:]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

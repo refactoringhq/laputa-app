@@ -82,10 +82,15 @@ function loadVaultEntriesWithCommand({ vaultPath, command }: VaultPathOptions & 
     .then((entries) => normalizeVaultEntries(entries, vaultPath))
 }
 
+function isMountedVault(vault: VaultOption, path: string, primaryPaths: Set<string>): boolean {
+  return vault.mounted !== false || primaryPaths.has(path)
+}
+
 function mountedVaultPath(vault: VaultOption, primaryPaths: Set<string>): string | null {
   const path = workspacePathOrEmpty(vault.path)
-  if (!path || vault.available === false) return null
-  return vault.mounted !== false || primaryPaths.has(path) ? path : null
+  if (!path) return null
+  if (vault.available === false) return null
+  return isMountedVault(vault, path, primaryPaths) ? path : null
 }
 
 function shouldReloadEmptyResult(entries: VaultEntry[], options: EmptyResultReloadOptions): boolean {
@@ -295,16 +300,21 @@ export async function loadStartupVaultData(options: MountedVaultEntriesOptions):
   return { entries, reconciliation, source: 'snapshot' }
 }
 
-export async function loadVaultChrome({
-  defaultWorkspacePath,
-  vaultPath,
-  vaults,
-}: MountedVaultEntriesOptions): Promise<LoadedVaultChrome> {
+async function loadVaultViewsForOptions(options: MountedVaultEntriesOptions): Promise<ViewFile[]> {
+  if (options.vaults?.length) {
+    return loadMountedVaultViews(options)
+  }
+  return loadVaultViews({ vaultPath: options.vaultPath })
+}
+
+async function loadListOrEmpty<T>(loader: () => Promise<T[]>): Promise<T[]> {
+  return loader().catch(() => [])
+}
+
+export async function loadVaultChrome(options: MountedVaultEntriesOptions): Promise<LoadedVaultChrome> {
   const [folders, views] = await Promise.all([
-    loadVaultFolders({ vaultPath }).catch(() => [] as FolderNode[]),
-    vaults?.length
-      ? loadMountedVaultViews({ defaultWorkspacePath, vaultPath, vaults }).catch(() => [] as ViewFile[])
-      : loadVaultViews({ vaultPath }).catch(() => [] as ViewFile[]),
+    loadListOrEmpty<FolderNode>(() => loadVaultFolders({ vaultPath: options.vaultPath })),
+    loadListOrEmpty(() => loadVaultViewsForOptions(options)),
   ])
 
   return {

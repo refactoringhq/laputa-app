@@ -285,10 +285,14 @@ function isFilesystemAbsolutePath(request: PathOnlyRequest): boolean {
     || request.path.startsWith('\\\\')
 }
 
+function hasRelativeOrRootPrefix(url: string): boolean {
+  return /^(?:\.{1,2}\/|[/\\?#])/u.test(url)
+}
+
 function isBareImageUrl(request: UrlOnlyRequest): boolean {
   const { url } = request
   if (!url) return false
-  if (/^(?:\.{1,2}\/|[/\\?#])/u.test(url)) return false
+  if (hasRelativeOrRootPrefix(url)) return false
   if (hasUrlScheme({ url })) return false
   return !isFilesystemAbsolutePath({ path: url })
 }

@@ -14,8 +14,37 @@ interface CommandPaletteAiModeProps {
   onSubmit: (text: string, references: NoteReference[]) => void
 }
 
-function stripLeadingSpace(value: string): string {
-  return value.startsWith(' ') ? value.slice(1) : value
+const stripLeadingSpace = (value: string): string => (
+  value.startsWith(' ') ? value.slice(1) : value
+)
+
+function aiPaletteHeader(aiAgentLabel: string) {
+  return (
+    <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+      <Sparkle size={12} weight="fill" />
+      <span>Ask {aiAgentLabel}</span>
+    </div>
+  )
+}
+
+function aiPaletteEmptyState(aiAgentLabel: string, ready: boolean, value: string) {
+  if (!ready) {
+    return <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">{aiAgentLabel} is not available on this machine.</div>
+  }
+  return (
+    <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
+      <div className="mb-1 font-medium text-foreground">Ask {aiAgentLabel}</div>
+      <div>{value.trim() ? 'Type [[ to insert a note reference inline.' : 'Type your prompt after the leading space.'}</div>
+    </div>
+  )
+}
+
+function aiPaletteFooter(aiAgentLabel: string) {
+  return (
+    <div className="flex items-center gap-4 border-t border-border px-4 py-1.5 text-[11px] text-muted-foreground">
+      <span>{aiAgentLabel} mode</span><span>↵ send</span><span>esc close</span>
+    </div>
+  )
 }
 
 export function CommandPaletteAiMode(options: CommandPaletteAiModeProps) {
@@ -43,35 +72,9 @@ export function CommandPaletteAiMode(options: CommandPaletteAiModeProps) {
       dataTestId="command-palette-ai-input"
       editorClassName="border-none px-0 py-0 text-[15px]"
       suggestionListVariant="palette"
-      paletteHeader={
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-          <Sparkle size={12} weight="fill" />
-          <span>Ask {aiAgentLabel}</span>
-        </div>
-      }
-      paletteEmptyState={
-        <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
-          {!resolvedAiAgentReady ? (
-            `${aiAgentLabel} is not available on this machine.`
-          ) : (
-            <>
-              <div className="mb-1 font-medium text-foreground">Ask {aiAgentLabel}</div>
-              <div>
-                {value.trim().length === 0
-                  ? 'Type your prompt after the leading space.'
-                  : 'Type [[ to insert a note reference inline.'}
-              </div>
-            </>
-          )}
-        </div>
-      }
-      paletteFooter={
-        <div className="flex items-center gap-4 border-t border-border px-4 py-1.5 text-[11px] text-muted-foreground">
-          <span>{aiAgentLabel} mode</span>
-          <span>↵ send</span>
-          <span>esc close</span>
-        </div>
-      }
+      paletteHeader={aiPaletteHeader(aiAgentLabel)}
+      paletteEmptyState={aiPaletteEmptyState(aiAgentLabel, resolvedAiAgentReady, value)}
+      paletteFooter={aiPaletteFooter(aiAgentLabel)}
     />
   )
 }

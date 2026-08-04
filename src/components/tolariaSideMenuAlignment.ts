@@ -22,29 +22,42 @@ type SideMenuAlignmentContext = {
 
 const SIDE_MENU_ALIGNMENT_ATTEMPTS = 8
 
+function htmlElement(element: Element | null): HTMLElement | null {
+  return element instanceof HTMLElement ? element : null
+}
+
 function sideMenuElementForEditor(editorElement: HTMLElement): HTMLElement | null {
-  const container = editorElement.closest('.editor__blocknote-container') ?? editorElement
-  const sideMenu = container.querySelector('.bn-side-menu')
-  return sideMenu instanceof HTMLElement ? sideMenu : null
+  const container = htmlElement(editorElement.closest('.editor__blocknote-container')) ?? editorElement
+  return htmlElement(container.querySelector('.bn-side-menu'))
+}
+
+function hasVisibleArea(rect: DOMRect): boolean {
+  return rect.width > 0 && rect.height > 0
+}
+
+function blockTextContentElement(blockElement: HTMLElement): HTMLElement | null {
+  const content = htmlElement(blockElement.querySelector('.bn-block-content'))
+  if (!content) return null
+  return htmlElement(content.querySelector('.bn-inline-content')) ?? content
+}
+
+function visibleRect(rect: DOMRect): DOMRect | null {
+  return rect.height > 0 ? rect : null
 }
 
 function blockTextAnchorRect(blockElement: HTMLElement): DOMRect | null {
-  const content = blockElement.querySelector('.bn-block-content')
-  const inlineContent = content?.querySelector('.bn-inline-content') ?? content
-  if (!(inlineContent instanceof HTMLElement)) return null
+  const inlineContent = blockTextContentElement(blockElement)
+  if (!inlineContent) return null
 
   const ownerDocument = inlineContent.ownerDocument
   const range = ownerDocument.createRange()
   range.selectNodeContents(inlineContent)
   const firstLineRect = Array.from(range.getClientRects())
-    .find((rect) => rect.width > 0 && rect.height > 0)
+    .find(hasVisibleArea)
   const textRect = firstLineRect ?? range.getBoundingClientRect()
   range.detach()
 
-  if (textRect.height > 0) return textRect
-
-  const fallbackRect = inlineContent.getBoundingClientRect()
-  return fallbackRect.height > 0 ? fallbackRect : null
+  return visibleRect(textRect) ?? visibleRect(inlineContent.getBoundingClientRect())
 }
 
 function alignSideMenuWithBlockText(editorElement: HTMLElement, blockId: string): boolean {

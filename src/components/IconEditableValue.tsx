@@ -6,7 +6,25 @@ import { ICON_OPTIONS } from '../utils/iconRegistry'
 
 const MAX_ICON_RESULTS = 24
 
-function isHttpUrl(value: string): boolean {
+type IconValue = string
+
+const IconKeyAction = {
+  Cancel: 0,
+  Commit: 1,
+  Next: 2,
+  Previous: 3,
+} as const
+type IconKeyAction = typeof IconKeyAction[keyof typeof IconKeyAction]
+type IconNavigationAction = typeof IconKeyAction.Next | typeof IconKeyAction.Previous
+
+const ICON_KEY_ACTIONS: Partial<Record<string, IconKeyAction>> = {
+  ArrowDown: IconKeyAction.Next,
+  ArrowUp: IconKeyAction.Previous,
+  Enter: IconKeyAction.Commit,
+  Escape: IconKeyAction.Cancel,
+}
+
+function isHttpUrl(value: IconValue): boolean {
   try {
     const url = new URL(value)
     return url.protocol === 'http:' || url.protocol === 'https:'
@@ -15,11 +33,11 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function normalizeIconQuery(query: string): string {
+function normalizeIconQuery(query: IconValue): string {
   return query.trim().toLowerCase()
 }
 
-function matchesIconQuery(name: string, query: string): boolean {
+function matchesIconQuery(name: IconValue, query: IconValue): boolean {
   if (!query) return true
 
   const normalized = normalizeIconQuery(query)
@@ -29,22 +47,31 @@ function matchesIconQuery(name: string, query: string): boolean {
   return name.includes(dashedQuery) || spacedName.includes(normalized)
 }
 
-function filterIconOptions(query: string) {
+function filterIconOptions(query: IconValue) {
   return ICON_OPTIONS
     .filter((option) => matchesIconQuery(option.name, query))
     .slice(0, MAX_ICON_RESULTS)
 }
 
-function shouldSelectIconSuggestion(value: string, suggestionCount: number): boolean {
+function shouldSelectIconSuggestion(value: IconValue, suggestionCount: number): boolean {
   const trimmed = value.trim()
   if (!trimmed) return false
   if (isEmoji(trimmed) || isHttpUrl(trimmed)) return false
   return suggestionCount > 0
 }
 
+function nextHighlightedIcon(
+  current: number,
+  action: IconNavigationAction,
+  iconCount: number,
+): number {
+  const offset = action === IconKeyAction.Next ? 1 : -1
+  return (current + offset + iconCount) % iconCount
+}
+
 interface IconEditableValueProps {
-  value: string
-  onSave: (newValue: string) => void
+  value: IconValue
+  onSave: (newValue: IconValue) => void
   onCancel: () => void
   isEditing: boolean
   onStartEdit: () => void
@@ -66,33 +93,28 @@ function IconEditableInput({
     onSave(iconName)
   }
 
+  const navigateIcons = (action: IconNavigationAction) => {
+    if (filteredIcons.length === 0) return
+    setHighlightedIndex((current) => nextHighlightedIcon(current, action, filteredIcons.length))
+  }
+  const commitIcon = () => {
+    if (shouldSelectIconSuggestion(editValue, filteredIcons.length)) {
+      selectIcon(filteredIcons.at(highlightedIndex)?.name ?? editValue)
+      return
+    }
+    commitTypedValue()
+  }
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      if (filteredIcons.length === 0) return
-      setHighlightedIndex((current) => (current + 1) % filteredIcons.length)
-      return
-    }
+    const action = ICON_KEY_ACTIONS[event.key]
+    if (action === undefined) return
+    event.preventDefault()
 
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (filteredIcons.length === 0) return
-      setHighlightedIndex((current) => (current - 1 + filteredIcons.length) % filteredIcons.length)
-      return
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      if (shouldSelectIconSuggestion(editValue, filteredIcons.length)) {
-        selectIcon(filteredIcons.at(highlightedIndex)?.name ?? editValue)
-        return
-      }
-      commitTypedValue()
-      return
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault()
+    if (action === IconKeyAction.Next || action === IconKeyAction.Previous) {
+      navigateIcons(action)
+    } else if (action === IconKeyAction.Commit) {
+      commitIcon()
+    } else {
       onCancel()
     }
   }

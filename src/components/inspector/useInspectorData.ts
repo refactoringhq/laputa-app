@@ -79,18 +79,27 @@ function buildEntryTargetMatcher(entry: VaultEntry): EntryTargetMatcher {
   }
 }
 
+function entriesForKey(entries: Map<string, VaultEntry[]>, key: string): VaultEntry[] {
+  return entries.get(key) ?? []
+}
+
+function pathSuffixMatches(target: string, lookup: EntryLookup): VaultEntry[] {
+  if (!target.includes('/')) return []
+  return entriesForKey(lookup.pathSuffixEntries, target.toLowerCase())
+}
+
+function matchingEntryCandidates(target: string, lookup: EntryLookup): VaultEntry[] {
+  const lastSegment = target.split('/').pop() ?? ''
+  const exactMatches = entriesForKey(lookup.exactTargetEntries, target)
+  const segmentMatches = entriesForKey(lookup.exactTargetEntries, lastSegment)
+  const pathMatches = pathSuffixMatches(target, lookup)
+  return [...exactMatches, ...segmentMatches, ...pathMatches]
+}
+
 function findMatchedEntries(target: string, lookup: EntryLookup): VaultEntry[] {
   const matches = new Map<string, VaultEntry>()
-  const lastSegment = target.split('/').pop() ?? ''
-  const pathMatches = target.includes('/') ? lookup.pathSuffixEntries.get(target.toLowerCase()) : undefined
 
-  for (const candidate of lookup.exactTargetEntries.get(target) ?? []) {
-    matches.set(candidate.path, candidate)
-  }
-  for (const candidate of lookup.exactTargetEntries.get(lastSegment) ?? []) {
-    matches.set(candidate.path, candidate)
-  }
-  for (const candidate of pathMatches ?? []) {
+  for (const candidate of matchingEntryCandidates(target, lookup)) {
     matches.set(candidate.path, candidate)
   }
 

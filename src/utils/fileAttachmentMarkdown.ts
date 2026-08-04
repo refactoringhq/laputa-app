@@ -88,10 +88,6 @@ function escapeMarkdownDestination(value: AttachmentUrl): MarkdownText {
   return value.replace(/\\/g, '\\\\').replace(/\)/g, '\\)')
 }
 
-function unescapeMarkdownText(value: MarkdownText): MarkdownText {
-  return value.replace(/\\([\\\]"'])/g, '$1')
-}
-
 function unescapeMarkdownDestination(value: MarkdownText): AttachmentUrl {
   const withoutAngles = value.startsWith('<') && value.endsWith('>')
     ? value.slice(1, -1)
@@ -177,6 +173,18 @@ function readFileAttachmentToken(text: MarkdownText): FileAttachmentPayload | nu
   }
 }
 
+function matchedAttachmentUrl(match: RegExpExecArray, readUrl: AttachmentUrlReader): AttachmentUrl | null {
+  return readUrl(unescapeMarkdownDestination(match[3] ?? ''))
+}
+
+function matchedAttachmentName(match: RegExpExecArray, url: AttachmentUrl): MarkdownText {
+  return unescapeMarkdownText(match[2] ?? '') || fileNameFromUrl(url)
+}
+
+function matchedAttachmentCaption(match: RegExpExecArray): MarkdownText | undefined {
+  return match[4] ? unescapeMarkdownText(match[4]) : undefined
+}
+
 function readStandaloneFileAttachmentLink(
   text: MarkdownText,
   readUrl: AttachmentUrlReader = readAttachmentUrl,
@@ -184,11 +192,11 @@ function readStandaloneFileAttachmentLink(
   const match = STANDALONE_ATTACHMENT_LINK_PATTERN.exec(text)
   if (!match) return null
 
-  const url = readUrl(unescapeMarkdownDestination(match[3] ?? ''))
+  const url = matchedAttachmentUrl(match, readUrl)
   if (!url) return null
 
-  const name = unescapeMarkdownText(match[2] ?? '') || fileNameFromUrl(url)
-  const caption = match[4] ? unescapeMarkdownText(match[4]) : undefined
+  const name = matchedAttachmentName(match, url)
+  const caption = matchedAttachmentCaption(match)
   return fileAttachmentPayload({ name, url, caption })
 }
 
@@ -391,4 +399,8 @@ export function preProcessFileAttachmentMarkdown(
     markdown: options.markdown,
     transform: fileAttachmentToken,
   })
+}
+
+function unescapeMarkdownText(value: MarkdownText): MarkdownText {
+  return value.replace(/\\([\\\]"'])/g, '$1')
 }

@@ -194,11 +194,7 @@ function useRepositoryRemoteStatuses(repositories: GitRepositoryOption[]) {
   return { byRepository, refreshAllRemoteStatuses, refreshRemoteStatusForRepository }
 }
 
-export function useGitRepositories({
-  defaultVaultPath,
-  enabled = true,
-  repositories,
-}: UseGitRepositoriesOptions) {
+export function useGitRepositories({ defaultVaultPath, enabled = true, repositories }: UseGitRepositoriesOptions) {
   const selectionConfig = { fallbackPath: defaultVaultPath, repositories }
   const [changesRepositoryPath, setChangesRepositoryPath] = useValidatedRepositoryPath(selectionConfig)
   const [historyRepositoryPath, setHistoryRepositoryPath] = useValidatedRepositoryPath(selectionConfig)
@@ -208,11 +204,8 @@ export function useGitRepositories({
     repositories,
     enabled,
   )
-  const {
-    byRepository: remoteStatusByRepository,
-    refreshAllRemoteStatuses,
-    refreshRemoteStatusForRepository,
-  } = useRepositoryRemoteStatuses(repositories)
+  const { byRepository: remoteStatusByRepository, refreshAllRemoteStatuses,
+    refreshRemoteStatusForRepository } = useRepositoryRemoteStatuses(repositories)
 
   const allModifiedFiles = useMemo(
     () => repositories.flatMap((repository) => repositoryState({

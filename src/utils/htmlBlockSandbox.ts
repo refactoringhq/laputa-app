@@ -89,14 +89,6 @@ function escapeScriptText(text: string): string {
   return text.replace(/<\/script/giu, '<\\/script')
 }
 
-function escapeScriptAttributeValue(value: string): string {
-  return value
-    .replace(/&/gu, '&amp;')
-    .replace(/"/gu, '&quot;')
-    .replace(/</gu, '&lt;')
-    .replace(/>/gu, '&gt;')
-}
-
 function normalizedScriptType(element: HTMLScriptElement): string {
   return (element.getAttribute('type') ?? '').trim().toLowerCase()
 }
@@ -233,4 +225,12 @@ export function htmlBlockPreview(markup: string, options: HtmlBlockPreviewOption
 
 export function htmlBlockIframeSrcDoc(markup: string, options: HtmlBlockPreviewOptions = {}): string {
   return htmlBlockPreview(markup, options).srcDoc
+}
+
+function escapeScriptAttributeValue(value: string): string {
+  return value
+    .replace(/&/gu, '&amp;')
+    .replace(/"/gu, '&quot;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;')
 }

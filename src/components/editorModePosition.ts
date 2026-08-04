@@ -206,6 +206,11 @@ function findNearestBlockIndex({
   return nearestIndex
 }
 
+function documentBlockIndex(editor: BlockNotePositionEditor, blockId: string): number | null {
+  const index = editor.document.findIndex(block => block.id === blockId)
+  return index === -1 ? null : index
+}
+
 function getSelectionIndexes(editor: BlockNotePositionEditor): [number, number] | null {
   if (typeof editor.getSelection !== 'function') return null
 
@@ -217,9 +222,9 @@ function getSelectionIndexes(editor: BlockNotePositionEditor): [number, number] 
   const endBlock = selectedBlocks.at(-1)
   if (!startBlock || !endBlock) return null
 
-  const startIndex = editor.document.findIndex(block => block.id === startBlock.id)
-  const endIndex = editor.document.findIndex(block => block.id === endBlock.id)
-  if (startIndex === -1 || endIndex === -1) return null
+  const startIndex = documentBlockIndex(editor, startBlock.id)
+  const endIndex = documentBlockIndex(editor, endBlock.id)
+  if (startIndex === null || endIndex === null) return null
 
   return [startIndex, endIndex]
 }

@@ -57,10 +57,13 @@ function isCodeContext(selection: CodeContextSelection): boolean {
   return false
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
 function getWritableCursor(selection: CodeContextSelection): number | null {
   const { from, to } = selection
-  if (typeof from !== 'number' || typeof to !== 'number') return null
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return null
+  if (!isFiniteNumber(from) || !isFiniteNumber(to)) return null
 
   return from === to ? from : null
 }

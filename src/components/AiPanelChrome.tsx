@@ -279,17 +279,9 @@ function AiPanelEmptyState({
 }
 
 export const AiPanelHeader = memo(function AiPanelHeader(options: AiPanelHeaderProps) {
-  const {
-    agentLabel,
-    agentReadiness,
-    targetKind = 'agent',
-    locale = 'en',
-    permissionMode,
-    permissionModeDisabled,
-    onPermissionModeChange,
-    onClose,
-    onNewChat,
-  } = options
+  const { agentLabel, agentReadiness, targetKind = 'agent', locale = 'en' } = options
+  const { permissionMode, permissionModeDisabled, onPermissionModeChange } = options
+  const { onClose, onNewChat } = options
   const t = createTranslator(locale)
   const modeLabel =
     targetKind === 'api_model' ? t('ai.panel.mode.chat') : aiAgentPermissionModeLabels(permissionMode, locale).short

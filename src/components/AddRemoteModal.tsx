@@ -68,12 +68,9 @@ async function getConnectErrorMessage({
   }
 }
 
-export function AddRemoteModal({
-  open,
-  vaultPath,
-  onClose,
-  onRemoteConnected,
-}: AddRemoteModalProps) {
+export function AddRemoteModal(
+  { open, vaultPath, onClose, onRemoteConnected }: AddRemoteModalProps,
+) {
   const [remoteUrl, setRemoteUrl] = useState('')
   const [connectState, setConnectState] = useState<ConnectState>('idle')
   const [connectError, setConnectError] = useState<string | null>(null)

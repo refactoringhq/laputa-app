@@ -29,6 +29,11 @@ function quickOpenEmptyMessage(isLoading: boolean, locale: AppLocale): string {
   return isLoading ? translate(locale, 'status.vault.reloading') : translate(locale, 'noteList.empty.noMatching')
 }
 
+function selectAndClose(entry: VaultEntry, onSelect: (entry: VaultEntry) => void, onClose: () => void) {
+  onSelect(entry)
+  onClose()
+}
+
 function QuickOpenCreateAction({ title, onCreate, disabled, locale }: QuickOpenCreateActionProps) {
   return (
     <div className="border-t border-border p-2">
@@ -77,7 +82,6 @@ function useQuickOpenCreateAction({
 }
 
 function useQuickOpenKeyboard({
-  open,
   results,
   selectedIndex,
   onSelect,
@@ -85,7 +89,6 @@ function useQuickOpenKeyboard({
   handleKeyDown,
   createFromQuery,
 }: {
-  open: boolean
   results: NoteSearchResult[]
   selectedIndex: number
   onSelect: (entry: VaultEntry) => void
@@ -94,7 +97,6 @@ function useQuickOpenKeyboard({
   createFromQuery: () => void | Promise<void>
 }) {
   useEffect(() => {
-    if (!open) return
     const handler = (e: KeyboardEvent) => {
       handleKeyDown(e)
       if (e.key === 'Escape') {
@@ -104,8 +106,7 @@ function useQuickOpenKeyboard({
         e.preventDefault()
         const selected = results.at(selectedIndex)
         if (selected) {
-          onSelect(selected.entry)
-          onClose()
+          selectAndClose(selected.entry, onSelect, onClose)
         } else {
           void createFromQuery()
         }
@@ -113,10 +114,24 @@ function useQuickOpenKeyboard({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery])
+  }, [results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery])
 }
 
-export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, onCreateNote, onClose, locale = 'en' }: QuickOpenPaletteProps) {
+function closeOnBackdrop(root: HTMLDivElement, onClose: () => void): () => void {
+  const handleRootClick = (event: MouseEvent) => {
+    if (event.target === root) onClose()
+  }
+  root.addEventListener('click', handleRootClick)
+  return () => root.removeEventListener('click', handleRootClick)
+}
+
+export function QuickOpenPalette(props: QuickOpenPaletteProps) {
+  if (!props.open) return null
+
+  return <QuickOpenPaletteContent {...props} />
+}
+
+function QuickOpenPaletteContent({ entries, isLoading = false, onSelect, onCreateNote, onClose, locale = 'en' }: QuickOpenPaletteProps) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -124,30 +139,16 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
   const createAction = useQuickOpenCreateAction({ query, isLoading, resultCount: results.length, onCreateNote, onClose })
 
   useEffect(() => {
-    if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on dialog open
-      setQuery('')
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }, [open, setSelectedIndex])
+    const focusTimer = setTimeout(() => inputRef.current?.focus(), 50)
+    return () => clearTimeout(focusTimer)
+  }, [])
 
-  useQuickOpenKeyboard({ open, results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery: createAction.create })
+  useQuickOpenKeyboard({ results, selectedIndex, onSelect, onClose, handleKeyDown, createFromQuery: createAction.create })
 
   useEffect(() => {
-    if (!open) return
     const root = rootRef.current
-    if (!root) return
-
-    const handleRootClick = (event: MouseEvent) => {
-      if (event.target === root) onClose()
-    }
-
-    root.addEventListener('click', handleRootClick)
-    return () => root.removeEventListener('click', handleRootClick)
-  }, [open, onClose])
-
-  if (!open) return null
+    return root ? closeOnBackdrop(root, onClose) : undefined
+  }, [onClose])
 
   return (
     <div
@@ -155,8 +156,7 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
       data-testid="quick-open-palette"
       className="fixed inset-0 z-[1000] flex justify-center bg-[var(--shadow-dialog)] pt-[15vh]"
     >
-      <button
-        type="button"
+      <button type="button"
         aria-label="Close quick open"
         className="absolute inset-0 z-0 cursor-default border-0 bg-transparent p-0"
         onClick={onClose}
@@ -176,10 +176,7 @@ export function QuickOpenPalette({ open, entries, isLoading = false, onSelect, o
           items={results}
           selectedIndex={selectedIndex}
           getItemKey={(item) => item.entry.path}
-          onItemClick={(item) => {
-            onSelect(item.entry)
-            onClose()
-          }}
+          onItemClick={(item) => selectAndClose(item.entry, onSelect, onClose)}
           onItemHover={(i) => setSelectedIndex(i)}
           emptyMessage={quickOpenEmptyMessage(isLoading, locale)}
           className="flex-1 overflow-y-auto"

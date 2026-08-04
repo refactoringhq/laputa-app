@@ -83,8 +83,12 @@ function htmlBlockProps(value: unknown): HtmlBlockProps | null {
   }
 }
 
+function isLiveHtmlBlockRecord(value: unknown): value is Record<string, unknown> & { id: string } {
+  return isRecord(value) && value.type === BLOCK_TYPE && typeof value.id === 'string'
+}
+
 function liveHtmlBlock(value: unknown): LiveHtmlBlock | null {
-  if (!isRecord(value) || value.type !== BLOCK_TYPE || typeof value.id !== 'string') return null
+  if (!isLiveHtmlBlockRecord(value)) return null
 
   const props = htmlBlockProps(value.props)
   return props ? { id: value.id, props } : null
