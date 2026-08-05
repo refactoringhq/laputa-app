@@ -28,7 +28,9 @@ import type {
 import { FormattingToolbarExtension } from '@blocknote/core/extensions'
 import { useEditorComposing } from './useEditorComposing'
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -62,10 +64,7 @@ import {
 import { translate, type AppLocale } from '../lib/i18n'
 import { useBlockNoteFormattingToolbarHoverGuard } from './blockNoteFormattingToolbarHoverGuard'
 import { openEditorAttachmentOrUrl } from './editorAttachmentActions'
-import {
-  isStaleBlockReferenceError,
-  reportRecoveredEditorTransformError,
-} from './richEditorTransformErrorRecoveryExtension'
+import { turnBlocksIntoType } from './richEditorBlockTypeCommands'
 
 type TolariaBasicTextStyle =
   | 'bold'
@@ -127,6 +126,10 @@ function useFormattingToolbarCloseGrace({
   const clearCloseGrace = useCallback(() => {
     clearToolbarCloseGrace(closeGraceTimeoutRef, setCloseGraceActive)
   }, [])
+  const dismissImmediately = useCallback(() => {
+    previousShowRef.current = false
+    clearCloseGrace()
+  }, [clearCloseGrace])
 
   useEffect(() => {
     const toolbarInteractionActive = show || toolbarHasFocus || toolbarHovered
@@ -146,11 +149,43 @@ function useFormattingToolbarCloseGrace({
     }
   }, [])
 
-  return { closeGraceActive, clearCloseGrace }
+  return { closeGraceActive, clearCloseGrace, dismissImmediately }
 }
 
 type FormattingToolbarStore = {
   setState(open: boolean): void
+}
+
+type BlockTypeMenuState = {
+  opened: boolean
+  setOpened(opened: boolean): void
+}
+
+const BlockTypeMenuContext = createContext<BlockTypeMenuState | null>(null)
+
+function useBlockTypeMenuState(): BlockTypeMenuState {
+  const sharedState = useContext(BlockTypeMenuContext)
+  const [localOpened, setLocalOpened] = useState(false)
+  return sharedState ?? { opened: localOpened, setOpened: setLocalOpened }
+}
+
+function useCloseBlockTypeMenuOnEditorInteraction(
+  editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>,
+  opened: boolean,
+  closeMenu: () => void,
+) {
+  useEffect(() => {
+    if (!opened || !editor.domElement) return
+    const editorElement = editor.domElement
+    editorElement.addEventListener('pointerdown', closeMenu, true)
+    editorElement.addEventListener('keydown', closeMenu, true)
+    editorElement.addEventListener('beforeinput', closeMenu, true)
+    return () => {
+      editorElement.removeEventListener('pointerdown', closeMenu, true)
+      editorElement.removeEventListener('keydown', closeMenu, true)
+      editorElement.removeEventListener('beforeinput', closeMenu, true)
+    }
+  }, [closeMenu, editor, opened])
 }
 
 function useDeduplicatedFormattingToolbarStore(
@@ -426,50 +461,27 @@ function getSelectedFileBlockState(
     : null
 }
 
-function reportStaleFormattingToolbarBlockReference(error: unknown) {
-  reportRecoveredEditorTransformError('stale_block_reference', error)
-}
-
-function liveSelectedBlock(
-  editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>,
-  block: TolariaSelectedBlock,
-) {
-  try {
-    return editor.getBlock(block.id) as TolariaSelectedBlock | undefined
-  } catch (error) {
-    if (isStaleBlockReferenceError(error)) {
-      reportStaleFormattingToolbarBlockReference(error)
-      return undefined
+type FormattingToolbarDictionary = {
+  formatting_toolbar?: {
+    file_download?: {
+      tooltip?: Record<string, string>
     }
-    throw error
   }
 }
 
-function liveSelectedBlocks(
-  editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>,
-  selectedBlocks: TolariaSelectedBlock[],
-) {
-  const liveBlocks: TolariaSelectedBlock[] = []
-
-  for (const block of selectedBlocks) {
-    const liveBlock = liveSelectedBlock(editor, block)
-    if (!liveBlock) return []
-    liveBlocks.push(liveBlock)
-  }
-
-  return liveBlocks
+function fileDownloadTooltips(dict: unknown): Record<string, string> {
+  const toolbar = (dict as FormattingToolbarDictionary).formatting_toolbar
+  if (!toolbar) return {}
+  const fileDownload = toolbar.file_download
+  if (!fileDownload) return {}
+  return fileDownload.tooltip ?? {}
 }
 
 function fileDownloadTooltip(dict: unknown, blockType: string): string {
-  const tooltip = (dict as {
-    formatting_toolbar?: {
-      file_download?: {
-        tooltip?: Record<string, string>
-      }
-    }
-  }).formatting_toolbar?.file_download?.tooltip
-
-  return (tooltip ? Reflect.get(tooltip, blockType) as string | undefined : undefined) ?? tooltip?.file ?? 'Download file'
+  const tooltips = fileDownloadTooltips(dict)
+  const specificTooltip = Reflect.get(tooltips, blockType)
+  if (typeof specificTooltip === 'string') return specificTooltip
+  return tooltips.file ?? 'Download file'
 }
 
 function getFormattingToolbarAnchorElement(
@@ -477,33 +489,6 @@ function getFormattingToolbarAnchorElement(
 ) {
   const anchor = editor.domElement?.firstElementChild
   return anchor instanceof Element && anchor.isConnected ? anchor : null
-}
-
-function updateSelectedBlocksToType(
-  editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>,
-  selectedBlocks: TolariaSelectedBlock[],
-  item: ReturnType<typeof getTolariaBlockTypeSelectItems>[number],
-) {
-  const blocks = liveSelectedBlocks(editor, selectedBlocks)
-  if (!blocks.length) return
-
-  try {
-    editor.focus()
-    editor.transact(() => {
-      for (const block of blocks) {
-        editor.updateBlock(block.id, {
-          type: item.type as never,
-          props: item.props as never,
-        })
-      }
-    })
-  } catch (error) {
-    if (isStaleBlockReferenceError(error)) {
-      reportStaleFormattingToolbarBlockReference(error)
-      return
-    }
-    throw error
-  }
 }
 
 function useRequiredComponentsContext() {
@@ -595,11 +580,34 @@ function TolariaBlockTypeSelect() {
   const selectedItem = selectItems.find(
     (item): item is TolariaBlockTypeSelectOption => item.isSelected,
   )
+  const menuState = useBlockTypeMenuState()
+  const selectedBlockIdsRef = useRef<string[]>([])
+  const captureSelectedBlockIds = useCallback(() => {
+    selectedBlockIdsRef.current = selectedBlocks.map((block) => block.id)
+  }, [selectedBlocks])
+  const handleMenuChange = useCallback((opened: boolean) => {
+    if (opened) captureSelectedBlockIds()
+    menuState.setOpened(opened)
+  }, [captureSelectedBlockIds, menuState])
+  const handleBlockTypeChange = useCallback((item: TolariaBlockTypeSelectOption) => {
+    const blockIds = selectedBlockIdsRef.current.length
+      ? selectedBlockIdsRef.current
+      : selectedBlocks.map((block) => block.id)
+    turnBlocksIntoType({
+      blockIds,
+      editor,
+      source: 'block_menu',
+      target: item,
+    })
+    menuState.setOpened(false)
+  }, [editor, menuState, selectedBlocks])
 
   if (!selectedItem || !editor.isEditable) return null
 
   return (
     <MantineMenu
+      opened={menuState.opened}
+      onChange={handleMenuChange}
       withinPortal={false}
       transitionProps={{ exitDuration: 0 }}
       middlewares={{ flip: true, shift: true, inline: false, size: true }}
@@ -607,6 +615,7 @@ function TolariaBlockTypeSelect() {
       <MantineMenu.Target>
         <MantineButton
           onMouseDown={(event) => {
+            captureSelectedBlockIds()
             event.preventDefault()
             event.currentTarget.focus()
           }}
@@ -623,7 +632,7 @@ function TolariaBlockTypeSelect() {
           <MantineMenu.Item
             key={item.name}
             onClick={() => {
-              updateSelectedBlocksToType(editor, selectedBlocks, item)
+              handleBlockTypeChange(item)
             }}
             leftSection={item.iconElement}
             rightSection={item.isSelected
@@ -754,7 +763,16 @@ export function TolariaFormattingToolbarController(props: {
   const isComposing = useEditorComposing(editor)
   const [toolbarHasFocus, setToolbarHasFocus] = useState(false)
   const [toolbarHovered, setToolbarHovered] = useState(false)
-  const { closeGraceActive, clearCloseGrace } = useFormattingToolbarCloseGrace({
+  const [blockTypeMenuOpened, setBlockTypeMenuOpened] = useState(false)
+  const blockTypeMenuState = useMemo<BlockTypeMenuState>(() => ({
+    opened: blockTypeMenuOpened,
+    setOpened: setBlockTypeMenuOpened,
+  }), [blockTypeMenuOpened])
+  const {
+    closeGraceActive,
+    clearCloseGrace,
+    dismissImmediately,
+  } = useFormattingToolbarCloseGrace({
     show,
     toolbarHasFocus,
     toolbarHovered,
@@ -763,9 +781,21 @@ export function TolariaFormattingToolbarController(props: {
     formattingToolbar.store,
     show,
   )
+  const closeBlockTypeMenuFromEditor = useCallback(() => {
+    setBlockTypeMenuOpened(false)
+    setToolbarHasFocus(false)
+    setToolbarHovered(false)
+    dismissImmediately()
+    setFormattingToolbarOpen(false)
+  }, [dismissImmediately, setFormattingToolbarOpen])
+  useCloseBlockTypeMenuOnEditorInteraction(
+    editor,
+    blockTypeMenuOpened,
+    closeBlockTypeMenuFromEditor,
+  )
 
   const isOpen = !isComposing
-    && (show || toolbarHasFocus || toolbarHovered || closeGraceActive)
+    && (show || toolbarHasFocus || toolbarHovered || blockTypeMenuOpened || closeGraceActive)
   const hasFloatingToolbarAnchor = getFormattingToolbarAnchorElement(editor) !== null
   const shouldRenderFloatingToolbar = isOpen && hasFloatingToolbarAnchor
   const currentBridgeBlockId = useEditorState({
@@ -821,6 +851,7 @@ export function TolariaFormattingToolbarController(props: {
           if (!open) {
             setToolbarHasFocus(false)
             setToolbarHovered(false)
+            setBlockTypeMenuOpened(false)
             clearCloseGrace()
           }
           if (reason === 'escape-key') {
@@ -872,10 +903,13 @@ export function TolariaFormattingToolbarController(props: {
             }
 
             setToolbarHasFocus(false)
+            setBlockTypeMenuOpened(false)
             setFormattingToolbarOpen(false)
           }}
         >
-          <Component />
+          <BlockTypeMenuContext.Provider value={blockTypeMenuState}>
+            <Component />
+          </BlockTypeMenuContext.Provider>
         </div>
       )}
     </PositionPopover>
