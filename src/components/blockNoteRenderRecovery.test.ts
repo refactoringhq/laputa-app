@@ -67,6 +67,18 @@ describe('blockNoteRenderRecovery', () => {
     expect(isRecoveredBlockNoteRenderError(error, '')).toBe(true)
   })
 
+  it('recognizes recovered BlockNote missing node-type render errors', () => {
+    const error = new TypeError("Cannot read properties of undefined (reading 'type')")
+
+    expect(blockNoteRenderRecoveryReason(error)).toBe('undefined_node_type')
+    expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(false)
+
+    markRecoveredBlockNoteRenderError(error)
+
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(true)
+  })
+
   it('recognizes stale BlockNote block references during note render', () => {
     const error = new Error('Block with ID stale-block not found')
 

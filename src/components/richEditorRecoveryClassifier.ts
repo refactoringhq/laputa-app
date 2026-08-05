@@ -7,6 +7,7 @@ const PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR = /^Position \d+ out of range$/
 const PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR = 'Selection points outside of document'
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
+const UNDEFINED_NODE_TYPE_PROPERTY_ERROR = "Cannot read properties of undefined (reading 'type')"
 const REACT_UPDATE_DEPTH_EXCEEDED_ERROR = 'Maximum update depth exceeded'
 const REACT_MINIFIED_UPDATE_DEPTH_ERROR = /\b(?:React error #185|errors\/185|#185)\b/
 const WEBKIT_DOM_NOT_FOUND_MESSAGES = [
@@ -24,6 +25,7 @@ export type BlockNoteRenderRecoveryReason =
   | 'react_update_depth_exceeded'
   | 'stale_block_reference'
   | 'table_row_index_out_of_range'
+  | 'undefined_node_type'
 
 export type RichEditorTransformRecoveryReason =
   | 'block_type_mismatch'
@@ -41,6 +43,7 @@ export type RichEditorTransformRecoveryReason =
   | 'stale_transaction'
   | 'table_row_index_out_of_range'
   | 'transform_error'
+  | 'undefined_node_type'
 
 type RichEditorRecoverySurface = 'render' | 'transform'
 type StaticTransformRecoveryReason = Exclude<RichEditorTransformRecoveryReason, 'stale_transaction'>
@@ -185,6 +188,11 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   {
     matches: isNullFirstChildError,
     reason: 'dom_not_found',
+    surfaces: ['render', 'transform'],
+  },
+  {
+    matches: (error) => error instanceof TypeError && isMessage(error, UNDEFINED_NODE_TYPE_PROPERTY_ERROR),
+    reason: 'undefined_node_type',
     surfaces: ['render', 'transform'],
   },
   {
