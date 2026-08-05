@@ -5,6 +5,7 @@ const BLOCKNOTE_TABLE_INDEX_ERROR = /^Index \d+ out of range for <table(?:Row)?\
 const BLOCKNOTE_PARAGRAPH_INDEX_ERROR = /^Index \d+ out of range for <paragraph\(/
 const PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR = /^Position \d+ out of range$/
 const PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR = 'Selection points outside of document'
+const PROSEMIRROR_SELECTION_CURRENT_DOCUMENT_ERROR = 'Selection passed to setSelection must point at the current document'
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
 const UNDEFINED_NODE_TYPE_PROPERTY_ERROR = "Cannot read properties of undefined (reading 'type')"
@@ -165,6 +166,7 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
       && (
         messageMatches(error, PROSEMIRROR_POSITION_OUT_OF_RANGE_ERROR)
         || isMessage(error, PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR)
+        || isMessage(error, PROSEMIRROR_SELECTION_CURRENT_DOCUMENT_ERROR)
       )
     ),
     reason: 'prosemirror_position_out_of_range',

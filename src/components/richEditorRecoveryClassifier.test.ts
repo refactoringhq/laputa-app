@@ -54,6 +54,7 @@ describe('richEditorRecoveryClassifier', () => {
     const stalePositionErrors = [
       new RangeError('Position 21183 out of range'),
       new RangeError('Selection points outside of document'),
+      new RangeError('Selection passed to setSelection must point at the current document'),
     ]
 
     for (const error of stalePositionErrors) {
