@@ -14,8 +14,8 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboa
 import { ActionTooltip, type ActionTooltipCopy } from '@/components/ui/action-tooltip'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ClaudeCodeStatus } from '../../hooks/useClaudeCodeStatus'
 import type { McpStatus } from '../../hooks/useMcpStatus'
+import type { AiAgentStatus } from '../../lib/aiAgents'
 import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { GitRemoteStatus, LastCommitInfo, SyncStatus } from '../../types'
 import { openExternalUrl } from '../../utils/url'
@@ -39,6 +39,8 @@ const SYNC_COLORS = new Map<SyncStatus, string>([
 const MCP_TOOLTIP_KEYS = new Map<McpStatus, TranslationKey>([['not_installed', 'status.mcp.notConnected']])
 
 const CLAUDE_INSTALL_URL = 'https://docs.anthropic.com/en/docs/claude-code'
+
+type OptionalGitRemoteStatus = GitRemoteStatus | null | undefined
 
 function formatElapsedSync(locale: AppLocale, lastSyncTime: number | null): string {
   if (!lastSyncTime) return translate(locale, 'status.sync.notSynced')
@@ -93,18 +95,18 @@ function hasRemote(remoteStatus: GitRemoteStatus | null): boolean {
   return remoteStatus?.hasRemote ?? false
 }
 
-function branchLabel(remoteStatus: GitRemoteStatus | null | undefined): string | null {
+function branchLabel(remoteStatus: OptionalGitRemoteStatus): string | null {
   const branch = remoteStatus?.branch?.trim()
   return branch ? branch : null
 }
 
-function isRemoteMissing(remoteStatus: GitRemoteStatus | null | undefined): boolean {
+function isRemoteMissing(remoteStatus: OptionalGitRemoteStatus): boolean {
   return remoteStatus?.hasRemote === false
 }
 
 function commitButtonTooltipCopy(
   locale: AppLocale,
-  remoteStatus: GitRemoteStatus | null | undefined,
+  remoteStatus: OptionalGitRemoteStatus,
 ): ActionTooltipCopy {
   return {
     label: isRemoteMissing(remoteStatus)
@@ -123,7 +125,7 @@ function getMcpBadgeConfig(locale: AppLocale, status: McpStatus, onInstall?: () 
   }
 }
 
-function getClaudeCodeBadgeConfig(locale: AppLocale, status: ClaudeCodeStatus, version?: string | null) {
+function getClaudeCodeBadgeConfig(locale: AppLocale, status: AiAgentStatus, version?: string | null) {
   if (status === 'checking') return null
   const missing = status === 'missing'
   const label = translate(locale, missing ? 'status.claude.missing' : 'status.claude.label')
@@ -311,7 +313,7 @@ type StatusWarningBadgeProps = {
   | { kind: 'conflict'; count: number; onClick?: () => void }
   | { kind: 'missingGit'; onClick?: () => void }
   | { kind: 'mcp'; status: McpStatus; onInstall?: () => void }
-  | { kind: 'claude'; status: ClaudeCodeStatus; version?: string | null }
+  | { kind: 'claude'; status: AiAgentStatus; version?: string | null }
 )
 
 interface StatusBadgeDisplayOptions {
@@ -335,7 +337,7 @@ type McpBadgeProps = StatusBadgeDisplayOptions & {
 }
 
 type ClaudeCodeBadgeProps = StatusBadgeDisplayOptions & {
-  status: ClaudeCodeStatus
+  status: AiAgentStatus
   version?: string | null
 }
 
