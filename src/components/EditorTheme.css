@@ -75,11 +75,6 @@
   pointer-events: none;
 }
 
-/* More horizontal space between drag handle and content */
-.editor__blocknote-container .bn-side-menu ~ * ,
-.editor__blocknote-container [class*="bn-side-menu"] {
-  /* The side menu is positioned via transform — we shift it further left */
-}
 .editor__blocknote-container .bn-block-content {
   margin-inline-start: 8px;
 }
@@ -846,6 +841,10 @@ body.tldraw-whiteboard-fullscreen-open {
   font-size: var(--table-font-size);
 }
 
+.editor__blocknote-container [data-content-type="table"] :is(th, td) {
+  border-color: var(--table-border-color);
+}
+
 .editor__blocknote-container [data-content-type="table"] th {
   background: var(--table-header-background);
   padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
@@ -853,8 +852,12 @@ body.tldraw-whiteboard-fullscreen-open {
 
 .editor__blocknote-container [data-content-type="table"] td {
   padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
-  border-color: var(--table-border-color);
   text-align: start;
+}
+
+/* Keep the one-pixel grid exposed beneath ProseMirror's selected-cell overlay. */
+.editor__blocknote-container [data-content-type="table"] .selectedCell::after {
+  inset: 1px;
 }
 
 /* --- Horizontal rule --- */

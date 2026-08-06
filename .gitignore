@@ -82,6 +82,7 @@ CODE-HEALTH-REPORT.md
 .codacy/*
 !.codacy/cli.sh
 !.codacy/codacy.yaml
+!.codacy/codacy.config.json
 !.codacy/tools-configs/
 .codacy/tools-configs/*
 !.codacy/tools-configs/semgrep.yaml

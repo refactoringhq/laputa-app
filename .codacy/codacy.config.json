@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "metadata": {
+    "source": "local",
+    "provider": null,
+    "organization": null,
+    "repositoryId": null,
+    "repositoryName": "tolaria",
+    "createdAt": "2026-08-06T13:21:04.438Z",
+    "updatedAt": "2026-08-06T13:21:04.438Z",
+    "languages": [
+      "CSS",
+      "HTML",
+      "JSON",
+      "Javascript",
+      "Markdown",
+      "Powershell",
+      "Rust",
+      "Shell",
+      "TypeScript",
+      "XML",
+      "YAML"
+    ]
+  },
+  "tools": [
+    {
+      "toolId": "Biome",
+      "patterns": [],
+      "exclude": [],
+      "useLocalConfigurationFile": true,
+      "localConfigurationFile": "biome.json"
+    },
+    {
+      "toolId": "Stylelint",
+      "patterns": [],
+      "exclude": [],
+      "useLocalConfigurationFile": true,
+      "localConfigurationFile": ".stylelintrc.json"
+    },
+    {
+      "toolId": "ESLint9",
+      "patterns": [],
+      "exclude": [],
+      "useLocalConfigurationFile": true,
+      "localConfigurationFile": "eslint.config.js"
+    },
+    {
+      "toolId": "Semgrep",
+      "patterns": [],
+      "exclude": [],
+      "useLocalConfigurationFile": true,
+      "localConfigurationFile": ".codacy/tools-configs/semgrep.yaml"
+    },
+    {
+      "toolId": "Trivy",
+      "patterns": [],
+      "exclude": [],
+      "useLocalConfigurationFile": true,
+      "localConfigurationFile": ".codacy/tools-configs/trivy.yaml"
+    },
+    {
+      "toolId": "Lizard",
+      "patterns": [],
+      "exclude": [],
+      "useLocalConfigurationFile": true,
+      "localConfigurationFile": ".codacy/tools-configs/lizard.yaml"
+    },
+    {
+      "toolId": "jackson",
+      "patterns": [
+        {
+          "patternId": "jackson_duplicate-keys"
+        },
+        {
+          "patternId": "jackson_parse-error"
+        }
+      ],
+      "exclude": []
+    }
+  ],
+  "exclude": [
+    ".chunk/**",
+    "coverage/**",
+    "dist/**",
+    "e2e/**",
+    "node_modules/**",
+    "pnpm-lock.yaml",
+    "scripts/**",
+    "site/.vitepress/cache/**",
+    "site/.vitepress/dist/**",
+    "src/test/**",
+    "src-tauri/gen/**",
+    "src-tauri/resources/agent-docs/**",
+    "src-tauri/resources/mcp-server/**",
+    "src-tauri/target/**",
+    "target/**",
+    "test-results/**",
+    "tests/**",
+    "**/package-lock.json",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.testUtils.ts",
+    "**/*.testUtils.tsx",
+    "mcp-server/test.js",
+    "vite.config.ts"
+  ]
+}
