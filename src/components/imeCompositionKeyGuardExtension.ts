@@ -41,7 +41,7 @@ export function shouldStopComposingParagraphInput(
   composingEnterAt: number | null = null,
 ): boolean {
   if (!isParagraphInput(event)) return false
-  if (event.isComposing || Boolean(view?.composing)) return true
+  if (event.isComposing || view?.composing === true) return true
   if (composingEnterAt === null) return false
 
   const elapsed = event.timeStamp - composingEnterAt
