@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
 import {
   createMarkdownHighlightShortcutExtension,
   isMarkdownHighlightShortcut,
 } from './markdownHighlightShortcutExtension'
 
-const { trackEventMock } = vi.hoisted(() => ({
+const { mountHighlightControlsMock, toggleDefaultHighlightMock, trackEventMock } = vi.hoisted(() => ({
+  mountHighlightControlsMock: vi.fn(),
+  toggleDefaultHighlightMock: vi.fn(),
   trackEventMock: vi.fn(),
+}))
+
+vi.mock('./markdownHighlightControls', () => ({
+  mountMarkdownHighlightControls: mountHighlightControlsMock,
+  toggleDefaultMarkdownHighlight: toggleDefaultHighlightMock,
 }))
 
 vi.mock('../lib/telemetry', () => ({
@@ -82,6 +88,8 @@ function createFixture({ editable = true, composing = false } = {}) {
 describe('createMarkdownHighlightShortcutExtension', () => {
   beforeEach(() => {
     trackEventMock.mockClear()
+    mountHighlightControlsMock.mockClear()
+    toggleDefaultHighlightMock.mockClear()
   })
 
   it('recognizes Cmd/Ctrl+Shift+M without Alt', () => {
@@ -105,6 +113,10 @@ describe('createMarkdownHighlightShortcutExtension', () => {
         signal: expect.any(AbortSignal),
       }),
     )
+    expect(mountHighlightControlsMock).toHaveBeenCalledWith(expect.objectContaining({
+      editor: fixture.editor,
+      signal: expect.any(AbortSignal),
+    }))
   })
 
   it('toggles the durable Markdown highlight style from the keyboard shortcut', () => {
@@ -114,7 +126,7 @@ describe('createMarkdownHighlightShortcutExtension', () => {
     const event = fixture.fireKeydown()
 
     expect(fixture.editor.focus).toHaveBeenCalledWith()
-    expect(fixture.editor.toggleStyles).toHaveBeenCalledWith({ [MARKDOWN_HIGHLIGHT_STYLE]: true })
+    expect(toggleDefaultHighlightMock).toHaveBeenCalledWith(fixture.editor)
     expect(trackEventMock).toHaveBeenCalledWith('markdown_highlight_shortcut_used', { source: 'keyboard' })
     expect(event.preventDefault).toHaveBeenCalledWith()
     expect(event.stopPropagation).toHaveBeenCalledWith()

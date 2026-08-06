@@ -47,6 +47,34 @@ describe('markdown highlight round-trip', () => {
     }])
   })
 
+  it('maps Bear-style circle prefixes to durable highlight colors', () => {
+    const blocks = injectMarkdownHighlightsInBlocks([{
+      type: 'paragraph',
+      content: [{
+        type: 'text',
+        text: '==🔴red== ==🔵blue== ==🟣purple== ==🟢green== ==yellow==',
+        styles: {},
+      }],
+      children: [],
+    }])
+
+    expect(blocks).toEqual([{
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'red', styles: { highlight: true, backgroundColor: 'red' } },
+        { type: 'text', text: ' ', styles: {} },
+        { type: 'text', text: 'blue', styles: { highlight: true, backgroundColor: 'blue' } },
+        { type: 'text', text: ' ', styles: {} },
+        { type: 'text', text: 'purple', styles: { highlight: true, backgroundColor: 'purple' } },
+        { type: 'text', text: ' ', styles: {} },
+        { type: 'text', text: 'green', styles: { highlight: true, backgroundColor: 'green' } },
+        { type: 'text', text: ' ', styles: {} },
+        { type: 'text', text: 'yellow', styles: { highlight: true } },
+      ],
+      children: [],
+    }])
+  })
+
   it('leaves code-styled ==text== literal', () => {
     const blocks = injectMarkdownHighlightsInBlocks([{
       type: 'paragraph',
@@ -95,5 +123,28 @@ describe('markdown highlight round-trip', () => {
 
     expect(serializeMarkdownHighlightAwareBlocks(editor, blocks)).toBe('Keep ==important== visible.')
     expect(editor.blocksToMarkdownLossy).toHaveBeenCalledWith(restoreMarkdownHighlightsInBlocks(blocks))
+  })
+
+  it('serializes adjacent highlight colors with their circle prefixes', () => {
+    const editor = {
+      blocksToMarkdownLossy: vi.fn((blocks: unknown[]) => {
+        return (blocks as Array<{ content?: Array<{ text?: string }> }>)
+          .map((block) => block.content?.map((item) => item.text ?? '').join('') ?? '')
+          .join('\n\n')
+      }),
+    }
+    const blocks = [{
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'red', styles: { highlight: true, backgroundColor: 'red' } },
+        { type: 'text', text: 'blue', styles: { highlight: true, backgroundColor: 'blue' } },
+        { type: 'text', text: 'yellow', styles: { highlight: true } },
+      ],
+      children: [],
+    }]
+
+    expect(serializeMarkdownHighlightAwareBlocks(editor, blocks)).toBe(
+      '==🔴red====🔵blue====yellow==',
+    )
   })
 })

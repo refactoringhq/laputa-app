@@ -1,7 +1,10 @@
 import { createExtension } from '@blocknote/core'
 import type { useCreateBlockNote } from '@blocknote/react'
 import { trackEvent } from '../lib/telemetry'
-import { MARKDOWN_HIGHLIGHT_STYLE } from '../utils/markdownHighlightMarkdown'
+import {
+  mountMarkdownHighlightControls,
+  toggleDefaultMarkdownHighlight,
+} from './markdownHighlightControls'
 
 type EditorLike = ReturnType<typeof useCreateBlockNote>
 type EditorViewLike = NonNullable<EditorLike['prosemirrorView']>
@@ -38,7 +41,7 @@ function isEditable(editor: ShortcutEditor): boolean {
 
 function toggleMarkdownHighlight(editor: ShortcutEditor): void {
   editor.focus()
-  editor.toggleStyles({ [MARKDOWN_HIGHLIGHT_STYLE]: true } as never)
+  toggleDefaultMarkdownHighlight(editor)
   trackEvent('markdown_highlight_shortcut_used', { source: 'keyboard' })
 }
 
@@ -58,6 +61,11 @@ export const createMarkdownHighlightShortcutExtension = createExtension(({ edito
   return {
     key: 'markdownHighlightShortcut',
     mount: ({ dom, signal }) => {
+      mountMarkdownHighlightControls({
+        dom,
+        editor: shortcutEditor,
+        signal,
+      })
       dom.addEventListener('keydown', handleKeyDown, {
         capture: true,
         signal,

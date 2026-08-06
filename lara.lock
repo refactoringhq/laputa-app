@@ -788,6 +788,13 @@ files:
     editor.sideMenu.turnInto: c2d2b328447c4974e839564b054c72f8
     editor.formatting.highlight: 0b90582f4589d84be89f5b847d4d1ed1
     editor.formatting.highlightTooltip: c27173fea9ec1718030c5fa8440b2c78
+    editor.formatting.highlightColor: 63774c0281fa455bf63cdb1df5336795
+    editor.formatting.highlightChangeColor: d76364005550995977f1eacb89ea7001
+    editor.formatting.highlightYellow: 51e6cd92b6c45f9affdc158ecca2b8b8
+    editor.formatting.highlightGreen: d382816a3cbeed082c9e216e7392eed1
+    editor.formatting.highlightRed: ee38e4d5dd68c4e440825018d549cb47
+    editor.formatting.highlightBlue: 9594eec95be70e7b1710f730fdda33d9
+    editor.formatting.highlightPurple: b9ba865fec061c9706d2fd7ce49c0cc7
     editor.whiteboard.enterFullscreen: 606bf766125ecff4b33ca98122222c72
     editor.whiteboard.exitFullscreen: afd0a0414d79d047f00319921e4d4944
     editor.whiteboard.permissionDeniedTitle: f40def4c1928438aa4ac86421fed9fd9

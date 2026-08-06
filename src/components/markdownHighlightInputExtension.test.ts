@@ -19,6 +19,8 @@ function createView(beforeText: string, parentStart = 0, parentTypeName = 'parag
   const transaction = createTransaction()
   const highlightMark = { type: { name: MARKDOWN_HIGHLIGHT_STYLE } }
   const highlightMarkType = { create: vi.fn(() => highlightMark) }
+  const backgroundColorMark = { type: { name: 'backgroundColor' } }
+  const backgroundColorMarkType = { create: vi.fn(() => backgroundColorMark) }
   const docNodes: Array<{
     node: {
       isText?: boolean
@@ -49,6 +51,7 @@ function createView(beforeText: string, parentStart = 0, parentTypeName = 'parag
       },
       schema: {
         marks: {
+          backgroundColor: backgroundColorMarkType,
           [MARKDOWN_HIGHLIGHT_STYLE]: highlightMarkType,
         },
       },
@@ -72,6 +75,8 @@ function createView(beforeText: string, parentStart = 0, parentTypeName = 'parag
 
   return {
     cursor,
+    backgroundColorMark,
+    backgroundColorMarkType,
     docNodes,
     highlightMark,
     highlightMarkType,
@@ -82,7 +87,15 @@ function createView(beforeText: string, parentStart = 0, parentTypeName = 'parag
 
 function createFixture(beforeText = 'Plain ==marked=', parentStart = 0, parentTypeName = 'paragraph') {
   let beforeInputListener: EventListener | null = null
-  const { docNodes, highlightMark, highlightMarkType, transaction, view } = createView(
+  const {
+    backgroundColorMark,
+    backgroundColorMarkType,
+    docNodes,
+    highlightMark,
+    highlightMarkType,
+    transaction,
+    view,
+  } = createView(
     beforeText,
     parentStart,
     parentTypeName,
@@ -102,6 +115,8 @@ function createFixture(beforeText = 'Plain ==marked=', parentStart = 0, parentTy
 
   return {
     docNodes,
+    backgroundColorMark,
+    backgroundColorMarkType,
     dom,
     extension,
     fireInput(event: Partial<InputEvent> = {}) {
@@ -154,6 +169,7 @@ describe('createMarkdownHighlightInputExtension', () => {
     })).toEqual({
       closingFrom: 14,
       closingTo: 15,
+      color: 'yellow',
       contentFrom: 8,
       contentTo: 14,
       openingFrom: 6,
@@ -187,6 +203,22 @@ describe('createMarkdownHighlightInputExtension', () => {
     expect(fixture.highlightMarkType.create).toHaveBeenCalledWith()
     expect(fixture.transaction.addMark).toHaveBeenCalledWith(26, 32, fixture.highlightMark)
     expect(fixture.transaction.scrollIntoView).toHaveBeenCalled()
+    expect(fixture.view.dispatch).toHaveBeenCalledWith(fixture.transaction)
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes a Bear-style circle prefix and applies its background color mark', () => {
+    const fixture = createFixture('Plain ==🔴marked=', 20)
+    fixture.mount()
+
+    const event = fixture.fireInput()
+
+    expect(fixture.transaction.delete).toHaveBeenNthCalledWith(1, 36, 37)
+    expect(fixture.transaction.delete).toHaveBeenNthCalledWith(2, 26, 30)
+    expect(fixture.highlightMarkType.create).toHaveBeenCalledWith()
+    expect(fixture.backgroundColorMarkType.create).toHaveBeenCalledWith({ stringValue: 'red' })
+    expect(fixture.transaction.addMark).toHaveBeenNthCalledWith(1, 26, 32, fixture.highlightMark)
+    expect(fixture.transaction.addMark).toHaveBeenNthCalledWith(2, 26, 32, fixture.backgroundColorMark)
     expect(fixture.view.dispatch).toHaveBeenCalledWith(fixture.transaction)
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
   })
