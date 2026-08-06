@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyRichEditorRecoveryError,
   richEditorRecoveryErrorNeedsDocumentRepair,
+  SHARED_RICH_EDITOR_RECOVERY_REASONS,
+  type RichEditorSharedRecoveryReason,
 } from './richEditorRecoveryClassifier'
 
 function transformError(message = 'Invalid transform') {
@@ -23,34 +25,97 @@ function tableRootIndexMessage() {
   )
 }
 
+function webkitNotFoundError(message = 'The object can not be found here.') {
+  const error = new Error(message)
+  error.name = 'NotFoundError'
+  return error
+}
+
+interface SharedRecoveryCase {
+  error: Error
+  needsDocumentRepair: boolean
+  reason: RichEditorSharedRecoveryReason
+}
+
+const sharedRecoveryCases: SharedRecoveryCase[] = [
+  {
+    error: new Error('Block type does not match'),
+    needsDocumentRepair: false,
+    reason: 'block_type_mismatch',
+  },
+  {
+    error: new Error("Block doesn't have id"),
+    needsDocumentRepair: true,
+    reason: 'block_missing_id',
+  },
+  {
+    error: webkitNotFoundError(),
+    needsDocumentRepair: false,
+    reason: 'dom_not_found',
+  },
+  {
+    error: new RangeError(nodeIndexMessage('', 0)),
+    needsDocumentRepair: true,
+    reason: 'empty_fragment_index_out_of_range',
+  },
+  {
+    error: new Error(nodeIndexMessage('paragraph("/")')),
+    needsDocumentRepair: true,
+    reason: 'paragraph_index_out_of_range',
+  },
+  {
+    error: new RangeError('Selection passed to setSelection must point at the current document'),
+    needsDocumentRepair: false,
+    reason: 'prosemirror_position_out_of_range',
+  },
+  {
+    error: new Error('Block with ID block-1 not found'),
+    needsDocumentRepair: false,
+    reason: 'stale_block_reference',
+  },
+  {
+    error: new RangeError(tableRootIndexMessage()),
+    needsDocumentRepair: true,
+    reason: 'table_row_index_out_of_range',
+  },
+  {
+    error: new TypeError("Cannot read properties of undefined (reading 'type')"),
+    needsDocumentRepair: false,
+    reason: 'undefined_node_type',
+  },
+]
+
 describe('richEditorRecoveryClassifier', () => {
-  function webkitNotFoundError(message = 'The object can not be found here.') {
-    const error = new Error(message)
-    error.name = 'NotFoundError'
-    return error
-  }
-
-  it('normalizes ProseMirror index failures across render and transform recovery', () => {
-    const tableError = new RangeError(
-      nodeIndexMessage('tableRow(tableCell(tableParagraph("A")))'),
+  it('defines the shared recovery reason source once', () => {
+    expect(SHARED_RICH_EDITOR_RECOVERY_REASONS).toEqual(
+      sharedRecoveryCases.map(({ reason }) => reason),
     )
-    const tableRootError = new RangeError(tableRootIndexMessage())
-    const paragraphError = new Error(nodeIndexMessage('paragraph("/")'))
-    const emptyFragmentError = new RangeError(nodeIndexMessage('', 0))
-
-    expect(classifyRichEditorRecoveryError(tableError, 'render')).toBe('table_row_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(tableError, 'transform')).toBe('table_row_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(tableRootError, 'render')).toBe('table_row_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(tableRootError, 'transform')).toBe('table_row_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(paragraphError, 'render')).toBe('paragraph_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(paragraphError, 'transform')).toBe('paragraph_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(emptyFragmentError, 'render')).toBe('empty_fragment_index_out_of_range')
-    expect(classifyRichEditorRecoveryError(emptyFragmentError, 'transform')).toBe('empty_fragment_index_out_of_range')
-    expect(richEditorRecoveryErrorNeedsDocumentRepair(emptyFragmentError)).toBe(true)
-    expect(richEditorRecoveryErrorNeedsDocumentRepair(tableRootError)).toBe(true)
   })
 
-  it('classifies stale ProseMirror document positions across recovery surfaces', () => {
+  it.each(sharedRecoveryCases)(
+    'classifies shared $reason errors once for both recovery surfaces',
+    ({ error, needsDocumentRepair, reason }) => {
+      expect(classifyRichEditorRecoveryError(error, 'render')).toBe(reason)
+      expect(classifyRichEditorRecoveryError(error, 'transform')).toBe(reason)
+      expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(needsDocumentRepair)
+    },
+  )
+
+  it('keeps render-only recovery reasons off the transform surface', () => {
+    const error = new Error('Maximum update depth exceeded')
+
+    expect(classifyRichEditorRecoveryError(error, 'render')).toBe('react_update_depth_exceeded')
+    expect(classifyRichEditorRecoveryError(error, 'transform')).toBeNull()
+  })
+
+  it('keeps transform-only recovery reasons off the render surface', () => {
+    const error = transformError()
+
+    expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('transform_error')
+    expect(classifyRichEditorRecoveryError(error, 'render')).toBeNull()
+  })
+
+  it('recognizes every stale ProseMirror document position as the shared reason', () => {
     const stalePositionErrors = [
       new RangeError('Position 21183 out of range'),
       new RangeError('Selection points outside of document'),
@@ -60,30 +125,14 @@ describe('richEditorRecoveryClassifier', () => {
     for (const error of stalePositionErrors) {
       expect(classifyRichEditorRecoveryError(error, 'render')).toBe('prosemirror_position_out_of_range')
       expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('prosemirror_position_out_of_range')
-      expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(false)
     }
   })
 
-  it('classifies missing-id failures across render and transform recovery', () => {
-    expect(classifyRichEditorRecoveryError(new Error("Block doesn't have id"), 'render')).toBe('block_missing_id')
-    expect(classifyRichEditorRecoveryError(new Error("Block doesn't have id"), 'transform')).toBe('block_missing_id')
-    expect(richEditorRecoveryErrorNeedsDocumentRepair(new Error("Block doesn't have id"))).toBe(true)
-    expect(classifyRichEditorRecoveryError(new Error("Block doesn't have identifier"), 'render')).toBeNull()
-  })
-
-  it('classifies DOM NotFoundError across editor recovery surfaces', () => {
-    expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'transform')).toBe('dom_not_found')
-    expect(classifyRichEditorRecoveryError(webkitNotFoundError(), 'render')).toBe('dom_not_found')
-    expect(classifyRichEditorRecoveryError(transformError(), 'transform')).toBe('transform_error')
-    expect(classifyRichEditorRecoveryError(transformError(), 'render')).toBeNull()
-  })
-
-  it('classifies null firstChild editor DOM races across recovery surfaces', () => {
+  it('classifies null firstChild DOM races as the shared DOM reason', () => {
     const error = new TypeError("Cannot read properties of null (reading 'firstChild')")
 
     expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('dom_not_found')
     expect(classifyRichEditorRecoveryError(error, 'render')).toBe('dom_not_found')
-    expect(richEditorRecoveryErrorNeedsDocumentRepair(error)).toBe(false)
   })
 
   it('classifies the WebKit filesystem NotFoundError message from production', () => {
@@ -99,12 +148,8 @@ describe('richEditorRecoveryClassifier', () => {
     const invalidContentError = new RangeError(
       'Invalid content for node blockContainer: <paragraph("A"), blockGroup(blockContainer(bulletListItem("B")))>',
     )
-    const staleBlockError = new Error('Block with ID block-1 not found')
 
     expect(classifyRichEditorRecoveryError(invalidContentError, 'transform')).toBe('transform_error')
     expect(richEditorRecoveryErrorNeedsDocumentRepair(invalidContentError)).toBe(true)
-    expect(classifyRichEditorRecoveryError(staleBlockError, 'render')).toBe('stale_block_reference')
-    expect(classifyRichEditorRecoveryError(staleBlockError, 'transform')).toBe('stale_block_reference')
-    expect(richEditorRecoveryErrorNeedsDocumentRepair(staleBlockError)).toBe(false)
   })
 })

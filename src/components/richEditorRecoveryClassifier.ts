@@ -16,46 +16,53 @@ const WEBKIT_DOM_NOT_FOUND_MESSAGES = [
   'A requested file or directory could not be found at the time an operation was processed',
 ]
 
-export type BlockNoteRenderRecoveryReason =
-  | 'block_type_mismatch'
-  | 'block_missing_id'
-  | 'dom_not_found'
-  | 'empty_fragment_index_out_of_range'
-  | 'paragraph_index_out_of_range'
-  | 'prosemirror_position_out_of_range'
-  | 'react_update_depth_exceeded'
-  | 'stale_block_reference'
-  | 'table_row_index_out_of_range'
-  | 'undefined_node_type'
+export const SHARED_RICH_EDITOR_RECOVERY_REASONS = [
+  'block_type_mismatch',
+  'block_missing_id',
+  'dom_not_found',
+  'empty_fragment_index_out_of_range',
+  'paragraph_index_out_of_range',
+  'prosemirror_position_out_of_range',
+  'stale_block_reference',
+  'table_row_index_out_of_range',
+  'undefined_node_type',
+] as const
 
-export type RichEditorTransformRecoveryReason =
-  | 'block_type_mismatch'
-  | 'block_missing_id'
+export type RichEditorSharedRecoveryReason = typeof SHARED_RICH_EDITOR_RECOVERY_REASONS[number]
+type BlockNoteRenderOnlyRecoveryReason = 'react_update_depth_exceeded'
+type RichEditorTransformOnlyRecoveryReason =
   | 'dom_index_size'
-  | 'dom_not_found'
-  | 'empty_fragment_index_out_of_range'
   | 'invalid_block_join'
   | 'invalid_insertion_depth'
   | 'mismatched_transaction'
   | 'null_fragment_append'
-  | 'paragraph_index_out_of_range'
-  | 'prosemirror_position_out_of_range'
-  | 'stale_block_reference'
   | 'stale_transaction'
-  | 'table_row_index_out_of_range'
   | 'transform_error'
-  | 'undefined_node_type'
+
+export type BlockNoteRenderRecoveryReason =
+  | RichEditorSharedRecoveryReason
+  | BlockNoteRenderOnlyRecoveryReason
+
+export type RichEditorTransformRecoveryReason =
+  | RichEditorSharedRecoveryReason
+  | RichEditorTransformOnlyRecoveryReason
 
 type RichEditorRecoverySurface = 'render' | 'transform'
 type StaticTransformRecoveryReason = Exclude<RichEditorTransformRecoveryReason, 'stale_transaction'>
+type StaticTransformOnlyRecoveryReason = Exclude<RichEditorTransformOnlyRecoveryReason, 'stale_transaction'>
 type RichEditorRecoveryReason = BlockNoteRenderRecoveryReason | StaticTransformRecoveryReason
 
-interface RecoveryErrorMatcher {
+interface RecoveryErrorMatcherBase<Reason, Surfaces extends readonly RichEditorRecoverySurface[]> {
   matches: (error: unknown) => boolean
-  reason: RichEditorRecoveryReason
+  reason: Reason
   repairsDocument?: boolean
-  surfaces: RichEditorRecoverySurface[]
+  surfaces: Surfaces
 }
+
+type RecoveryErrorMatcher =
+  | RecoveryErrorMatcherBase<RichEditorSharedRecoveryReason, readonly ['render', 'transform']>
+  | RecoveryErrorMatcherBase<BlockNoteRenderOnlyRecoveryReason, readonly ['render']>
+  | RecoveryErrorMatcherBase<StaticTransformOnlyRecoveryReason, readonly ['transform']>
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -251,7 +258,7 @@ export function classifyRichEditorRecoveryError(
   surface: RichEditorRecoverySurface,
 ): RichEditorRecoveryReason | null {
   return RECOVERY_ERROR_MATCHERS.find((matcher) => (
-    matcher.surfaces.includes(surface) && matcher.matches(error)
+    matcher.surfaces.some((candidate) => candidate === surface) && matcher.matches(error)
   ))?.reason ?? null
 }
 
