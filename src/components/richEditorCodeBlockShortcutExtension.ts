@@ -1,15 +1,19 @@
 import { createExtension } from '@blocknote/core'
-import type { EditorView } from '@tiptap/pm/view'
 import { trackEvent } from '../lib/telemetry'
 import { isMac } from '../utils/platform'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { createCodeBlockLineNumberPlugin } from './codeBlockLineNumbers'
+import {
+  consumeKeyboardEvent,
+  createCaptureKeydownMount,
+  isComposingKeyboardEvent,
+  type RichEditorView,
+} from './richEditorKeyboard'
 
 const CODE_BLOCK_TYPE = 'codeBlock'
 const PARAGRAPH_TYPE = 'paragraph'
 const FENCE_PATTERN = /^```([^\s`]*)$/
 
-type EditorViewLike = EditorView
 type CodeBlockShortcutPlatform = 'mac' | 'non-mac'
 type ShortcutEvent = Pick<
   KeyboardEvent,
@@ -21,11 +25,11 @@ type RichEditorBlock = {
   type: string
 }
 type ShortcutEditor = {
-  _tiptapEditor?: { view: EditorViewLike }
+  _tiptapEditor?: { view: RichEditorView }
   focus: () => void
   getTextCursorPosition: () => { block?: RichEditorBlock }
   isEditable?: boolean
-  prosemirrorView?: EditorViewLike
+  prosemirrorView?: RichEditorView
   updateBlock: (id: string, update: never) => unknown
 }
 type CodeBlockCreationSource = 'keyboard_shortcut' | 'markdown_fence'
@@ -65,10 +69,6 @@ function isSelectAllShortcut(
     && !event.shiftKey
     && !event.altKey
     && (event.code === 'KeyA' || event.key.toLowerCase() === 'a')
-}
-
-function isComposing(event: ShortcutEvent, view?: EditorViewLike | null): boolean {
-  return event.isComposing || event.keyCode === 229 || Boolean(view?.composing)
 }
 
 function currentBlock(editor: ShortcutEditor): RichEditorBlock | null {
@@ -165,11 +165,6 @@ function selectCodeBlockContents(target: EventTarget | null): boolean {
   return true
 }
 
-function consume(event: KeyboardEvent): void {
-  event.preventDefault()
-  event.stopPropagation()
-}
-
 function isPlainEnter(event: KeyboardEvent): boolean {
   return event.key === 'Enter' && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
 }
@@ -187,27 +182,25 @@ function selectFromCodeBlock(event: KeyboardEvent, block: RichEditorBlock): bool
   return isSelectAllShortcut(event) && selectCodeBlockContents(event.target)
 }
 
-function handleCodeBlockKeyDown(event: KeyboardEvent, editor: ShortcutEditor, view?: EditorViewLike | null): void {
-  if (editor.isEditable === false || isComposing(event, view)) return
+function handleCodeBlockKeyDown(event: KeyboardEvent, editor: ShortcutEditor, view?: RichEditorView | null): void {
+  if (editor.isEditable === false || isComposingKeyboardEvent(event, view)) return
   const block = currentBlock(editor)
   if (!block) return
 
   const handled = createFromFenceKey(event, editor, block)
     || createFromShortcutKey(event, editor, block)
     || selectFromCodeBlock(event, block)
-  if (handled) consume(event)
+  if (handled) consumeKeyboardEvent(event, 'bubble')
 }
 
 export const createRichEditorCodeBlockShortcutExtension = createExtension(({ editor }) => {
   const richEditor = editor as ShortcutEditor
-  const readView = () => richEditor._tiptapEditor?.view ?? richEditor.prosemirrorView
-  const handleKeyDown = (event: KeyboardEvent) => { handleCodeBlockKeyDown(event, richEditor, readView()); }
 
   return {
     key: 'richEditorCodeBlockShortcuts',
     prosemirrorPlugins: [createCodeBlockLineNumberPlugin()],
-    mount: ({ dom, signal }) => {
-      dom.addEventListener('keydown', handleKeyDown, { capture: true, signal })
-    },
+    mount: createCaptureKeydownMount(richEditor, (event, view) => {
+      handleCodeBlockKeyDown(event, richEditor, view)
+    }),
   } as const
 })

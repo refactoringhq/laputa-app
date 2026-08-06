@@ -1,11 +1,16 @@
 import { createExtension } from '@blocknote/core'
 import type { useCreateBlockNote } from '@blocknote/react'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
+import {
+  consumeKeyboardEvent,
+  createCaptureKeydownMount,
+  isComposingKeyboardEvent,
+  type RichEditorView,
+} from './richEditorKeyboard'
 
 const CODE_BLOCK_TYPE = 'codeBlock'
 
 type EditorLike = ReturnType<typeof useCreateBlockNote>
-type EditorViewLike = NonNullable<EditorLike['prosemirrorView']>
 type ArrowKey = 'ArrowDown' | 'ArrowUp'
 type CodeBlockArrowEditor = EditorLike & {
   isEditable?: boolean
@@ -29,10 +34,6 @@ function isPlainArrowKey(event: ArrowEvent): event is ArrowEvent & { key: ArrowK
     && !event.ctrlKey
     && !event.metaKey
     && !event.shiftKey
-}
-
-function isComposing(event: ArrowEvent, view?: EditorViewLike | null): boolean {
-  return event.isComposing || event.keyCode === 229 || Boolean(view?.composing)
 }
 
 function lineStart(source: string, offset: number): number {
@@ -105,7 +106,7 @@ function restoreDomSelection(selection: Selection, range: Range): void {
 }
 
 function restoreEditorSelection(
-  view: EditorViewLike,
+  view: RichEditorView,
   selection: Selection,
   range: Range,
   position: number,
@@ -114,14 +115,14 @@ function restoreEditorSelection(
   view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, position)))
 }
 
-function activeCollapsedSelection(view: EditorViewLike): Selection | null {
+function activeCollapsedSelection(view: RichEditorView): Selection | null {
   const selection = view.dom.ownerDocument.getSelection()
   if (!selection?.isCollapsed) return null
   return selection.rangeCount === 0 ? null : selection
 }
 
 function codePositionAfterNativeMove(
-  view: EditorViewLike,
+  view: RichEditorView,
   selection: Selection,
   sourceCodeBlock: Element,
   key: ArrowKey,
@@ -136,7 +137,7 @@ function codePositionAfterNativeMove(
   return targetPosition === view.state.selection.from ? null : targetPosition
 }
 
-function moveVisuallyWithinCodeBlock(view: EditorViewLike, key: ArrowKey): boolean {
+function moveVisuallyWithinCodeBlock(view: RichEditorView, key: ArrowKey): boolean {
   const selection = activeCollapsedSelection(view)
   if (!selection) return false
 
@@ -159,7 +160,7 @@ function moveVisuallyWithinCodeBlock(view: EditorViewLike, key: ArrowKey): boole
 function moveCodeBlockCaret(
   editor: CodeBlockArrowEditor,
   key: ArrowKey,
-  view?: EditorViewLike | null,
+  view?: RichEditorView | null,
 ): boolean {
   if (view && moveVisuallyWithinCodeBlock(view, key)) return true
 
@@ -173,24 +174,21 @@ function moveCodeBlockCaret(
 function handleArrowKey(
   event: ArrowEvent,
   editor: CodeBlockArrowEditor,
-  view?: EditorViewLike | null,
+  view?: RichEditorView | null,
 ): void {
-  if (!isPlainArrowKey(event) || editor.isEditable === false || isComposing(event, view)) return
+  if (!isPlainArrowKey(event) || editor.isEditable === false || isComposingKeyboardEvent(event, view)) return
   if (!moveCodeBlockCaret(editor, event.key, view)) return
 
-  event.preventDefault()
-  event.stopImmediatePropagation()
+  consumeKeyboardEvent(event)
 }
 
 export const createRichEditorCodeBlockArrowNavigationExtension = createExtension(({ editor }) => {
   const richEditor = editor as CodeBlockArrowEditor
-  const readView = () => richEditor._tiptapEditor?.view ?? richEditor.prosemirrorView
-  const handleKeyDown = (event: KeyboardEvent) => handleArrowKey(event, richEditor, readView())
 
   return {
     key: 'richEditorCodeBlockArrowNavigation',
-    mount: ({ dom, signal }) => {
-      dom.addEventListener('keydown', handleKeyDown, { capture: true, signal })
-    },
+    mount: createCaptureKeydownMount(richEditor, (event, view) => {
+      handleArrowKey(event, richEditor, view)
+    }),
   } as const
 })

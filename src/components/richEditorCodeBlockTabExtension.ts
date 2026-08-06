@@ -1,15 +1,19 @@
 import { createExtension } from '@blocknote/core'
-import type { EditorView } from '@tiptap/pm/view'
+import {
+  consumeKeyboardEvent,
+  createCaptureKeydownMount,
+  isComposingKeyboardEvent,
+  type RichEditorView,
+} from './richEditorKeyboard'
 
 const CODE_BLOCK_TYPE = 'codeBlock'
 const CODE_BLOCK_INDENT = '  '
 
-type EditorViewLike = EditorView
 type CodeBlockTabEditor = {
-  _tiptapEditor?: { view: EditorViewLike }
+  _tiptapEditor?: { view: RichEditorView }
   getTextCursorPosition: () => { block: { type: unknown } }
   isEditable?: boolean
-  prosemirrorView?: EditorViewLike
+  prosemirrorView?: RichEditorView
   transact: (callback: (transaction: CodeBlockIndentTransaction) => boolean) => boolean
 }
 type CodeBlockTabEvent = Pick<
@@ -34,10 +38,6 @@ function isPlainTabKey(event: CodeBlockTabEvent): boolean {
     && !event.ctrlKey
     && !event.metaKey
     && !event.shiftKey
-}
-
-function isComposingKeyEvent(event: CodeBlockTabEvent, view?: EditorViewLike | null): boolean {
-  return event.isComposing || event.keyCode === 229 || Boolean(view?.composing)
 }
 
 function isEditable(editor: CodeBlockTabEditor): boolean {
@@ -69,33 +69,22 @@ function insertCodeBlockIndent(editor: CodeBlockTabEditor): boolean {
 function shouldHandleCodeBlockTab(
   event: CodeBlockTabEvent,
   editor: CodeBlockTabEditor,
-  view?: EditorViewLike | null,
+  view?: RichEditorView | null,
 ): boolean {
   return isPlainTabKey(event)
     && isEditable(editor)
-    && !isComposingKeyEvent(event, view)
+    && !isComposingKeyboardEvent(event, view)
     && isCodeBlockCursor(editor)
 }
 
 export const createRichEditorCodeBlockTabExtension = createExtension(({ editor }) => {
   const richEditor = editor as CodeBlockTabEditor
-  const readView = () => richEditor._tiptapEditor?.view ?? richEditor.prosemirrorView
-
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (!shouldHandleCodeBlockTab(event, richEditor, readView())) return
-    if (!insertCodeBlockIndent(richEditor)) return
-
-    event.preventDefault()
-    event.stopImmediatePropagation()
-  }
 
   return {
     key: 'richEditorCodeBlockTab',
-    mount: ({ dom, signal }) => {
-      dom.addEventListener('keydown', handleKeyDown, {
-        capture: true,
-        signal,
-      })
-    },
+    mount: createCaptureKeydownMount(richEditor, (event, view) => {
+      if (!shouldHandleCodeBlockTab(event, richEditor, view)) return
+      if (insertCodeBlockIndent(richEditor)) consumeKeyboardEvent(event)
+    }),
   } as const
 })

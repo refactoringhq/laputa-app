@@ -74,6 +74,8 @@ Hot edit paths should avoid document-wide BlockNote lifecycle work. `richEditorB
 
 Block-selection behavior keeps UI/plugin wiring separate from block operations. `richEditorBlockSelectionExtension.ts` owns the ProseMirror plugin, state reducer, decorations, and keyboard/clipboard event dispatch. `richEditorBlockSelectionDocument.ts` owns BlockNote document traversal, nested-selection pruning, collapsed hidden-content operation IDs, and block-move helpers. `richEditorBlockSelectionClipboard.ts` owns Tolaria clipboard MIME data, BlockNote HTML/Markdown fallback parsing, and ID stripping before paste.
 
+Rich-editor keyboard extensions share their capture-phase wiring through `src/components/richEditorKeyboard.ts`. That helper owns active ProseMirror-view resolution, browser and ProseMirror composition detection, listener mounting, and consistent handled-event consumption. Individual extensions retain their feature-specific key matching and editor mutations; the helper is not a general keyboard controller.
+
 Focused block type changes share the same block-type catalog in `src/utils/richEditorBlockTypes.ts` across the formatting toolbar, command palette, and block handle menu. UI surfaces call the helpers in `src/components/richEditorBlockTypeCommands.ts` instead of manually constructing BlockNote updates so conversion preserves current block content, re-resolves captured block ids, runs inside one editor transaction, restores focus only after the mutation, and emits the shared `editor_block_type_changed` analytics event.
 
 ### Vault Git Capability

@@ -1,5 +1,11 @@
 import { createExtension } from '@blocknote/core'
 import type { useCreateBlockNote } from '@blocknote/react'
+import {
+  consumeKeyboardEvent,
+  createCaptureKeydownMount,
+  isComposingKeyboardEvent,
+  type RichEditorView,
+} from './richEditorKeyboard'
 
 const EMPTY_LIST_TYPES = new Set([
   'bulletListItem',
@@ -9,7 +15,6 @@ const EMPTY_LIST_TYPES = new Set([
 ])
 
 type EditorLike = ReturnType<typeof useCreateBlockNote>
-type EditorViewLike = NonNullable<EditorLike['prosemirrorView']>
 type ArrowKey = 'ArrowDown' | 'ArrowUp'
 type EmptyListNavigationEditor = EditorLike & { isEditable?: boolean }
 type CursorPosition = ReturnType<EmptyListNavigationEditor['getTextCursorPosition']>
@@ -56,10 +61,6 @@ function hasModifier(event: ArrowEvent): boolean {
   return [event.altKey, event.ctrlKey, event.metaKey, event.shiftKey].some(Boolean)
 }
 
-function isComposing(event: ArrowEvent, view: EditorViewLike): boolean {
-  return [event.isComposing, event.keyCode === 229, view.composing].some(Boolean)
-}
-
 function hasNoInlineContent(block: BlockLike): boolean {
   return Array.isArray(block.content) && block.content.length === 0
 }
@@ -69,14 +70,14 @@ function isEmptyListItem(block: BlockLike | null | undefined): block is BlockLik
   return EMPTY_LIST_TYPES.has(block.type) && hasNoInlineContent(block)
 }
 
-function isAtVisualEdge(view: EditorViewLike, navigation: Navigation): boolean {
+function isAtVisualEdge(view: RichEditorView, navigation: Navigation): boolean {
   if (!view.state.selection.empty) return false
   return view.endOfTextblock(navigation.direction)
 }
 
 function moveToAdjacentEmptyList(
   editor: EmptyListNavigationEditor,
-  view: EditorViewLike,
+  view: RichEditorView,
   navigation: Navigation,
 ): boolean {
   if (!isAtVisualEdge(view, navigation)) return false
@@ -91,35 +92,29 @@ function moveToAdjacentEmptyList(
 function shouldIgnoreArrow(
   event: ArrowEvent,
   editor: EmptyListNavigationEditor,
-  view: EditorViewLike,
+  view: RichEditorView,
 ): boolean {
-  return [hasModifier(event), editor.isEditable === false, isComposing(event, view)].some(Boolean)
+  return [hasModifier(event), editor.isEditable === false, isComposingKeyboardEvent(event, view)].some(Boolean)
 }
 
 function handleArrowKey(
   event: ArrowEvent,
   editor: EmptyListNavigationEditor,
-  view: EditorViewLike,
+  view: RichEditorView,
 ): void {
   if (!isArrowKey(event.key) || shouldIgnoreArrow(event, editor, view)) return
   if (!moveToAdjacentEmptyList(editor, view, NAVIGATION_BY_KEY[event.key])) return
 
-  event.preventDefault()
-  event.stopImmediatePropagation()
+  consumeKeyboardEvent(event)
 }
 
 export const createRichEditorEmptyListNavigationExtension = createExtension(({ editor }) => {
   const richEditor = editor as EmptyListNavigationEditor
-  const readView = () => richEditor._tiptapEditor?.view ?? richEditor.prosemirrorView
-  const handleKeyDown = (event: KeyboardEvent) => {
-    const view = readView()
-    if (view) handleArrowKey(event, richEditor, view)
-  }
 
   return {
     key: 'richEditorEmptyListNavigation',
-    mount: ({ dom, signal }) => {
-      dom.addEventListener('keydown', handleKeyDown, { capture: true, signal })
-    },
+    mount: createCaptureKeydownMount(richEditor, (event, view) => {
+      if (view) handleArrowKey(event, richEditor, view)
+    }),
   } as const
 })
