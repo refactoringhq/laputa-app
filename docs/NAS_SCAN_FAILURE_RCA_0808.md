@@ -95,6 +95,9 @@ ports 5001 (HTTPS) and 5000 (HTTP). Both connections failed before HTTP with a
 connect error after approximately two seconds. No authentication request was
 made, no credential was read or stored, and the scanner did not fall back to
 SMB/CIFS. The earlier SMB timing is therefore not promoted as HTTP evidence.
+Standard HTTPS port 443 was likewise unreachable. Port 80 answered quickly, but
+the API discovery route returned a short HTML response rather than Synology's
+JSON API envelope, proving that listener is not the DSM FileStation API.
 
 Root cause is currently bounded to network/service reachability: the workstation
 can reach the NAS file share, but DSM WebAPI is not listening or not routed on
