@@ -4,9 +4,12 @@
  * permission profile and native file-edit tools; createNote is intentionally
  * narrow so read-only agents can create a new Markdown file without overwrite.
  */
-import { mkdir, open, opendir, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, open, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
+import { findMarkdownFiles } from './vault-scan.js'
+
+export { findMarkdownFiles } from './vault-scan.js'
 
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
 const VAULT_CONTEXT_PREFIX_BYTES = 64 * 1024
@@ -16,14 +19,6 @@ const VAULT_CONTEXT_PREFIX_BYTES = 64 * 1024
  * @param {string} dir
  * @returns {Promise<string[]>}
  */
-export async function findMarkdownFiles(dir) {
-  const results = []
-  const items = await opendir(dir)
-  for await (const item of items) {
-    await collectMarkdownFile(results, dir, item)
-  }
-  return results
-}
 
 async function resolveVaultNotePath(vaultPath, notePath) {
   const vaultRoot = await realpath(vaultPath)
@@ -187,21 +182,6 @@ export async function vaultContext(vaultPath) {
 }
 
 // --- Helpers ---
-
-async function collectMarkdownFile(results, dir, item) {
-  if (item.name.startsWith('.')) return
-
-  const full = resolveInside(dir, item.name)
-  if (!full) return
-  if (item.isDirectory()) {
-    results.push(...await findMarkdownFiles(full))
-    return
-  }
-
-  if (item.name.endsWith('.md')) {
-    results.push(full)
-  }
-}
 
 function resolveRequestedNotePath(vaultRoot, notePath) {
   if (path.isAbsolute(notePath)) return notePath
