@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
-import { findMarkdownFiles } from './vault-scan.js'
+import { findMarkdownFiles, streamMarkdownFiles } from './vault-scan.js'
+import { streamFileStationMarkdownFiles } from './filestation-scan.js'
 
 describe('NAS vault scan boundaries', () => {
   it('reproduces two vaults three times while skipping protected children', async () => {
@@ -44,6 +45,43 @@ describe('NAS vault scan boundaries', () => {
       { code: 'EACCES' },
     )
     assert.deepEqual(events, [])
+  })
+
+  it('streams results with progress and stops on cancellation or deadline', async () => {
+    const root = path.resolve('large-fixture')
+    const progress = []
+    const openDirectory = async () => asyncEntries(Array.from({ length: 2500 }, (_, index) => file(`${index}.md`)))
+    let count = 0
+    for await (const ignored of streamMarkdownFiles(root, { openDirectory, progressEvery: 1000, onProgress: event => progress.push(event) })) {
+      void ignored
+      count += 1
+    }
+    assert.equal(count, 2500)
+    assert.deepEqual(progress.map(event => event.entriesSeen), [1000, 2000])
+
+    await assert.rejects(
+      async () => { for await (const ignored of streamMarkdownFiles(root, { openDirectory, deadline: 1, now: () => 1 })) void ignored },
+      { code: 'SCAN_DEADLINE' },
+    )
+  })
+
+  it('paginates FileStation over HTTP without returning raw paths', async () => {
+    const requests = []
+    const pages = [
+      { success: true, data: { total: 3, files: [{ name: 'a.md', isdir: false }, { name: 'folder', isdir: true }] } },
+      { success: true, data: { total: 3, files: [{ name: 'b.md', isdir: false }] } },
+    ]
+    const fetchImpl = async (url, init) => {
+      requests.push({ url, body: init.body })
+      return { ok: true, json: async () => pages.shift() }
+    }
+    const files = []
+    for await (const entry of streamFileStationMarkdownFiles({
+      endpoint: 'https://nas.invalid:5001', sid: 'secret-session', vaultPath: '/private/vault', pageSize: 2, fetchImpl,
+    })) files.push(entry)
+    assert.deepEqual(files, [{ name: 'a.md' }, { name: 'b.md' }])
+    assert.deepEqual(requests.map(request => request.body.get('offset')), ['0', '2'])
+    assert.ok(requests.every(request => !request.url.searchParams.has('_sid')))
   })
 })
 

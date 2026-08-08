@@ -441,7 +441,7 @@ flowchart TD
     subgraph MCP["MCP Server (Node.js or Bun) — mounted-workspace scoped"]
         IDX["index.js"]
         SVC["tool-service.js\n(vault resolution, note operations,\nUI action intents)"]
-        VAULT["vault.js\n(findMarkdownFiles, readNote, createNote,\nsearchNotes, appendToNote, editNoteFrontmatter,\ndeleteNote, linkNotes, listNotes, vaultContext)"]
+        VAULT["vault.js / vault-scan.js\n(bounded streamMarkdownFiles, readNote, createNote,\nsearchNotes, appendToNote, editNoteFrontmatter,\ndeleteNote, linkNotes, listNotes, vaultContext)"]
         WSB["ws-bridge.js"]
 
         IDX -->|"stdio transport"| STDIO["Claude Code / Cursor / Antigravity / OpenCode"]

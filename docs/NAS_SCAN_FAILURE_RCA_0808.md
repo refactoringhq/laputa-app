@@ -85,3 +85,27 @@ real NAS E2E was merely forbidden hid this separate production-scale defect.
 Until that work is implemented and both vaults complete, installation is
 verified, fixture functionality is verified, and real NAS E2E/promotion remain
 **NO-GO / UNVERIFIED**.
+
+## HTTP validation endpoint unavailable (2026-08-09)
+
+Failure slug: `tolaria-filestation-http-endpoint-unreachable-0809`
+
+The HTTP-first retry probed DSM's documented read-only API discovery endpoint on
+ports 5001 (HTTPS) and 5000 (HTTP). Both connections failed before HTTP with a
+connect error after approximately two seconds. No authentication request was
+made, no credential was read or stored, and the scanner did not fall back to
+SMB/CIFS. The earlier SMB timing is therefore not promoted as HTTP evidence.
+
+Root cause is currently bounded to network/service reachability: the workstation
+can reach the NAS file share, but DSM WebAPI is not listening or not routed on
+the probed management ports from this network. Distinguishing disabled DSM WebAPI
+from firewall/VLAN routing requires NAS/network-owner action and is not safely
+inferable by changing NAS configuration. Production permission, firewall, and
+service settings remain untouched.
+
+The corrective code adds a read-only FileStation HTTP adapter using POST-based
+pagination (so the session is not placed in a URL), recursive sibling traversal,
+sanitized child permission events, deadline/cancellation/progress, and a runner
+that emits only counts and hashes. Actual two-vault HTTP E2E remains
+**UNVERIFIED / NO-GO** until the endpoint is reachable and an ephemeral session
+is supplied through the process environment.

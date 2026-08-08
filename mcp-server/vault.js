@@ -7,9 +7,9 @@
 import { mkdir, open, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
-import { findMarkdownFiles } from './vault-scan.js'
+import { findMarkdownFiles, streamMarkdownFiles } from './vault-scan.js'
 
-export { findMarkdownFiles } from './vault-scan.js'
+export { findMarkdownFiles, streamMarkdownFiles } from './vault-scan.js'
 
 const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
 const VAULT_CONTEXT_PREFIX_BYTES = 64 * 1024
@@ -126,11 +126,10 @@ export async function appendToNote(vaultPath, notePath, content) {
  * @returns {Promise<Array<{path: string, title: string, snippet: string}>>}
  */
 export async function searchNotes(vaultPath, query, limit = 10) {
-  const files = await findMarkdownFiles(vaultPath)
   const q = query.toLowerCase()
   const results = []
 
-  for (const filePath of files) {
+  for await (const filePath of streamMarkdownFiles(vaultPath)) {
     if (results.length >= limit) break
     const content = await readUtf8File(filePath)
     const filename = path.basename(filePath, '.md')
@@ -154,26 +153,28 @@ export async function searchNotes(vaultPath, query, limit = 10) {
  * @returns {Promise<{types: string[], noteCount: number, folders: string[], recentNotes: Array<{path: string, title: string, type: string|null}>, vaultPath: string}>}
  */
 export async function vaultContext(vaultPath) {
-  const files = await findMarkdownFiles(vaultPath)
   const typesSet = new Set()
   const foldersSet = new Set()
   const notesWithMtime = []
+  let noteCount = 0
 
-  for (const filePath of files) {
+  for await (const filePath of streamMarkdownFiles(vaultPath)) {
+    noteCount += 1
     const { topFolder, note, type } = await readVaultContextNote(vaultPath, filePath)
     if (type) typesSet.add(type)
     if (topFolder) foldersSet.add(topFolder)
     notesWithMtime.push(note)
+    notesWithMtime.sort((a, b) => b.mtime - a.mtime)
+    if (notesWithMtime.length > 20) notesWithMtime.pop()
   }
 
-  notesWithMtime.sort((a, b) => b.mtime - a.mtime)
   const recentNotes = await Promise.all(
-    notesWithMtime.slice(0, 20).map(hydrateContextNoteTitle),
+    notesWithMtime.map(hydrateContextNoteTitle),
   )
 
   return {
     types: [...typesSet].sort(),
-    noteCount: files.length,
+    noteCount,
     folders: [...foldersSet].sort(),
     recentNotes: recentNotes.map(contextNoteWithoutMtime),
     configFiles: await readConfigFiles(vaultPath),
