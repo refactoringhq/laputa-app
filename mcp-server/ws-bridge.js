@@ -99,6 +99,10 @@ function listVaultsTool() {
   return toolService.listVaults()
 }
 
+function scanVaultsTool(args) {
+  return toolService.scanVaults(args)
+}
+
 const TOOL_EXECUTORS = [
   ['open_note', readNoteTool],
   ['read_note', readNoteTool],
@@ -108,6 +112,7 @@ const TOOL_EXECUTORS = [
   ['search_notes', searchNotesTool],
   ['vault_context', vaultContextTool],
   ['list_vaults', listVaultsTool],
+  ['scan_vaults', scanVaultsTool],
   ['ui_open_note', uiOpenNoteTool],
   ['ui_open_tab', uiOpenTabTool],
   ['ui_highlight', highlightTool],

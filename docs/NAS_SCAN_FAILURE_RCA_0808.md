@@ -152,3 +152,20 @@ two-vault listing.
 
 Until those changes and the authoritative CI gates pass, HTTP functional E2E and
 promotion remain **UNVERIFIED / NO-GO**.
+
+### Corrective implementation
+
+The MCP stdio and desktop WebSocket bridge now expose the same `scan_vaults`
+tool through `tool-service.js`. `TOLARIA_VAULT_TRANSPORT` is an explicit
+`filesystem` or `filestation-http` choice. HTTP mode requires an endpoint, an
+active-vault-to-remote-root JSON mapping, and an ephemeral session provider;
+missing or invalid values fail closed and never retry through CIFS. The session
+is removed from the process environment at service initialization and retained
+only in process memory. Results contain only transport, vault label, and count.
+
+The production caller regression uses the real MCP service with two vaults and
+a mock HTTP contract. It proves dispatch without recording a session, remote
+root, raw content, or credential. Focused boundary and caller tests passed three
+consecutive runs. Repository-owned CircleCI now invokes the MCP suite. Live
+authenticated listing remains **UNVERIFIED / NO-GO** because no approved
+ephemeral FileStation session was available to this process.

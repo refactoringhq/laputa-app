@@ -8,10 +8,12 @@ import {
 } from './vault.js'
 import { requireVaultPaths } from './vault-path.js'
 import { readAgentInstructions, vaultContextWithInstructions } from './agent-instructions.js'
+import { createVaultScanDispatcher } from './vault-scan-transport.js'
 
 export function createMcpToolService({
   resolveVaultPaths = () => requireVaultPaths(),
   emitUiAction = () => {},
+  scanVault = createVaultScanDispatcher(),
 } = {}) {
   function activeVaultPaths() {
     return resolveVaultPaths()
@@ -73,6 +75,19 @@ export function createMcpToolService({
       }
     }))
 
+    return { vaults }
+  }
+
+  async function scanVaults(args = {}) {
+    const target = requestedVaultPath(args)
+    const roots = target ? [target] : activeVaultPaths()
+    const deadlineMs = Number.isFinite(args.deadlineMs) ? Math.max(1, Math.min(args.deadlineMs, 300_000)) : 60_000
+    const deadline = Date.now() + deadlineMs
+    const vaults = []
+    for (const vaultPath of roots) {
+      const result = await scanVault(vaultPath, { deadline })
+      vaults.push({ vaultLabel: vaultLabel(vaultPath), ...result })
+    }
     return { vaults }
   }
 
@@ -181,6 +196,7 @@ export function createMcpToolService({
     requestedVaultPath,
     resolveUiPath,
     searchNotes,
+    scanVaults,
     setFilter,
     updateNote,
     vaultContext,

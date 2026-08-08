@@ -176,6 +176,9 @@ jobs:
                 raise SystemExit("CodeScene project health gate failed")
             PY
       - run:
+          name: MCP vault transport regression
+          command: npm --prefix mcp-server test
+      - run:
           name: Frontend lint, build, and sharded coverage
           command: |
             FRONTEND_COVERAGE_SHARDS=2 \

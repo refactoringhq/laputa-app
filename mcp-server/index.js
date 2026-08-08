@@ -221,6 +221,18 @@ const TOOLS = [
     },
   },
   {
+    name: 'scan_vaults',
+    description: 'Scan active vaults using the explicitly configured filesystem or FileStation HTTP transport.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vaultPath: { type: 'string', description: 'Optional active vault identity.' },
+        deadlineMs: { type: 'number', minimum: 1, maximum: 300000 },
+      },
+    },
+  },
+  {
     name: 'highlight_editor',
     description: 'Visually highlight a UI element in Tolaria (editor, tab, properties panel, or note list). The highlight auto-clears after a short delay.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
@@ -262,6 +274,10 @@ async function handleVaultContext(args = {}) {
 
 async function handleListVaults() {
   return { content: [{ type: 'text', text: JSON.stringify(await toolService.listVaults(), null, 2) }] }
+}
+
+async function handleScanVaults(args = {}) {
+  return { content: [{ type: 'text', text: JSON.stringify(await toolService.scanVaults(args), null, 2) }] }
 }
 
 async function handleGetNote(args) {
@@ -320,6 +336,7 @@ const TOOL_HANDLERS = new Map([
   ['search_notes', handleSearchNotes],
   ['get_vault_context', handleVaultContext],
   ['list_vaults', handleListVaults],
+  ['scan_vaults', handleScanVaults],
   ['get_note', handleGetNote],
   ['create_note', handleCreateNote],
   ['update_note', handleUpdateNote],

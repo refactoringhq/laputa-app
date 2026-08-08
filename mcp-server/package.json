@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test.js tool-service.test.js"
+    "test": "node --test test.js tool-service.test.js vault-scan.test.js vault-scan-transport.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

@@ -397,7 +397,7 @@ Each CLI agent authenticates itself outside Tolaria. Claude Code uses its existi
 ## MCP Server
 
 The MCP server (`mcp-server/`) exposes vault operations as tools for AI assistants (Claude Code, Antigravity CLI, Cursor, or any MCP-compatible client).
-The stdio entrypoint and desktop WebSocket bridge share `mcp-server/tool-service.js` for mounted-vault resolution, note lookup/search, note creation defaults, vault listing, and UI action intents; `index.js` and `ws-bridge.js` only adapt those semantics to their transport-specific request and response shapes.
+The stdio entrypoint and desktop WebSocket bridge share `mcp-server/tool-service.js` for mounted-vault resolution, note lookup/search, note creation defaults, vault listing, read-only vault scanning, and UI action intents; `index.js` and `ws-bridge.js` only adapt those semantics to their transport-specific request and response shapes. Vault scanning uses an explicit `filesystem` or `filestation-http` dispatcher. HTTP mode requires a mapped remote root and an ephemeral in-memory FileStation session, fails closed without either, never silently falls back to CIFS, and returns only sanitized counts and labels.
 
 ### Tool Surface
 
