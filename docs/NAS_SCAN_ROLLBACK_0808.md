@@ -13,3 +13,6 @@ move files, delete files, or persist raw NAS paths/content/credentials.
 Exception record: for this PR only, the repository owner exempted the CodeScene/Codacy
 pre-edit gates. Substitute checks are fixture regression, Node tests, Semgrep, Gitleaks,
 and path/error-handling tests. CodeScene/Codacy revalidation remains separate backlog work.
+
+Backlog owner: repository maintainers. Exit condition: rerun both analyzers on this exact
+PR head and attach file-level results without weakening either repository threshold.

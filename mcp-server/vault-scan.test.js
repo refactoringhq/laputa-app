@@ -8,7 +8,7 @@ describe('NAS vault scan boundaries', () => {
     const events = []
     const root = path.resolve('nas-fixture')
     const entries = new Map([
-      [root, [dir('#recycle'), dir('_system'), dir('.hidden'), dir('000_개인폴더'), dir('denied'), dir('vault-a'), dir('vault-b')]],
+      [root, [dir('#RECYCLE'), dir('_SYSTEM'), dir('.hidden'), dir('000_개인폴더'), dir('denied'), dir('vault-a'), dir('vault-b')]],
       [path.join(root, 'vault-a'), [file('a.md')]],
       [path.join(root, 'vault-b'), [file('b.md')]],
     ])
@@ -33,9 +33,20 @@ describe('NAS vault scan boundaries', () => {
     }
     await assert.rejects(() => findMarkdownFiles(root, { openDirectory }), { code: 'EIO' })
   })
+
+  it('does not downgrade a vault-root permission failure to a child skip', async () => {
+    const events = []
+    const openDirectory = async () => {
+      throw Object.assign(new Error('root denied'), { code: 'EACCES' })
+    }
+    await assert.rejects(
+      () => findMarkdownFiles(path.resolve('denied-root'), { openDirectory, onSkip: event => events.push(event) }),
+      { code: 'EACCES' },
+    )
+    assert.deepEqual(events, [])
+  })
 })
 
 function dir(name) { return { name, isDirectory: () => true } }
 function file(name) { return { name, isDirectory: () => false } }
 async function* asyncEntries(entries) { yield* entries }
-
