@@ -6,6 +6,8 @@ Related failure slug: `nas-scan-root-permission-misclassified-as-child-skip-0809
 
 Validation-environment failure slug: `tolaria-mcp-windows-path-separator-baseline-0809`
 
+Production-scale E2E failure slug: `tolaria-nas-full-scan-unbounded-result-accumulation-0809`
+
 ## Symptom
 
 A permission-denied or protected child could abort traversal of its parent. That
@@ -46,3 +48,40 @@ instead of being counted as a scanner pass. The earlier missing-SDK error was a
 worktree dependency-installation failure, resolved from the committed lockfile.
 
 Rollback: revert commit `009c82d6`; no production or NAS state needs restoration.
+
+## Production-scale read-only E2E failure (2026-08-09)
+
+The repository owner authorized a real read-only E2E against the two configured
+UNC NAS vaults. The runner selected the two roots from local Tolaria
+configuration in memory and emitted only ordinal counts, hashes, and sanitized
+event fields. It did not read file content, persist paths or credentials, or
+change NAS permissions/files.
+
+The combined run exceeded the 120-second harness limit. An isolated run of the
+first vault also exceeded five minutes, and a longer retry showed the Node
+process working set grow to approximately 494 MB before it was terminated.
+Neither run produced a completed summary, so this is **not** an E2E PASS.
+
+### Root cause
+
+`findMarkdownFiles()` materializes every discovered absolute path. Each
+recursive frame first builds a child array and then spreads it into its parent
+with `results.push(...childResults)`. Production-sized NAS trees therefore have
+unbounded result retention, repeated array copying at directory boundaries, and
+no deadline, cancellation, or progress contract. Fixture tests contain only a
+few entries and could not expose this scale behavior. The earlier claim that a
+real NAS E2E was merely forbidden hid this separate production-scale defect.
+
+### Required corrective work
+
+- expose traversal as an async iterator or callback so callers can consume
+  bounded batches instead of retaining the full tree;
+- add cancellation/deadline handling around directory enumeration;
+- retain the existing child permission boundary and sanitized skip schema;
+- add a high-cardinality synthetic regression with a bounded-memory assertion;
+- rerun both configured NAS vaults independently and then together, recording
+  only counts/hashes and sanitized event totals.
+
+Until that work is implemented and both vaults complete, installation is
+verified, fixture functionality is verified, and real NAS E2E/promotion remain
+**NO-GO / UNVERIFIED**.
