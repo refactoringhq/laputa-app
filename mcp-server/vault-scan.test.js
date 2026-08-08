@@ -83,6 +83,14 @@ describe('NAS vault scan boundaries', () => {
     assert.deepEqual(requests.map(request => request.body.get('offset')), ['0', '2'])
     assert.ok(requests.every(request => !request.url.searchParams.has('_sid')))
   })
+
+  it('refuses to send a FileStation session over plaintext HTTP', async () => {
+    const iterator = streamFileStationMarkdownFiles({
+      endpoint: 'http://nas.invalid:5000', sid: 'secret-session', vaultPath: '/private/vault',
+      fetchImpl: async () => { throw new Error('must not send') },
+    })
+    await assert.rejects(() => iterator.next(), { code: 'FILESTATION_TLS_REQUIRED' })
+  })
 })
 
 function dir(name) { return { name, isDirectory: () => true } }

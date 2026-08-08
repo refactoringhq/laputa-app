@@ -4,7 +4,9 @@ const EXPECTED_PERMISSION_API_CODES = new Set([408])
 
 export async function* streamFileStationMarkdownFiles(options) {
   const { endpoint, sid, vaultPath, fetchImpl = fetch, signal, deadline, now = Date.now } = options
-  if (!isHttpUrl(endpoint)) throw new Error('FileStation endpoint must use HTTP or HTTPS')
+  if (!isSecureHttpUrl(endpoint)) {
+    throw Object.assign(new Error('FileStation endpoint must use HTTPS'), { code: 'FILESTATION_TLS_REQUIRED' })
+  }
   if (!sid || !vaultPath) throw new Error('FileStation session and vault path are required')
 
   const pageSize = Math.max(1, Math.min(options.pageSize ?? DEFAULT_PAGE_SIZE, 1000))
@@ -62,6 +64,6 @@ function assertActive({ signal, deadline, now }) {
   }
 }
 
-function isHttpUrl(value) {
-  try { return ['http:', 'https:'].includes(new URL(value).protocol) } catch { return false }
+function isSecureHttpUrl(value) {
+  try { return new URL(value).protocol === 'https:' } catch { return false }
 }

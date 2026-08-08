@@ -1,5 +1,13 @@
 # NAS scan boundary failure — RCA 0808
 
+Failure slug: `tolaria-filestation-session-over-plaintext-http-0809`
+
+Bug-hunt found that the adapter accepted `http://` endpoints while transmitting
+the ephemeral SID in a POST body.  Keeping a credential out of the URL does not
+protect it from plaintext transport interception.  Remote FileStation scans now
+require HTTPS and fail with `FILESTATION_TLS_REQUIRED` before fetch; regression
+tests prove the request callback is never invoked for DSM port 5000 HTTP URLs.
+
 Failure slug: `nas-scan-parent-abort-on-protected-child-0808`
 
 Related failure slug: `nas-scan-root-permission-misclassified-as-child-skip-0809`
