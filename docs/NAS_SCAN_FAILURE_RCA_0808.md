@@ -112,3 +112,43 @@ sanitized child permission events, deadline/cancellation/progress, and a runner
 that emits only counts and hashes. Actual two-vault HTTP E2E remains
 **UNVERIFIED / NO-GO** until the endpoint is reachable and an ephemeral session
 is supplied through the process environment.
+
+## FileStation adapter not connected to the application (2026-08-09)
+
+Failure slug: `tolaria-filestation-adapter-e2e-only-0809`
+
+A live-readiness audit found that `streamFileStationMarkdownFiles()` is imported
+only by its focused test and the standalone E2E runner. The MCP service and
+desktop vault-loading paths still call the filesystem scanner. Shipping the
+current branch would therefore install the safer filesystem traversal, but it
+would not make Tolaria select HTTP transport for a configured NAS vault. A
+passing standalone HTTP runner would not prove the application path functional.
+
+### Root cause
+
+The HTTP work was implemented as a transport adapter and validation harness
+without first defining a transport-selection boundary in the production vault
+abstraction. No configuration schema maps a registered vault to a FileStation
+endpoint, remote root, or ephemeral session provider, and no caller dispatches
+to the HTTP iterator. This is an integration-contract omission, not a DSM
+listener failure.
+
+On 2026-08-09 a fresh unauthenticated discovery request reached the configured
+NAS on DSM port 5000 and reported `SYNO.FileStation.List` version 2. No session,
+credential, raw path, or file content was sent or stored. This narrows the
+earlier reachability failure to a transient network/service state; it does not
+remove the missing application wiring or supply authorization for an actual
+two-vault listing.
+
+### Required corrective work
+
+- define a redaction-safe registered-vault transport schema;
+- resolve FileStation sessions ephemerally without persistence or logging;
+- dispatch the real MCP/desktop scan call through the HTTP adapter;
+- fail closed instead of silently falling back to SMB/CIFS;
+- verify two configured vaults through the application call path, not only the
+  standalone runner;
+- retain filesystem scanning for explicitly local vaults and preserve rollback.
+
+Until those changes and the authoritative CI gates pass, HTTP functional E2E and
+promotion remain **UNVERIFIED / NO-GO**.
