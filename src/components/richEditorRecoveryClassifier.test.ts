@@ -135,6 +135,13 @@ describe('richEditorRecoveryClassifier', () => {
     expect(classifyRichEditorRecoveryError(error, 'render')).toBe('dom_not_found')
   })
 
+  it('classifies WebKit null DOM-order races as the shared DOM reason', () => {
+    const error = new TypeError("null is not an object (evaluating 'n.compareDocumentPosition')")
+
+    expect(classifyRichEditorRecoveryError(error, 'transform')).toBe('dom_not_found')
+    expect(classifyRichEditorRecoveryError(error, 'render')).toBe('dom_not_found')
+  })
+
   it('classifies the WebKit filesystem NotFoundError message from production', () => {
     const error = webkitNotFoundError(
       'A requested file or directory could not be found at the time an operation was processed.',
