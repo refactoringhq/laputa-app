@@ -338,6 +338,39 @@ describe('initSentry', () => {
     expect(beforeSend(unrelatedNotFoundEvent)).toBe(unrelatedNotFoundEvent)
   })
 
+  it('drops recovered stale ProseMirror selection events before sending them to Sentry', () => {
+    const beforeSend = initSentryBeforeSend()
+    const selectionEvent = {
+      exception: {
+        values: [{
+          type: 'RangeError',
+          value: 'Selection points outside of document',
+        }],
+      },
+    }
+    const messageOnlyEvent = {
+      message: 'RangeError: Selection points outside of document',
+    }
+    const hintedEvent = {
+      message: 'Script error.',
+    }
+    const unrelatedRangeEvent = {
+      exception: {
+        values: [{
+          type: 'RangeError',
+          value: 'Selection size exceeds document limit',
+        }],
+      },
+    }
+
+    expect(beforeSend(selectionEvent)).toBeNull()
+    expect(beforeSend(messageOnlyEvent)).toBeNull()
+    expect(beforeSend(hintedEvent, {
+      originalException: new RangeError('Selection points outside of document'),
+    })).toBeNull()
+    expect(beforeSend(unrelatedRangeEvent)).toBe(unrelatedRangeEvent)
+  })
+
   it('drops browser ResizeObserver loop notifications before sending them to Sentry', () => {
     const beforeSend = initSentryBeforeSend()
     const loopLimitEvent = {

@@ -81,6 +81,22 @@ function recoveredRichEditorDomNotFoundText(value: string | undefined): boolean 
   return recoveredRichEditorDomNotFoundError(name, message)
 }
 
+function recoveredRichEditorPositionError(name: string | undefined, message: string | undefined): boolean {
+  if (name !== 'RangeError' || !message) return false
+
+  return classifyRichEditorRecoveryError(
+    new RangeError(message),
+    'render',
+  ) === 'prosemirror_position_out_of_range'
+}
+
+function recoveredRichEditorPositionText(value: string | undefined): boolean {
+  const [name, ...messageParts] = value?.split(':') ?? []
+  const message = messageParts.join(':').trim()
+
+  return recoveredRichEditorPositionError(name, message)
+}
+
 function errorText(value: unknown): string | undefined {
   if (!value) return undefined
   if (value instanceof Error) return `${value.name}: ${value.message}`
@@ -171,6 +187,18 @@ function shouldDropRichEditorDomNotFoundEvent(
   })
 }
 
+function shouldDropRichEditorPositionEvent(
+  event: Sentry.ErrorEvent,
+  hint?: Sentry.EventHint,
+): boolean {
+  return matchesBenignSentryEventSurface(event, hint, {
+    exception: (exception) => recoveredRichEditorPositionError(exception.type, exception.value),
+    message: recoveredRichEditorPositionText,
+    originalException: (originalException) =>
+      classifyRichEditorRecoveryError(originalException, 'render') === 'prosemirror_position_out_of_range',
+  })
+}
+
 function shouldDropResizeObserverLoopEvent(
   event: Sentry.ErrorEvent,
   hint?: Sentry.EventHint,
@@ -191,13 +219,18 @@ function shouldDropMissingFilePromiseRejectionEvent(
   })
 }
 
-function shouldDropSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): boolean {
-  return shouldDropWhiteboardPlatformPermissionEvent(event, hint)
-    || shouldDropStaleTauriListenerCleanupEvent(event, hint)
-    || shouldDropBlockNoteStaleBlockReferenceEvent(event, hint)
+function shouldDropRichEditorRecoveryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): boolean {
+  return shouldDropBlockNoteStaleBlockReferenceEvent(event, hint)
     || shouldDropRecoveredBlockNoteRenderEvent(hint)
     || shouldDropBlockNoteMissingIdEvent(event, hint)
     || shouldDropRichEditorDomNotFoundEvent(event, hint)
+    || shouldDropRichEditorPositionEvent(event, hint)
+}
+
+function shouldDropSentryEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): boolean {
+  return shouldDropWhiteboardPlatformPermissionEvent(event, hint)
+    || shouldDropStaleTauriListenerCleanupEvent(event, hint)
+    || shouldDropRichEditorRecoveryEvent(event, hint)
     || shouldDropResizeObserverLoopEvent(event, hint)
     || shouldDropMissingFilePromiseRejectionEvent(event, hint)
 }
