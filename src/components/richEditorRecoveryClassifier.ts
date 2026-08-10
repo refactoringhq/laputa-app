@@ -8,6 +8,7 @@ const PROSEMIRROR_SELECTION_OUTSIDE_DOCUMENT_ERROR = 'Selection points outside o
 const PROSEMIRROR_SELECTION_CURRENT_DOCUMENT_ERROR = 'Selection passed to setSelection must point at the current document'
 const NULL_APPEND_PROPERTY_ERROR = "Cannot read properties of null (reading 'append')"
 const NULL_FIRST_CHILD_PROPERTY_ERROR = "Cannot read properties of null (reading 'firstChild')"
+const WEBKIT_NULL_COMPARE_DOCUMENT_POSITION_ERROR = /^null is not an object \(evaluating '[A-Za-z_$][\w$]*\.compareDocumentPosition'\)$/
 const UNDEFINED_NODE_TYPE_PROPERTY_ERROR = "Cannot read properties of undefined (reading 'type')"
 const REACT_UPDATE_DEPTH_EXCEEDED_ERROR = 'Maximum update depth exceeded'
 const REACT_MINIFIED_UPDATE_DEPTH_ERROR = /\b(?:React error #185|errors\/185|#185)\b/
@@ -116,6 +117,10 @@ function isNullFirstChildError(error: unknown): boolean {
   return error instanceof TypeError && error.message === NULL_FIRST_CHILD_PROPERTY_ERROR
 }
 
+function isWebKitNullCompareDocumentPositionError(error: unknown): boolean {
+  return error instanceof TypeError && WEBKIT_NULL_COMPARE_DOCUMENT_POSITION_ERROR.test(error.message)
+}
+
 export function isStaleBlockReferenceError(error: unknown): boolean {
   return error instanceof Error && /^Block with ID .+ not found$/.test(error.message)
 }
@@ -196,6 +201,11 @@ const RECOVERY_ERROR_MATCHERS: RecoveryErrorMatcher[] = [
   },
   {
     matches: isNullFirstChildError,
+    reason: 'dom_not_found',
+    surfaces: ['render', 'transform'],
+  },
+  {
+    matches: isWebKitNullCompareDocumentPositionError,
     reason: 'dom_not_found',
     surfaces: ['render', 'transform'],
   },
