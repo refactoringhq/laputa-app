@@ -31,8 +31,10 @@ function isParagraphInput(event: InputEvent): boolean {
 export function shouldStopComposingEditorShortcutKey(
   event: KeyboardEvent,
   view?: ComposingEditorView | null,
+  compositionActive = false,
 ): boolean {
-  return isCompositionEditorShortcutKey(event) && isComposingKeyboardEvent(event, view)
+  return isCompositionEditorShortcutKey(event)
+    && (compositionActive || isComposingKeyboardEvent(event, view))
 }
 
 export function shouldStopComposingParagraphInput(
@@ -50,10 +52,11 @@ export function shouldStopComposingParagraphInput(
 
 export const createImeCompositionKeyGuardExtension = createExtension(({ editor }) => {
   const readView = () => activeRichEditorView(editor)
+  let compositionActive = false
   let composingEnterAt: number | null = null
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (!shouldStopComposingEditorShortcutKey(event, readView())) {
+    if (!shouldStopComposingEditorShortcutKey(event, readView(), compositionActive)) {
       composingEnterAt = null
       return
     }
@@ -62,7 +65,12 @@ export const createImeCompositionKeyGuardExtension = createExtension(({ editor }
     event.stopImmediatePropagation()
   }
 
+  const handleCompositionStart = () => {
+    compositionActive = true
+  }
+
   const handleCompositionEnd = (event: CompositionEvent) => {
+    compositionActive = false
     if (composingEnterAt !== null) composingEnterAt = event.timeStamp
   }
 
@@ -82,6 +90,10 @@ export const createImeCompositionKeyGuardExtension = createExtension(({ editor }
     key: 'imeCompositionKeyGuard',
     mount: ({ dom, signal }) => {
       dom.addEventListener('keydown', handleKeyDown, {
+        capture: true,
+        signal,
+      })
+      dom.addEventListener('compositionstart', handleCompositionStart, {
         capture: true,
         signal,
       })
