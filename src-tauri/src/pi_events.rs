@@ -4,6 +4,8 @@ const LOCALIZED_ERROR_PREFIX: &str = "tolaria:i18n-error:";
 const PI_EMPTY_OUTPUT_KEY: &str = "ai.error.pi.emptyOutput";
 const PI_EMPTY_OUTPUT_WITH_DIAGNOSTIC_KEY: &str = "ai.error.pi.emptyOutputWithDiagnostic";
 
+struct PiDiagnosticLine<'a>(&'a str);
+
 #[cfg(test)]
 pub(crate) fn parse_line<F>(
     line: Result<String, std::io::Error>,
@@ -45,14 +47,16 @@ pub(crate) fn format_error(stderr_output: String, status: String) -> String {
         return "Pi CLI is not authenticated. Run `pi /login` in your terminal or configure a provider API key, then retry.".into();
     }
 
-    if stderr_output.trim().is_empty() {
+    let diagnostic = actionable_diagnostic(stderr_output.lines());
+    if diagnostic.is_empty() {
         format!("pi exited with status {status}")
     } else {
-        stderr_output.lines().take(3).collect::<Vec<_>>().join("\n")
+        diagnostic
     }
 }
 
 pub(crate) fn format_empty_success(diagnostic_output: &str) -> String {
+    let diagnostic_output = actionable_diagnostic(diagnostic_output.lines());
     if diagnostic_output.is_empty() {
         return localized_error(PI_EMPTY_OUTPUT_KEY, serde_json::json!({}));
     }
@@ -61,6 +65,34 @@ pub(crate) fn format_empty_success(diagnostic_output: &str) -> String {
         PI_EMPTY_OUTPUT_WITH_DIAGNOSTIC_KEY,
         serde_json::json!({ "diagnostic_output": diagnostic_output }),
     )
+}
+
+fn actionable_diagnostic<'a>(lines: impl Iterator<Item = &'a str>) -> String {
+    lines
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !is_pi_extension_install_noise(PiDiagnosticLine(line)))
+        .take(3)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn is_pi_extension_install_noise(line: PiDiagnosticLine<'_>) -> bool {
+    let lower = line.0.to_ascii_lowercase();
+    let prefixes = [
+        "npm warn deprecated ",
+        "npm warn exec ",
+        "npm notice",
+        "run `npm fund`",
+        "run `npm audit",
+        "audited ",
+        "found 0 vulnerabilities",
+    ];
+    let fragments = [
+        "packages are looking for funding",
+        " packages, and audited ",
+    ];
+    prefixes.iter().any(|prefix| lower.starts_with(prefix))
+        || fragments.iter().any(|fragment| lower.contains(fragment))
 }
 
 fn localized_error(key: &str, values: serde_json::Value) -> String {

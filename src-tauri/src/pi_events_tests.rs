@@ -115,13 +115,36 @@ fn format_error_uses_status_or_first_stderr_lines() {
 }
 
 #[test]
+fn format_error_skips_pi_extension_install_noise() {
+    let message = format_error(
+        "npm warn deprecated node-domexception@1.0.0\n\nadded 42 packages, and audited 44 packages in 2s\n\nfound 0 vulnerabilities\nFailed to load extension: incompatible runtime"
+            .into(),
+        "exit status: 1".into(),
+    );
+
+    assert_eq!(message, "Failed to load extension: incompatible runtime");
+    assert!(!message.contains("added 42 packages"));
+}
+
+#[test]
 fn format_empty_success_returns_localized_error_markers() {
     let empty = format_empty_success("");
-    let diagnostic = format_empty_success("npm warn exec installing pi-mcp-adapter");
+    let diagnostic = format_empty_success("Pi completed without JSON output");
 
     assert!(empty.starts_with("tolaria:i18n-error:"));
     assert!(empty.contains(r#""key":"ai.error.pi.emptyOutput""#));
     assert!(diagnostic.contains(r#""key":"ai.error.pi.emptyOutputWithDiagnostic""#));
-    assert!(diagnostic.contains("npm warn exec installing pi-mcp-adapter"));
+    assert!(diagnostic.contains("Pi completed without JSON output"));
     assert!(!diagnostic.contains("Pi CLI exited without agent output"));
+}
+
+#[test]
+fn format_empty_success_ignores_pi_extension_install_noise() {
+    let diagnostic = format_empty_success(
+        "npm warn deprecated node-domexception@1.0.0\nadded 42 packages, and audited 44 packages in 2s\nfound 0 vulnerabilities",
+    );
+
+    assert!(diagnostic.contains(r#""key":"ai.error.pi.emptyOutput""#));
+    assert!(!diagnostic.contains("emptyOutputWithDiagnostic"));
+    assert!(!diagnostic.contains("added 42 packages"));
 }
