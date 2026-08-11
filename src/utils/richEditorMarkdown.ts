@@ -180,7 +180,7 @@ function preProcessBlankBlockquoteParagraphs(markdown: MarkdownBody): MarkdownBo
   const lines = splitMarkdownSourceLines(markdown)
   return lines.map((line, index) => {
     const parsed = parseBlockquoteSourceLine(line.content)
-    if (!parsed || parsed.content.trim() !== '') return markdownSourceLineText(line)
+    if (parsed?.content.trim() !== '') return markdownSourceLineText(line)
     if (!hasQuotedContentNeighbor(lines, index - 1) || !hasQuotedContentNeighbor(lines, index + 1)) {
       return markdownSourceLineText(line)
     }
