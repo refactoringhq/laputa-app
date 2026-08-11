@@ -49,6 +49,11 @@ const EMPTY_CHECKLIST_ITEM_FILLER = '\u200B'
 const EMPTY_CHECKLIST_ITEM_LINE_RE = /^([ \t]*[-*+][ \t]+\[[ xX]\])[ \t]*$/u
 const BLANK_PARAGRAPH_PLACEHOLDER = '\u200B'
 
+interface ParsedBlockquoteSourceLine {
+  content: string
+  marker: string
+}
+
 interface MarkdownSourceLine {
   content: string
   newline: string
@@ -94,7 +99,8 @@ export function preProcessRichEditorMarkdown(
 ): PreprocessedMarkdown {
   const withDurableBlocks = preProcessDurableEditorMarkdown({ markdown })
   const withEmptyChecklists = preProcessEmptyChecklistItems(withDurableBlocks)
-  const withBlankParagraphs = preProcessBlankParagraphs(withEmptyChecklists)
+  const withBlankQuotes = preProcessBlankBlockquoteParagraphs(withEmptyChecklists)
+  const withBlankParagraphs = preProcessBlankParagraphs(withBlankQuotes)
   const withBareImages = normalizeBareImageUrls(withBlankParagraphs)
   const withImages = vaultPath ? resolveImageUrls(withBareImages, vaultPath, notePath) : withBareImages
   const withWikilinks = preProcessWikilinks(withImages)
@@ -141,8 +147,9 @@ function serializeRichEditorBodyToMarkdownWithTrace(
   const directEditor = editor as DirectMarkdownCapableSerializer
   delete directEditor.__tolariaLastDirectMarkdownMetrics
   const document = blocks
+  const serialized = serializeDurableEditorBlocks(editor, document, vaultPath)
   const body = compactMarkdown(
-    serializeDurableEditorBlocks(editor, document, vaultPath),
+    restoreBlankBlockquoteParagraphs(serialized),
     { preserveConsecutiveBlankLines: true },
   )
   const metrics = readDirectMarkdownMetrics(directEditor)
@@ -167,6 +174,76 @@ function preProcessEmptyChecklistItems(markdown: MarkdownBody): MarkdownBody {
 function preProcessEmptyChecklistLine(line: MarkdownBody): MarkdownBody {
   const match = EMPTY_CHECKLIST_ITEM_LINE_RE.exec(line)
   return match ? `${match[1]} ${EMPTY_CHECKLIST_ITEM_FILLER}` : line
+}
+
+function preProcessBlankBlockquoteParagraphs(markdown: MarkdownBody): MarkdownBody {
+  const lines = splitMarkdownSourceLines(markdown)
+  return lines.map((line, index) => {
+    const parsed = parseBlockquoteSourceLine(line.content)
+    if (!parsed || parsed.content.trim() !== '') return markdownSourceLineText(line)
+    if (!hasQuotedContentNeighbor(lines, index - 1) || !hasQuotedContentNeighbor(lines, index + 1)) {
+      return markdownSourceLineText(line)
+    }
+
+    const newline = line.newline || '\n'
+    const marker = parsed.marker.trimEnd()
+    return `${newline}${marker} ${BLANK_PARAGRAPH_PLACEHOLDER}${newline}${newline}`
+  }).join('')
+}
+
+function hasQuotedContentNeighbor(lines: MarkdownSourceLine[], index: number): boolean {
+  const content = lines.at(index)?.content
+  if (content === undefined) return false
+  const parsed = parseBlockquoteSourceLine(content)
+  return parsed !== null && parsed.content.trim() !== ''
+}
+
+function restoreBlankBlockquoteParagraphs(markdown: MarkdownBody): MarkdownBody {
+  const pendingLines = markdown.split('\n')
+  const restored: string[] = []
+
+  while (pendingLines.length > 0) {
+    const line = pendingLines.shift() ?? ''
+    const parsed = parseBlockquoteSourceLine(line)
+    if (!isBlankSerializedBlockquoteGap(parsed, restored.at(-1), pendingLines.at(0))) {
+      restored.push(line)
+      continue
+    }
+
+    restored.pop()
+    restored.push(parsed.marker.trimEnd())
+    pendingLines.shift()
+  }
+
+  return restored.join('\n')
+}
+
+function isBlankSerializedBlockquoteGap(
+  parsed: ParsedBlockquoteSourceLine | null,
+  previous: string | undefined,
+  next: string | undefined,
+): parsed is ParsedBlockquoteSourceLine {
+  if (!parsed) return false
+  if (parsed.content.trim() !== '') return false
+  if (previous !== '') return false
+  return next === ''
+}
+
+function parseBlockquoteSourceLine(line: string): ParsedBlockquoteSourceLine | null {
+  let cursor = 0
+  while (cursor < 3 && isHorizontalWhitespace(line.charAt(cursor))) cursor += 1
+  if (line.charAt(cursor) !== '>') return null
+
+  do {
+    cursor += 1
+    if (isHorizontalWhitespace(line.charAt(cursor))) cursor += 1
+  } while (line.charAt(cursor) === '>')
+
+  return { content: line.slice(cursor), marker: line.slice(0, cursor) }
+}
+
+function isHorizontalWhitespace(character: string): boolean {
+  return character === ' ' || character === '\t'
 }
 
 function preProcessBlankParagraphs(markdown: MarkdownBody): MarkdownBody {
@@ -300,7 +377,8 @@ function injectBlankParagraphBlock(block: unknown): unknown {
 }
 
 function isBlankParagraphPlaceholderBlock(block: Record<string, unknown>): boolean {
-  return block.type === 'paragraph' && isBlankParagraphPlaceholderContent(block.content)
+  return (block.type === 'paragraph' || block.type === 'quote')
+    && isBlankParagraphPlaceholderContent(block.content)
 }
 
 function isBlankParagraphPlaceholderContent(content: unknown): boolean {
