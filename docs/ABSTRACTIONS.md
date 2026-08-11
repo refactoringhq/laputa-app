@@ -774,6 +774,7 @@ Defined in `src/components/tolariaEditorFormatting.tsx` and `src/components/tola
 - `tauriEventCleanup.ts` owns safe Tauri event unlisten cleanup. Hooks and stream utilities route listener teardown through it so stale or duplicate native listener removals cannot surface as unhandled promise rejections during fast remounts, window teardown, or stream completion.
 - `useTauriDragDropEvent()` owns the shared Tauri window drag/drop subscription used by native drop features.
 - `useNativePathDrop()` is the shared Tauri file/folder-drop abstraction for text inputs that need filesystem paths instead of attachment import. It consumes native window drag/drop events, gates them to the target element bounds or focused text selection, and lets AI composer / command-palette inputs insert formatted paths at the current cursor.
+- `InlineWikilinkInput` owns the AI composer and command-palette contenteditable lifecycle. Its event and editing primitives live in `inlineWikilinkInputEvents.ts` and `inlineWikilinkInputOperations.ts`, while `InlineWikilinkSuggestionMenu` owns the optional suggestion surface. Composition completion uses a short settle window so Windows CJK IMEs can deliver their final native text input without a controlled React render committing an intermediate syllable sequence first.
 
 ### Markdown-to-BlockNote Pipeline
 
