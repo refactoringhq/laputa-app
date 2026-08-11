@@ -277,25 +277,33 @@ test.describe('Editor code block theme', () => {
       .last()
     await expect(pastedCodeBlock).toBeVisible({ timeout: 10_000 })
 
-    const languageSelect = pastedCodeBlock.locator('select').first()
+    const blockId = await pastedCodeBlock.locator('xpath=ancestor::*[@data-id][1]')
+      .getAttribute('data-id')
+    expect(blockId).toBeTruthy()
+    const nativeLanguageSelect = pastedCodeBlock.locator('select').first()
+    const languageSelect = page.locator(
+      `.editor__code-block-language-overlay[data-code-block-id="${blockId}"] [data-slot="select-trigger"]`,
+    )
     await expect(languageSelect).toBeVisible()
     await expect(languageSelect).toBeEnabled()
-    await expect(languageSelect).toHaveValue('text')
+    await expect(languageSelect).toContainText('Plain Text')
+    await expect.poll(() => nativeLanguageSelect.evaluate((select) => (
+      getComputedStyle(select).visibility
+    ))).toBe('hidden')
     await expect.poll(() => languageSelect.evaluate((select) => {
       const style = getComputedStyle(select)
       return {
         cursor: style.cursor,
-        minHeight: Number.parseFloat(style.minHeight),
-        paddingInlineEnd: Number.parseFloat(style.paddingInlineEnd),
+        height: select.getBoundingClientRect().height,
       }
     })).toEqual({
       cursor: 'pointer',
-      minHeight: 28,
-      paddingInlineEnd: 28,
+      height: 28,
     })
 
-    await languageSelect.selectOption('cpp')
-    await expect(languageSelect).toHaveValue('cpp')
+    await languageSelect.click()
+    await page.getByRole('option', { name: 'C++' }).click()
+    await expect(languageSelect).toContainText('C++')
     await expect.poll(() => fs.readFileSync(path.join(tempVaultDir, CODE_NOTE_RELATIVE_PATH), 'utf8'), {
       timeout: 10_000,
     }).toContain(`\`\`\`cpp\n${PASTED_CPP_SNIPPET}\n\`\`\``)

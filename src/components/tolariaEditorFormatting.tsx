@@ -27,6 +27,7 @@ import type {
 } from '@blocknote/core'
 import { FormattingToolbarExtension } from '@blocknote/core/extensions'
 import { useEditorComposing } from './useEditorComposing'
+import { CodeBlockLanguageControls } from './codeBlockLanguageControls'
 import {
   createContext,
   useCallback,
@@ -745,10 +746,109 @@ export function TolariaFormattingToolbar({
   return <FormattingToolbar>{getTolariaFormattingToolbarItems(vaultPath, locale)}</FormattingToolbar>
 }
 
-export function TolariaFormattingToolbarController(props: {
+type TolariaFormattingToolbarControllerProps = {
   formattingToolbar?: FC<FormattingToolbarProps>;
   floatingUIOptions?: FloatingUIOptions;
+}
+
+function useFormattingToolbarInteractionState({
+  editor,
+  formattingToolbarStore,
+  isComposing,
+  show,
+}: {
+  editor: BlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>
+  formattingToolbarStore: FormattingToolbarStore
+  isComposing: boolean
+  show: boolean
 }) {
+  const [toolbarHasFocus, setToolbarHasFocus] = useState(false)
+  const [toolbarHovered, setToolbarHovered] = useState(false)
+  const [blockTypeMenuOpened, setBlockTypeMenuOpened] = useState(false)
+  const blockTypeMenuState = useMemo<BlockTypeMenuState>(() => ({
+    opened: blockTypeMenuOpened,
+    setOpened: setBlockTypeMenuOpened,
+  }), [blockTypeMenuOpened])
+  const { closeGraceActive, clearCloseGrace, dismissImmediately } = useFormattingToolbarCloseGrace({
+    show,
+    toolbarHasFocus,
+    toolbarHovered,
+  })
+  const setFormattingToolbarOpen = useDeduplicatedFormattingToolbarStore(
+    formattingToolbarStore,
+    show,
+  )
+  const closeBlockTypeMenuFromEditor = useCallback(() => {
+    setBlockTypeMenuOpened(false)
+    setToolbarHasFocus(false)
+    setToolbarHovered(false)
+    dismissImmediately()
+    setFormattingToolbarOpen(false)
+  }, [dismissImmediately, setFormattingToolbarOpen])
+  useCloseBlockTypeMenuOnEditorInteraction(editor, blockTypeMenuOpened, closeBlockTypeMenuFromEditor)
+
+  return {
+    blockTypeMenuState,
+    clearCloseGrace,
+    isOpen: !isComposing
+      && (show || toolbarHasFocus || toolbarHovered || blockTypeMenuOpened || closeGraceActive),
+    setBlockTypeMenuOpened,
+    setFormattingToolbarOpen,
+    setToolbarHasFocus,
+    setToolbarHovered,
+  }
+}
+
+type FormattingToolbarSurfaceProps = {
+  Component?: FC<FormattingToolbarProps>
+  blockTypeMenuState: BlockTypeMenuState
+  floatingUIOptions: FloatingUIOptions
+  position: { from: number; to: number } | undefined
+  setBlockTypeMenuOpened: Dispatch<SetStateAction<boolean>>
+  setFormattingToolbarOpen: (open: boolean) => void
+  setToolbarHasFocus: Dispatch<SetStateAction<boolean>>
+  setToolbarHovered: Dispatch<SetStateAction<boolean>>
+  shouldRender: boolean
+}
+
+function FormattingToolbarSurface(props: FormattingToolbarSurfaceProps) {
+  const {
+    Component,
+    blockTypeMenuState,
+    floatingUIOptions,
+    position,
+    setBlockTypeMenuOpened,
+    setFormattingToolbarOpen,
+    setToolbarHasFocus,
+    setToolbarHovered,
+    shouldRender,
+  } = props
+  return (
+    <PositionPopover position={position} {...floatingUIOptions}>
+      {shouldRender && (
+        <div
+          onPointerEnter={() => setToolbarHovered(true)}
+          onPointerLeave={(event) => {
+            if (!isFocusStillWithinToolbar(event.currentTarget, event.relatedTarget)) setToolbarHovered(false)
+          }}
+          onFocusCapture={() => setToolbarHasFocus(true)}
+          onBlurCapture={(event) => {
+            if (isFocusStillWithinToolbar(event.currentTarget, event.relatedTarget)) return
+            setToolbarHasFocus(false)
+            setBlockTypeMenuOpened(false)
+            setFormattingToolbarOpen(false)
+          }}
+        >
+          <BlockTypeMenuContext.Provider value={blockTypeMenuState}>
+            {Component ? <Component /> : <TolariaFormattingToolbar />}
+          </BlockTypeMenuContext.Provider>
+        </div>
+      )}
+    </PositionPopover>
+  )
+}
+
+export function TolariaFormattingToolbarController(props: TolariaFormattingToolbarControllerProps) {
   const editor = useBlockNoteEditor<
     BlockSchema,
     InlineContentSchema,
@@ -761,41 +861,20 @@ export function TolariaFormattingToolbarController(props: {
     editor,
   })
   const isComposing = useEditorComposing(editor)
-  const [toolbarHasFocus, setToolbarHasFocus] = useState(false)
-  const [toolbarHovered, setToolbarHovered] = useState(false)
-  const [blockTypeMenuOpened, setBlockTypeMenuOpened] = useState(false)
-  const blockTypeMenuState = useMemo<BlockTypeMenuState>(() => ({
-    opened: blockTypeMenuOpened,
-    setOpened: setBlockTypeMenuOpened,
-  }), [blockTypeMenuOpened])
   const {
-    closeGraceActive,
+    blockTypeMenuState,
     clearCloseGrace,
-    dismissImmediately,
-  } = useFormattingToolbarCloseGrace({
-    show,
-    toolbarHasFocus,
-    toolbarHovered,
-  })
-  const setFormattingToolbarOpen = useDeduplicatedFormattingToolbarStore(
-    formattingToolbar.store,
-    show,
-  )
-  const closeBlockTypeMenuFromEditor = useCallback(() => {
-    setBlockTypeMenuOpened(false)
-    setToolbarHasFocus(false)
-    setToolbarHovered(false)
-    dismissImmediately()
-    setFormattingToolbarOpen(false)
-  }, [dismissImmediately, setFormattingToolbarOpen])
-  useCloseBlockTypeMenuOnEditorInteraction(
+    isOpen,
+    setBlockTypeMenuOpened,
+    setFormattingToolbarOpen,
+    setToolbarHasFocus,
+    setToolbarHovered,
+  } = useFormattingToolbarInteractionState({
     editor,
-    blockTypeMenuOpened,
-    closeBlockTypeMenuFromEditor,
-  )
-
-  const isOpen = !isComposing
-    && (show || toolbarHasFocus || toolbarHovered || blockTypeMenuOpened || closeGraceActive)
+    formattingToolbarStore: formattingToolbar.store,
+    isComposing,
+    show,
+  })
   const hasFloatingToolbarAnchor = getFormattingToolbarAnchorElement(editor) !== null
   const shouldRenderFloatingToolbar = isOpen && hasFloatingToolbarAnchor
   const currentBridgeBlockId = useEditorState({
@@ -873,45 +952,28 @@ export function TolariaFormattingToolbarController(props: {
       editor,
       placement,
       props.floatingUIOptions,
+      setBlockTypeMenuOpened,
       setFormattingToolbarOpen,
+      setToolbarHasFocus,
+      setToolbarHovered,
       shouldRenderFloatingToolbar,
     ],
   )
 
-  const Component = props.formattingToolbar || TolariaFormattingToolbar
-
   return (
-    <PositionPopover position={position} {...floatingUIOptions}>
-      {shouldRenderFloatingToolbar && (
-        <div
-          onPointerEnter={() => {
-            setToolbarHovered(true)
-          }}
-          onPointerLeave={(event) => {
-            if (isFocusStillWithinToolbar(event.currentTarget, event.relatedTarget)) {
-              return
-            }
-
-            setToolbarHovered(false)
-          }}
-          onFocusCapture={() => {
-            setToolbarHasFocus(true)
-          }}
-          onBlurCapture={(event) => {
-            if (isFocusStillWithinToolbar(event.currentTarget, event.relatedTarget)) {
-              return
-            }
-
-            setToolbarHasFocus(false)
-            setBlockTypeMenuOpened(false)
-            setFormattingToolbarOpen(false)
-          }}
-        >
-          <BlockTypeMenuContext.Provider value={blockTypeMenuState}>
-            <Component />
-          </BlockTypeMenuContext.Provider>
-        </div>
-      )}
-    </PositionPopover>
+    <>
+      <CodeBlockLanguageControls editor={editor} />
+      <FormattingToolbarSurface
+        Component={props.formattingToolbar}
+        blockTypeMenuState={blockTypeMenuState}
+        floatingUIOptions={floatingUIOptions}
+        position={position}
+        setBlockTypeMenuOpened={setBlockTypeMenuOpened}
+        setFormattingToolbarOpen={setFormattingToolbarOpen}
+        setToolbarHasFocus={setToolbarHasFocus}
+        setToolbarHovered={setToolbarHovered}
+        shouldRender={shouldRenderFloatingToolbar}
+      />
+    </>
   )
 }
