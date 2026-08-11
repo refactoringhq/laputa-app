@@ -6,5 +6,6 @@ export function isReleasedWorkbookModelError(error: unknown): boolean {
 }
 
 export function isIronCalcWasmBridgeError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes(WASM_BINDGEN_STACK_POINTER_EXPORT)
+  return isReleasedWorkbookModelError(error)
+    || (error instanceof Error && error.message.includes(WASM_BINDGEN_STACK_POINTER_EXPORT))
 }
