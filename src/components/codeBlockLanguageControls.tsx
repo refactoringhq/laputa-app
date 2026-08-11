@@ -139,7 +139,7 @@ function updateCodeBlockLanguage(
 
   try {
     const block = editor.getBlock(blockId)
-    if (!block || block.type !== 'codeBlock') return
+    if (block?.type !== 'codeBlock') return
     editor.updateBlock(blockId, { props: { language } })
   } catch {
     // BlockNote can remove a block between the picker opening and selection.
