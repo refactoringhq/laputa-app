@@ -1,10 +1,10 @@
-import { useCallback, type DragEventHandler, type MouseEvent as ReactMouseEvent, type MouseEventHandler } from 'react'
 import { Folder, FolderOpen } from '@phosphor-icons/react'
+import { type DragEventHandler, type MouseEventHandler, type MouseEvent as ReactMouseEvent, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { FolderNode } from '../../types'
-import { useFolderRowInteractions } from './useFolderRowInteractions'
 import { readDraggedNotePath } from '../../utils/noteDragDrop'
+import { useFolderRowInteractions } from './useFolderRowInteractions'
 
 interface FolderItemRowProps {
   contentInset: number
@@ -28,28 +28,28 @@ function useFolderNoteDropHandlers({
 }: Pick<FolderItemRowProps, 'node' | 'onCanDropNote' | 'onMoveNoteToFolder'>) {
   const canMoveDraggedNote = useCallback(
     (dataTransfer: DataTransfer | null) => {
-    const notePath = readDraggedNotePath(dataTransfer)
-    return notePath && onCanDropNote?.(notePath, node.path) ? notePath : null
+      const notePath = readDraggedNotePath(dataTransfer)
+      return notePath && onCanDropNote?.(notePath, node.path) ? notePath : null
     },
     [node.path, onCanDropNote],
   )
 
   const onDragOver: DragEventHandler<HTMLButtonElement> = useCallback(
     (event) => {
-    if (!canMoveDraggedNote(event.dataTransfer)) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
+      if (!canMoveDraggedNote(event.dataTransfer)) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
     },
     [canMoveDraggedNote],
   )
 
   const onDrop: DragEventHandler<HTMLButtonElement> = useCallback(
     (event) => {
-    const notePath = canMoveDraggedNote(event.dataTransfer)
-    if (!notePath) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-    void onMoveNoteToFolder?.(notePath, node.path)
+      const notePath = canMoveDraggedNote(event.dataTransfer)
+      if (!notePath) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+      void onMoveNoteToFolder?.(notePath, node.path)
     },
     [canMoveDraggedNote, node.path, onMoveNoteToFolder],
   )
@@ -147,6 +147,7 @@ function FolderSelectButton(options: {
       className={cn(
         'h-auto flex-1 justify-start gap-2 rounded text-left text-[13px] font-medium hover:bg-transparent',
         isSelected ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground',
+        'data-[note-drop-state=valid]:!bg-[var(--accent-blue-light)] data-[note-drop-state=valid]:ring-1 data-[note-drop-state=valid]:ring-[var(--accent-blue)]',
       )}
       style={{
         paddingTop: 6,
@@ -162,6 +163,7 @@ function FolderSelectButton(options: {
       onDragOver={onDragOver}
       onDrop={onDrop}
       data-testid={`folder-row:${node.path}`}
+      data-note-drop-folder={node.path}
     >
       {isSelected || isExpanded ? (
         <FolderOpen size={17} weight="fill" className="size-[17px] shrink-0" />

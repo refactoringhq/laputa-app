@@ -1,11 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
-import { NOTE_DRAG_MIME_TYPE, readDraggedNotePath, writeNoteDragData } from './noteDragDrop'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { clearDraggedNotePath, NOTE_DRAG_MIME_TYPE, readDraggedNotePath, writeNoteDragData } from './noteDragDrop'
 
 function dataTransferWithGetData(getData: (type: string) => unknown): DataTransfer {
   return { getData } as DataTransfer
 }
 
 describe('note drag/drop data', () => {
+  afterEach(() => clearDraggedNotePath())
+
   it('writes the Tolaria note path and plain text drag payloads', () => {
     const setData = vi.fn()
     const dataTransfer = { setData } as unknown as DataTransfer

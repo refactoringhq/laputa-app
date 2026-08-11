@@ -1,36 +1,27 @@
-import type { CSSProperties, Dispatch, ReactNode, Ref, RefObject, SetStateAction } from 'react'
-import type { VaultEntry, SidebarSelection, ViewDefinition, ViewFile } from '../../types'
-import { DndContext, closestCenter, type useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { closestCenter, DndContext, type DragEndEvent, type useSensors } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Palette,
-  PencilSimple,
-  Plus,
-  SidebarSimple,
-  SlidersHorizontal,
-  Trash,
-} from '@phosphor-icons/react'
-import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
-import { Button } from '@/components/ui/button'
+import { ArrowLeft, ArrowRight, Palette, PencilSimple, Plus, SidebarSimple, Trash } from '@phosphor-icons/react'
+import type { CSSProperties, ReactNode, Ref } from 'react'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
-import { type SectionGroup, isSelectionActive, SectionContent, VisibilityPopover } from '../SidebarParts'
-import { TypeCustomizePopover } from '../TypeCustomizePopover'
+import { Button } from '@/components/ui/button'
+import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { useDragRegion } from '../../hooks/useDragRegion'
+import { type AppLocale, translate } from '../../lib/i18n'
+import type { SidebarSelection, VaultEntry, ViewDefinition, ViewFile } from '../../types'
+import { MACOS_TRAFFIC_LIGHT_SAFE_PADDING } from '../../utils/platform'
+import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
+import { getContextMenuPositionStyle } from '../contextMenuPosition'
+import { isSelectionActive } from '../SidebarParts'
+import { TypeCustomizePopover } from '../TypeCustomizePopover'
 import { SidebarGroupHeader } from './SidebarGroupHeader'
 import { SidebarViewItem } from './SidebarViewItem'
 import { computeReorder } from './sidebarHooks'
 import { SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
-import { getContextMenuPositionStyle } from '../contextMenuPosition'
-import { countByFilter } from '../../utils/noteListHelpers'
-import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
-import { translate, type AppLocale } from '../../lib/i18n'
-import { MACOS_TRAFFIC_LIGHT_SAFE_PADDING } from '../../utils/platform'
 
-export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
+export { SidebarTopNav } from './SidebarTopNav'
+export { type SidebarSectionProps, TypesSection } from './SidebarTypesSection'
 
 const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
   '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'
@@ -43,20 +34,6 @@ const SIDEBAR_TYPE_CONTEXT_MENU_SURFACE_CLASSNAME =
   'fixed z-50 inline-flex w-fit max-w-[calc(100vw-16px)] flex-col rounded-md border bg-popover p-1 shadow-md'
 const SIDEBAR_TYPE_CONTEXT_MENU_BUTTON_CLASSNAME =
   'h-auto w-auto max-w-full justify-start gap-2 rounded-sm px-2 py-1.5 text-left text-sm font-normal'
-
-export interface SidebarSectionProps {
-  entries: VaultEntry[]
-  selection: SidebarSelection
-  onSelect: (selection: SidebarSelection) => void
-  onContextMenu: (event: React.MouseEvent, type: string) => void
-  renamingType: string | null
-  renameInitialValue: string
-  onRenameSubmit: (value: string) => void
-  onRenameCancel: () => void
-  onStartRename: (type: string) => void
-  onSelectTypeNote: (type: string) => void
-  locale?: AppLocale
-}
 
 export function ViewsSection(options: {
   views: ViewFile[]
@@ -196,151 +173,9 @@ function SortableViewItem(options: {
   )
 }
 
-function SortableSection({ group, sectionProps }: { group: SectionGroup; sectionProps: SidebarSectionProps }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.type })
-  const itemCount = countByFilter(sectionProps.entries, group.type).open
-  const isRenaming = sectionProps.renamingType === group.type
-  const content = (
-    <SectionContent
-      group={group}
-      itemCount={itemCount}
-      selection={sectionProps.selection}
-      onSelect={sectionProps.onSelect}
-      onContextMenu={sectionProps.onContextMenu}
-      dragHandleProps={listeners}
-      isRenaming={isRenaming}
-      renameInitialValue={isRenaming ? sectionProps.renameInitialValue : undefined}
-      onRenameSubmit={sectionProps.onRenameSubmit}
-      onRenameCancel={sectionProps.onRenameCancel}
-      onStartRename={sectionProps.onStartRename}
-      onSelectTypeNote={sectionProps.onSelectTypeNote}
-      locale={sectionProps.locale}
-    />
-  )
+const titleWithShortcut = (label: string, shortcut?: string): string => shortcut ? `${label} (${shortcut})` : label
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-        padding: '0 6px',
-      }}
-      {...attributes}
-    >
-      {content}
-    </div>
-  )
-}
-
-export function TypesSection(options: {
-  entries: VaultEntry[]
-  visibleSections: SectionGroup[]
-  allSectionGroups: SectionGroup[]
-  sectionIds: string[]
-  sensors: ReturnType<typeof useSensors>
-  handleDragEnd: (event: DragEndEvent) => void
-  sectionProps: SidebarSectionProps
-  collapsed: boolean
-  onToggle: () => void
-  showCustomize: boolean
-  setShowCustomize: Dispatch<SetStateAction<boolean>>
-  isSectionVisible: (type: string) => boolean
-  toggleVisibility: (type: string, typeEntryPath?: string) => void
-  onCreateNewType?: () => void
-  customizeRef: RefObject<HTMLDivElement | null>
-  workspaceOrder?: readonly string[]
-  locale?: AppLocale
-}) {
-  const {
-    entries,
-    visibleSections,
-    allSectionGroups,
-    sectionIds,
-    sensors,
-    handleDragEnd,
-    sectionProps,
-    collapsed,
-    onToggle,
-    showCustomize,
-    setShowCustomize,
-    isSectionVisible,
-    toggleVisibility,
-    onCreateNewType,
-    customizeRef,
-    workspaceOrder,
-    locale = 'en',
-  } = options
-  return (
-    <div className="border-b border-border">
-      <div ref={customizeRef} style={{ position: 'relative', padding: '0 6px' }}>
-        <SidebarGroupHeader label={translate(locale, 'sidebar.group.types')} collapsed={collapsed} onToggle={onToggle}>
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              title={translate(locale, 'sidebar.action.customizeSections')}
-              aria-label={translate(locale, 'sidebar.action.customizeSections')}
-              className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={(event) => {
-                event.stopPropagation()
-                setShowCustomize((value) => !value)
-              }}
-            >
-              <SlidersHorizontal size={12} className="text-muted-foreground hover:text-foreground" />
-            </Button>
-            {onCreateNewType && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="h-auto w-auto min-w-0 rounded-none p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                data-testid="create-type-btn"
-                title={translate(locale, 'sidebar.action.createType')}
-                aria-label={translate(locale, 'sidebar.action.createType')}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onCreateNewType()
-                }}
-              >
-                <Plus size={12} className="text-muted-foreground hover:text-foreground" />
-              </Button>
-            )}
-          </div>
-        </SidebarGroupHeader>
-        {showCustomize && (
-          <VisibilityPopover
-            entries={entries}
-            sections={allSectionGroups}
-            isSectionVisible={isSectionVisible}
-            onToggle={toggleVisibility}
-            workspaceOrder={workspaceOrder}
-            locale={locale}
-          />
-        )}
-      </div>
-      {!collapsed && (
-        <div style={{ paddingBottom: SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM }}>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
-              {visibleSections.map((group) => (
-                <SortableSection key={group.type} group={group} sectionProps={sectionProps} />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function titleWithShortcut(label: string, shortcut?: string): string {
-  return shortcut ? `${label} (${shortcut})` : label
-}
-
-function SidebarTitleBarAction({
+const SidebarTitleBarAction = ({
   children,
   disabled = false,
   label,
@@ -352,7 +187,7 @@ function SidebarTitleBarAction({
   label: string
   onClick?: () => void
   shortcut?: string
-}) {
+}) => {
   const title = titleWithShortcut(label, shortcut)
 
   return (
@@ -379,7 +214,7 @@ function SidebarTitleBarAction({
   )
 }
 
-export function SidebarTitleBar({
+export const SidebarTitleBar = ({
   locale = 'en',
   onCollapse,
   onGoBack,
@@ -393,7 +228,7 @@ export function SidebarTitleBar({
   onGoForward?: () => void
   canGoBack?: boolean
   canGoForward?: boolean
-}) {
+}) => {
   const { dragRegionRef } = useDragRegion<HTMLDivElement>()
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
   const backLabel = translate(locale, 'command.navigation.goBack')
@@ -442,7 +277,7 @@ export function SidebarTitleBar({
   )
 }
 
-export function ContextMenuOverlay({
+export const ContextMenuOverlay = ({
   pos,
   type,
   innerRef,
@@ -458,7 +293,7 @@ export function ContextMenuOverlay({
   onStartRename: (type: string) => void
   onDelete: (type: string) => void
   locale?: AppLocale
-}) {
+}) => {
   if (!pos || !type) return null
 
   return (
@@ -503,7 +338,7 @@ export function ContextMenuOverlay({
   )
 }
 
-export function CustomizeOverlay({
+export const CustomizeOverlay = ({
   target,
   typeEntryMap,
   innerRef,
@@ -519,7 +354,7 @@ export function CustomizeOverlay({
   onChangeTemplate: (template: string) => void
   onClose: () => void
   locale?: AppLocale
-}) {
+}) => {
   if (!target) return null
   const typeEntry = Reflect.get(typeEntryMap, target) as VaultEntry | undefined
 
