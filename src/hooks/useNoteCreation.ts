@@ -25,6 +25,10 @@ import {
 import type { VaultOption } from '../components/status-bar/types'
 import { useCreateNoteInFolderRequests } from './noteCreationRequests'
 import { requestEditorFocus } from './useEditorFocus'
+import {
+  resolveWikilinkCreationRequest,
+  type WikilinkCreationDestination,
+} from '../utils/wikilinkCreation'
 
 export interface NewEntryParams {
   path: string
@@ -176,12 +180,12 @@ function buildNoteBody({
   template,
   initialEmptyHeading,
 }: Pick<NoteContentParams, 'format' | 'template' | 'initialEmptyHeading'>): string {
-  if (format === NOTE_FORMAT_SHEET) return template ? `\n${template}` : ''
-  const templateStartsWithH1 = template?.trimStart().startsWith('# ') ?? false
-  if (initialEmptyHeading && !templateStartsWithH1) {
-    return template ? `\n# \n\n${template}` : '\n# \n\n'
-  }
-  return template ? `\n${template}` : ''
+  const templateBody = template ? `\n${template}` : ''
+  if (format === NOTE_FORMAT_SHEET) return templateBody
+  if (!initialEmptyHeading) return templateBody
+  if (template?.trimStart().startsWith('# ')) return templateBody
+  if (!template) return '\n# \n\n'
+  return `\n# \n\n${template}`
 }
 
 function isDefaultablePropertyValue(value: unknown): value is string | number | boolean {
@@ -311,6 +315,7 @@ export function buildNoteContent({
 }
 
 export interface NewNoteParams {
+  destination?: WikilinkCreationDestination
   title: string
   type: string
   format?: NoteFormat
@@ -325,13 +330,15 @@ export function resolveNewNote(options: NewNoteParams): {
   entry: VaultEntry
   content: string
 } {
-  const { title, type, format, vaultPath, defaultWorkspacePath, vaults = [], template, defaults = [] } = options
-  const creationVaultPath = resolveCreationVaultPath(vaultPath, defaultWorkspacePath, vaults)
+  const { destination, title, type, format, vaultPath, defaultWorkspacePath, vaults = [], template, defaults = [] } = options
+  const creationVaultPath = destination?.vaultPath
+    ?? resolveCreationVaultPath(vaultPath, defaultWorkspacePath, vaults)
   const slug = slugify(title)
+  const relativePath = destination?.relativePath ?? `${slug}.md`
   const status = null
   const entry = {
     ...buildNewEntry({
-      path: joinVaultPath(creationVaultPath, `${slug}.md`),
+      path: joinVaultPath(creationVaultPath, relativePath),
       slug,
       title,
       type,
@@ -467,8 +474,9 @@ function findEquivalentTypeEntry(entries: VaultEntry[], typeName: string): Vault
 }
 
 export function planNewNoteCreation(options: NewNoteParams & { entries: VaultEntry[] }): NoteCreationPlan {
-  const { defaultWorkspacePath, entries, title, type, vaultPath, vaults, template, defaults } = options
+  const { defaultWorkspacePath, destination, entries, title, type, vaultPath, vaults, template, defaults } = options
   const resolved = resolveNewNote({
+  destination,
   title,
   type,
   vaultPath,
@@ -640,16 +648,19 @@ interface CreationDeps {
 }
 
 interface NoteCreationRequest extends CreationDeps {
+  destination?: WikilinkCreationDestination
+  focusEditor?: boolean
   title: string
   type: string
-  creationPath?: 'plus_button' | 'quick_open'
+  creationPath?: 'plus_button' | 'quick_open' | 'wikilink'
 }
 
 async function createNamedNote(options: NoteCreationRequest): Promise<boolean> {
-  const { entries, defaultWorkspacePath, title, type, vaultPath, vaults, setToastMessage, persistResolvedEntry, creationPath } = options
+  const { creationPath, defaultWorkspacePath, destination, entries, focusEditor, persistResolvedEntry, setToastMessage, title, type, vaultPath, vaults } = options
   const template = resolveTemplate({ entries, typeName: type })
   const defaults = resolveTypeInstanceDefaults({ entries, typeName: type })
   const plan = planNewNoteCreation({
+    destination,
     entries,
     title,
     type,
@@ -666,6 +677,7 @@ async function createNamedNote(options: NoteCreationRequest): Promise<boolean> {
 
   try {
     await persistResolvedEntry(plan.resolved)
+    if (focusEditor) signalFocusEditor({ path: plan.resolved.entry.path })
     if (creationPath) {
       trackEvent('note_created', {
         has_type: type !== 'Note' ? 1 : 0,
@@ -1097,10 +1109,75 @@ function usePersistResolvedEntry(config: NoteCreationConfig, openTabWithContent:
   return persistResolvedEntry
 }
 
-function useNamedCreationActions(options: Pick<NoteCreationConfig, 'defaultWorkspacePath' | 'entries' | 'setToastMessage' | 'vaultPath' | 'vaults'> & {
+type NamedCreationOptions = Pick<
+  NoteCreationConfig,
+  'defaultWorkspacePath' | 'entries' | 'setToastMessage' | 'vaultPath' | 'vaults'
+> & {
   persistResolvedEntry: (resolved: ResolvedEntry, options?: PersistResolvedOptions) => Promise<void>
-}) {
+}
+
+function useCreateNoteFromWikilink(options: NamedCreationOptions) {
   const { defaultWorkspacePath, entries, persistResolvedEntry, setToastMessage, vaultPath, vaults } = options
+  return useCallback(
+    (target: string, sourceEntry?: VaultEntry): Promise<boolean> => {
+      const request = resolveWikilinkCreationRequest({
+        fallbackVaultPath: vaultPath,
+        sourceEntry,
+        target,
+        vaults,
+      })
+      if (!request) return Promise.resolve(false)
+      return createNamedNote({
+        entries,
+        vaultPath,
+        defaultWorkspacePath,
+        vaults,
+        setToastMessage,
+        persistResolvedEntry,
+        destination: request.destination,
+        focusEditor: true,
+        title: request.title,
+        type: 'Note',
+        creationPath: 'wikilink',
+      })
+    },
+    [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
+  )
+}
+
+function useTypeCreationActions(options: NamedCreationOptions) {
+  const { defaultWorkspacePath, entries, persistResolvedEntry, setToastMessage, vaultPath, vaults } = options
+  const handleCreateType = useCallback(
+    (typeName: string): Promise<boolean> => createTypeFromName({
+      entries,
+      vaultPath,
+      defaultWorkspacePath,
+      vaults,
+      setToastMessage,
+      persistResolvedEntry,
+      typeName,
+    }),
+    [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
+  )
+  const createTypeEntrySilent = useCallback(
+    (typeName: string): Promise<VaultEntry> => createTypeSilently({
+      entries,
+      vaultPath,
+      defaultWorkspacePath,
+      vaults,
+      setToastMessage,
+      persistResolvedEntry,
+      typeName,
+    }),
+    [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
+  )
+  return { createTypeEntrySilent, handleCreateType }
+}
+
+function useNamedCreationActions(options: NamedCreationOptions) {
+  const { defaultWorkspacePath, entries, persistResolvedEntry, setToastMessage, vaultPath, vaults } = options
+  const handleCreateNoteFromWikilink = useCreateNoteFromWikilink(options)
+  const { createTypeEntrySilent, handleCreateType } = useTypeCreationActions(options)
   const handleCreateNote = useCallback(
     (title: string, type: string, creationPath: 'plus_button' | 'quick_open' = 'plus_button'): Promise<boolean> =>
       createNamedNote({
@@ -1113,34 +1190,6 @@ function useNamedCreationActions(options: Pick<NoteCreationConfig, 'defaultWorks
         title,
         type,
         creationPath,
-      }),
-    [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
-  )
-
-  const handleCreateType = useCallback(
-    (typeName: string): Promise<boolean> =>
-      createTypeFromName({
-        entries,
-        vaultPath,
-        defaultWorkspacePath,
-        vaults,
-        setToastMessage,
-        persistResolvedEntry,
-        typeName,
-      }),
-    [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
-  )
-
-  const createTypeEntrySilent = useCallback(
-    (typeName: string): Promise<VaultEntry> =>
-      createTypeSilently({
-        entries,
-        vaultPath,
-        defaultWorkspacePath,
-        vaults,
-        setToastMessage,
-        persistResolvedEntry,
-        typeName,
       }),
     [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
   )
@@ -1159,14 +1208,26 @@ function useNamedCreationActions(options: Pick<NoteCreationConfig, 'defaultWorks
       }),
     [entries, vaultPath, defaultWorkspacePath, vaults, setToastMessage, persistResolvedEntry],
   )
-  return { handleCreateNote, handleCreateType, createTypeEntrySilent, handleCreateNoteForRelationship }
+  return {
+    handleCreateNote,
+    handleCreateNoteFromWikilink,
+    handleCreateType,
+    createTypeEntrySilent,
+    handleCreateNoteForRelationship,
+  }
 }
 
 export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTabDeps) {
   const { addEntry, defaultWorkspacePath, entries, setToastMessage, addPendingSave, removePendingSave, vaultPath, vaults, onNewNotePersisted } = config
   const { openTabWithContent } = tabDeps
   const persistResolvedEntry = usePersistResolvedEntry(config, openTabWithContent)
-  const { handleCreateNote, handleCreateType, createTypeEntrySilent, handleCreateNoteForRelationship } =
+  const {
+    handleCreateNote,
+    handleCreateNoteFromWikilink,
+    handleCreateType,
+    createTypeEntrySilent,
+    handleCreateNoteForRelationship,
+  } =
     useNamedCreationActions({ defaultWorkspacePath, entries, persistResolvedEntry, setToastMessage, vaultPath, vaults })
 
   const handleCreateNoteImmediate = useImmediateCreateQueue({
@@ -1185,6 +1246,7 @@ export function useNoteCreation(config: NoteCreationConfig, tabDeps: CreationTab
 
   return {
     handleCreateNote,
+    handleCreateNoteFromWikilink,
     handleCreateNoteImmediate,
     handleCreateNoteForRelationship,
     handleCreateType,

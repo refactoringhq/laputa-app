@@ -824,10 +824,12 @@ Autosave then waits for a 1.5s idle window before invoking `save_note_content`. 
 
 Two navigation mechanisms:
 
-1. **Click handler**: DOM event listener on `.editor__blocknote-container` catches clicks on `.wikilink` elements → `onNavigateWikilink(target)`.
+1. **Activation handler**: DOM listeners on `.editor__blocknote-container` catch modified clicks and keyboard `Enter` on focusable `.wikilink` elements → `onNavigateWikilink(target)`.
 2. **Suggestion menu**: Typing `[[` or `@` triggers `SuggestionMenuController` with the same filtered vault-entry suggestions and inserts normal wikilink inline content.
 
 Wikilink resolution (`resolveEntry` in `src/utils/wikilink.ts`) uses multi-pass matching with global priority: path suffix for path-style targets, filename stem, alias, exact title, then humanized title (kebab-case -> words). In a mounted-workspace graph, unprefixed links prefer the source note's workspace, while links prefixed by a known workspace alias resolve inside that workspace (`[[team/projects/alpha]]`). Cross-workspace canonical link insertion prefixes the target alias only when source and target workspaces differ; same-workspace links stay vault-relative.
+
+When activation cannot resolve an entry, `resolveWikilinkCreationRequest()` turns the target into a named-note request without changing the source Markdown. Simple targets are created beside the source note, path-qualified targets use that vault-relative folder, and a mounted workspace-alias prefix selects that workspace. The filename uses the canonical Unicode-aware note slug while a pipe alias remains display-only. Creation flows through the existing exclusive note persistence boundary, opens the persisted entry, focuses its editor, emits `note_created` with `creation_path: wikilink`, and lets normal active-note history preserve Back navigation.
 
 ### Raw Editor Mode
 

@@ -1,6 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import fs from 'fs'
-import path from 'path'
+import path from 'node:path'
 import {
   createFixtureVaultCopy,
   openFixtureVaultDesktopHarness,
@@ -12,7 +11,7 @@ let tempVaultDir: string
 
 type LinkErrorMessage = { message: string }
 type OpenedUrlExpectation = { url: string; count: number }
-type InlineUrlNoteFile = { filePath: string }
+type FixtureNoteRequest = { content: string; filePath: string; page: Page }
 
 async function openNote(page: Page, title: string) {
   const noteList = page.locator('[data-testid="note-list-container"]')
@@ -62,8 +61,22 @@ async function appendToProjectParagraph(page: Page, marker: string): Promise<voi
   await page.keyboard.type(` ${marker}`)
 }
 
-async function expectFileToContain(filePath: string, marker: string): Promise<void> {
-  await expect.poll(() => fs.readFileSync(filePath, 'utf8'), { timeout: 10_000 }).toContain(marker)
+async function readFixtureNote(page: Page, filePath: string): Promise<string> {
+  const response = await page.request.get(`/api/vault/content?path=${encodeURIComponent(filePath)}`)
+  expect(response.ok()).toBe(true)
+  const payload = await response.json() as { content: string }
+  return payload.content
+}
+
+async function readFixtureNoteIfExists(page: Page, filePath: string): Promise<string | null> {
+  const response = await page.request.get(`/api/vault/content?path=${encodeURIComponent(filePath)}`)
+  if (!response.ok()) return null
+  const payload = await response.json() as { content: string }
+  return payload.content
+}
+
+async function expectFileToContain(page: Page, filePath: string, marker: string): Promise<void> {
+  await expect.poll(() => readFixtureNote(page, filePath), { timeout: 10_000 }).toContain(marker)
 }
 
 async function reloadVault(page: Page): Promise<void> {
@@ -122,8 +135,15 @@ async function dispatchModifiedLinkActivation(link: Locator): Promise<void> {
   })
 }
 
-function writeInlineUrlNote({ filePath }: InlineUrlNoteFile): void {
-  fs.writeFileSync(filePath, `---
+async function writeFixtureNote({ content, filePath, page }: FixtureNoteRequest): Promise<void> {
+  const response = await page.request.post('/api/vault/save', {
+    data: { path: filePath, content },
+  })
+  expect(response.ok()).toBe(true)
+}
+
+async function writeInlineUrlNote(page: Page, filePath: string): Promise<void> {
+  await writeFixtureNote({ filePath, page, content: `---
 Is A: Note
 Status: Active
 ---
@@ -131,13 +151,11 @@ Status: Active
 # Inline Link Reload
 
 Use [regular link](https://example.com) beside [[Note B]] after reload.
-`, 'utf8')
+` })
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
-  testInfo.setTimeout(60_000)
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
+  testInfo.setTimeout(90_000)
   tempVaultDir = createFixtureVaultCopy()
   await openFixtureVaultDesktopHarness(page, tempVaultDir)
 })
@@ -178,7 +196,7 @@ test('Cmd-clicking a wikilink after rich-edit autosave does not dispatch through
   await expectActiveHeading(page, 'Alpha Project')
 
   await appendToProjectParagraph(page, marker)
-  await expectFileToContain(alphaPath, marker)
+  await expectFileToContain(page, alphaPath, marker)
 
   const wikilink = page.locator('.bn-editor .wikilink').filter({ hasText: 'Note B' }).first()
   await expect(wikilink).toBeVisible()
@@ -196,7 +214,7 @@ test('Cmd-clicking an inline URL after a vault reload does not dispatch through 
   const staleClickErrors = trackStaleLinkClickErrors(page)
   const notePath = path.join(tempVaultDir, 'note', 'inline-link-reload.md')
 
-  writeInlineUrlNote({ filePath: notePath })
+  await writeInlineUrlNote(page, notePath)
   await reloadVault(page)
   await openNote(page, 'Inline Link Reload')
   await expectActiveHeading(page, 'Inline Link Reload')
@@ -215,4 +233,46 @@ test('Cmd-clicking an inline URL after a vault reload does not dispatch through 
   await dispatchModifiedLinkActivation(inlineUrl)
   await expectOpenedUrlCount(page, { url: 'https://example.com', count: 2 })
   expect(staleClickErrors).toEqual([])
+})
+
+test('@smoke unresolved wikilinks create beside the source and preserve keyboard history', async ({ page }) => {
+  const sourcePath = path.join(tempVaultDir, 'project', 'unresolved-source.md')
+  const createdPath = path.join(tempVaultDir, 'project', 'new-note-topic.md')
+  await writeFixtureNote({
+    filePath: sourcePath,
+    page,
+    content: `---
+type: Note
+---
+
+# Unresolved Source
+
+Follow [[new-note-topic]] from here.
+`,
+  })
+  await reloadVault(page)
+  await openNote(page, 'Unresolved Source')
+  await expectActiveHeading(page, 'Unresolved Source')
+
+  const wikilink = page.locator('.bn-editor .wikilink').filter({ hasText: 'New Note Topic' }).first()
+  await expect(wikilink).toHaveClass(/wikilink--broken/u)
+  await expect(wikilink).toHaveAttribute('role', 'link')
+  await expect(wikilink).toHaveAttribute('tabindex', '0')
+  await wikilink.focus()
+  await page.keyboard.press('Enter')
+
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('new-note-topic')
+  await expect.poll(() => readFixtureNoteIfExists(page, createdPath)).toContain('title: New Note Topic')
+  await expect.poll(() => page.locator('.bn-editor').evaluate(
+    (editor) => editor.contains(document.activeElement),
+  )).toBe(true)
+
+  await page.keyboard.press('Meta+k')
+  await page.getByPlaceholder('Type a command...').fill('Go Back')
+  await page.keyboard.press('Enter')
+  await expectActiveHeading(page, 'Unresolved Source')
+
+  await wikilink.click({ modifiers: ['Meta'] })
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('new-note-topic')
+  expect(await readFixtureNote(page, createdPath)).toContain('title: New Note Topic')
 })

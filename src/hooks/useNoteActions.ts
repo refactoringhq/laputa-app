@@ -235,16 +235,21 @@ async function notifyFrontmatterPersisted(config: NoteActionsConfig, key: string
 }
 
 interface NavigateWikilinkParams {
+  createNote: (target: string, sourceEntry?: VaultEntry) => Promise<boolean>
   entries: VaultEntry[]
   sourceEntry?: VaultEntry
   target: string
-  selectNote: (entry: VaultEntry) => void
+  selectNote: (entry: VaultEntry) => Promise<void>
 }
 
-function navigateWikilink({ entries, sourceEntry, target, selectNote }: NavigateWikilinkParams): void {
+async function navigateWikilink({ createNote, entries, sourceEntry, target, selectNote }: NavigateWikilinkParams): Promise<void> {
   const found = resolveEntry(entries, target, sourceEntry)
-  if (found) selectNote(found)
-  else console.warn(`Navigation target not found: ${target}`)
+  if (found) {
+    await selectNote(found)
+    return
+  }
+  console.warn(`Navigation target not found: ${target}`)
+  await createNote(target, sourceEntry)
 }
 
 interface MaybeRenameAfterFrontmatterUpdateParams {
@@ -825,28 +830,26 @@ function buildNoteActionsResult({
   }
 }
 
-export function useNoteActions(config: NoteActionsConfig) {
-  const { entries, setToastMessage, updateEntry } = config
-  const { handlePathRenamed, resolveActionPath } = useRenamedNotePathResolver(config.onPathRenamed)
-  const tabMgmt = useTabManagement(buildTabManagementOptions(config))
-  const { setTabs, handleSelectNote: selectTab, openTabWithContent, activeTabPathRef, handleSwitchTab } = tabMgmt
+function useNoteSelectionState(
+  config: Pick<NoteActionsConfig, 'entries' | 'setToastMessage'>,
+  tabMgmt: ReturnType<typeof useTabManagement>,
+) {
+  const { entries, setToastMessage } = config
+  const { activeTabPathRef, handleSelectNote: selectNote } = tabMgmt
   const handleSelectNote = useCallback(
-    async (entry: VaultEntry) => {
-    await selectTab(entry)
-    },
-    [selectTab],
+    async (entry: VaultEntry) => selectNote(entry),
+    [selectNote],
   )
   const revealActionHistoryTarget = useCallback(
     async (item: ActionHistoryEntry) => {
-    const { path } = item
-    if (!path) return
-    if (activeTabPathRef.current === path) return
-    const entry = entries.find((candidate) => notePathsMatch(candidate.path, path))
-    if (!entry) {
-      setToastMessage('Cannot undo action because the note is no longer available')
-      throw new Error(`Action history target is unavailable: ${path}`)
-    }
-    await handleSelectNote(entry)
+      const { path } = item
+      if (!path || activeTabPathRef.current === path) return
+      const entry = entries.find((candidate) => notePathsMatch(candidate.path, path))
+      if (!entry) {
+        setToastMessage('Cannot undo action because the note is no longer available')
+        throw new Error(`Action history target is unavailable: ${path}`)
+      }
+      await handleSelectNote(entry)
     },
     [activeTabPathRef, entries, handleSelectNote, setToastMessage],
   )
@@ -854,58 +857,90 @@ export function useNoteActions(config: NoteActionsConfig) {
     onRevealTarget: revealActionHistoryTarget,
     onToast: setToastMessage,
   })
-  useGitignoredVisibilityTabCleanup({
-    activeTabPathRef,
-    closeAllTabs: tabMgmt.closeAllTabs,
-    setToastMessage,
-  })
+  return { actionHistory, handleSelectNote }
+}
 
-  const updateTabContent = useCallback(
-    (path: string, newContent: string) => {
-    setTabs((prev) => {
+function useTabContentUpdater(setTabs: ReturnType<typeof useTabManagement>['setTabs']) {
+  return useCallback((path: string, newContent: string) => {
+    setTabs((previous) => {
       let changed = false
-      const next = prev.map((tab) => {
-        if (!notePathsMatch(tab.entry.path, path)) return tab
-        if (tab.content === newContent) return tab
+      const next = previous.map((tab) => {
+        if (!notePathsMatch(tab.entry.path, path) || tab.content === newContent) return tab
         changed = true
         return { ...tab, content: newContent }
       })
-      return changed ? next : prev
+      return changed ? next : previous
     })
-    },
-    [setTabs],
-  )
+  }, [setTabs])
+}
 
-  const creation = useNoteCreation(config, { openTabWithContent })
-  const rename = useNoteRename(
+function useConfiguredNoteRename({
+  config,
+  handlePathRenamed,
+  tabMgmt,
+  updateTabContent,
+}: {
+  config: NoteActionsConfig
+  handlePathRenamed: (oldPath: string, newPath: string) => void
+  tabMgmt: ReturnType<typeof useTabManagement>
+  updateTabContent: (path: string, content: string) => void
+}) {
+  return useNoteRename(
     {
-      entries,
-      setToastMessage,
+      entries: config.entries,
+      setToastMessage: config.setToastMessage,
       reloadVault: config.reloadVault,
       onPathRenamed: handlePathRenamed,
     },
     {
       tabs: tabMgmt.tabs,
-      setTabs,
-      activeTabPathRef,
-      handleSwitchTab,
+      setTabs: tabMgmt.setTabs,
+      activeTabPathRef: tabMgmt.activeTabPathRef,
+      handleSwitchTab: tabMgmt.handleSwitchTab,
       updateTabContent,
     },
   )
+}
 
-  const handleNavigateWikilink = useCallback(
-    (target: string) =>
-      navigateWikilink({
+function useWikilinkNavigation({
+  creation,
+  entries,
+  handleSelectNote,
+  tabMgmt,
+}: {
+  creation: ReturnType<typeof useNoteCreation>
+  entries: VaultEntry[]
+  handleSelectNote: (entry: VaultEntry) => Promise<void>
+  tabMgmt: ReturnType<typeof useTabManagement>
+}) {
+  return useCallback(
+    (target: string) => navigateWikilink({
+      createNote: creation.handleCreateNoteFromWikilink,
       entries,
       sourceEntry: tabMgmt.tabs.find((tab) => notePathsMatch(tab.entry.path, tabMgmt.activeTabPath))?.entry,
       target,
       selectNote: handleSelectNote,
     }),
-    [entries, handleSelectNote, tabMgmt.activeTabPath, tabMgmt.tabs],
+    [creation.handleCreateNoteFromWikilink, entries, handleSelectNote, tabMgmt.activeTabPath, tabMgmt.tabs],
   )
+}
 
+export function useNoteActions(config: NoteActionsConfig) {
+  const { entries, setToastMessage, updateEntry } = config
+  const { handlePathRenamed, resolveActionPath } = useRenamedNotePathResolver(config.onPathRenamed)
+  const tabMgmt = useTabManagement(buildTabManagementOptions(config))
+  const { actionHistory, handleSelectNote } = useNoteSelectionState(config, tabMgmt)
+  useGitignoredVisibilityTabCleanup({
+    activeTabPathRef: tabMgmt.activeTabPathRef,
+    closeAllTabs: tabMgmt.closeAllTabs,
+    setToastMessage,
+  })
+  const updateTabContent = useTabContentUpdater(tabMgmt.setTabs)
+  const creation = useNoteCreation(config, { openTabWithContent: tabMgmt.openTabWithContent })
+  const rename = useConfiguredNoteRename({ config, handlePathRenamed, tabMgmt, updateTabContent })
+  const handleNavigateWikilink = useWikilinkNavigation({ creation, entries, handleSelectNote, tabMgmt })
   const runFrontmatterOp = useFrontmatterRunner({
-    activeTabPathRef,
+    activeTabPathRef: tabMgmt.activeTabPathRef,
     closeAllTabs: tabMgmt.closeAllTabs,
     entries,
     reloadVault: config.reloadVault,
@@ -918,9 +953,9 @@ export function useNoteActions(config: NoteActionsConfig) {
     onPathRenamed: handlePathRenamed,
     resolvePath: resolveActionPath,
     renameTabsRef: rename.tabsRef,
-    setTabs,
-    activeTabPathRef,
-    handleSwitchTab,
+    setTabs: tabMgmt.setTabs,
+    activeTabPathRef: tabMgmt.activeTabPathRef,
+    handleSwitchTab: tabMgmt.handleSwitchTab,
     setToastMessage,
     updateTabContent,
     runFrontmatterOp,
