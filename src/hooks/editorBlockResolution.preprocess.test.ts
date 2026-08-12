@@ -158,6 +158,40 @@ describe('preProcessRichEditorMarkdown', () => {
     })).toBe(`${content}\n`)
   })
 
+  it('preserves linked inline code through a small-note rich-editor round trip', async () => {
+    const content = 'See [`some-symbol`](https://example.com) for details.'
+
+    const resolved = await reloadRichEditorMarkdown(content, 'linked-inline-code.md')
+
+    expect(resolved.blocks).toContainEqual(expect.objectContaining({
+      type: 'paragraph',
+      content: expect.arrayContaining([
+        expect.objectContaining({
+          type: 'link',
+          href: 'https://example.com',
+          content: [expect.objectContaining({
+            type: 'text',
+            text: 'some-symbol',
+            styles: expect.objectContaining({ code: true }),
+          })],
+        }),
+      ]),
+    }))
+    expect(resolved.markdown).toBe(`${content}\n`)
+  })
+
+  it('preserves linked inline code when another block requires BlockNote parsing', async () => {
+    const content = [
+      'See [`some-symbol`](https://example.com) for details.',
+      '',
+      '![Diagram](https://example.com/diagram.png)',
+    ].join('\n')
+
+    const resolved = await reloadRichEditorMarkdown(content, 'linked-inline-code-with-image.md')
+
+    expect(resolved.markdown).toBe(`${content}\n`)
+  })
+
   it('keeps underscored wikilinks stable across repeated rich-editor reloads', async () => {
     const editor = BlockNoteEditor.create({ schema })
     installRichEditorMarkdownSerializer(editor)

@@ -62,7 +62,7 @@ All data lives in markdown files with YAML frontmatter. There is no database —
 
 ### Rich-Editor Markdown Serialization
 
-`src/utils/richEditorMarkdown.ts` is the canonical owner for rich-editor Markdown import/export boundaries. It installs the app-facing serializer on real BlockNote editors, preprocesses Markdown before parsing, injects Tolaria schema blocks after parsing, and turns BlockNote documents back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, math, highlights, attachments, Mermaid, tldraw, sandboxed HTML blocks, and blockquote callouts before the save path writes bytes to disk. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
+`src/utils/richEditorMarkdown.ts` is the canonical owner for rich-editor Markdown import/export boundaries. It installs the app-facing serializer on real BlockNote editors, preprocesses Markdown before parsing, injects Tolaria schema blocks after parsing, and turns BlockNote documents back into vault Markdown. It restores Tolaria's durable Markdown syntax for wikilinks, linked inline-code labels, math, highlights, attachments, Mermaid, tldraw, sandboxed HTML blocks, and blockquote callouts before the save path writes bytes to disk. Linked inline code uses a Markdown-inert placeholder during BlockNote import so the link wrapper survives parsing, then restores the nested code mark before editing or serialization. Hot save paths should pass an already-read block snapshot when they have one; a debounced rich-editor flush should not ask BlockNote for `editor.document` twice.
 
 The experimental direct serializer remains a lower-level implementation in `src/utils/blockNoteDirectMarkdown.ts`. App/editor flows should go through `richEditorMarkdown.ts` entry points instead of installing the direct serializer, invoking `blocksToMarkdownLossy()`, or composing durable Markdown codecs locally. The direct helper uses cached direct serialization when every block shape is supported and falls back to BlockNote's exporter when a custom or unknown block appears.
 
@@ -799,7 +799,7 @@ flowchart LR
     style L fill:#d4edda,stroke:#28a745,color:#000
 ```
 
-> Wikilink placeholder tokens use `\u2039` and `\u203A`; math, Mermaid, tldraw, sandboxed HTML, and standalone file-attachment link placeholders use ASCII sentinels with URI-encoded payloads.
+> Wikilink and linked-inline-code placeholder tokens use `\u2039` and `\u203A`; linked code encodes Unicode code points so Markdown punctuation cannot be reinterpreted during import. Math, Mermaid, tldraw, sandboxed HTML, and standalone file-attachment link placeholders use ASCII sentinels with URI-encoded payloads.
 
 ### BlockNote-to-Markdown Pipeline (Save)
 

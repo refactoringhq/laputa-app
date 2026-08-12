@@ -1,7 +1,8 @@
 import { useEffect, type RefObject } from 'react'
 import { openEditorAttachmentOrUrl } from './editorAttachmentActions'
 
-const CODE_CONTEXT_SELECTOR = '[data-content-type="codeBlock"], pre, code'
+const CODE_BLOCK_CONTEXT_SELECTOR = '[data-content-type="codeBlock"], pre'
+const INLINE_CODE_SELECTOR = 'code'
 const HEADING_SELECTOR = '[data-content-type="heading"], h1, h2, h3, h4, h5, h6'
 const MOUSEDOWN_URL_SUPPRESSION_MS = 750
 const MARKDOWN_NOTE_EXT_RE = /\.(?:md|markdown)$/iu
@@ -72,7 +73,9 @@ function hasFollowModifier(event: KeyboardEvent | MouseEvent) {
 }
 
 function isInsideCodeContext(target: HTMLElement) {
-  return !!target.closest(CODE_CONTEXT_SELECTOR)
+  if (target.closest(CODE_BLOCK_CONTEXT_SELECTOR)) return true
+  const inlineCode = target.closest(INLINE_CODE_SELECTOR)
+  return Boolean(inlineCode && !target.closest('a[href]'))
 }
 
 function elementFromEventTarget(target: EventTarget | null) {

@@ -9,6 +9,7 @@ import {
 import { portableFileAttachmentUrls } from './fileAttachmentMarkdown'
 import { logRichEditorSerializationTrace } from './editorPerformanceTrace'
 import { injectMarkdownHighlightsInBlocks } from './markdownHighlightMarkdown'
+import { injectLinkedCodeInBlocks, preProcessLinkedCodeMarkdown } from './linkedCodeMarkdown'
 import { injectMathInBlocks, preProcessMathMarkdown } from './mathMarkdown'
 import { advanceMarkdownFence, type MarkdownFence } from './markdownFences'
 import { preProcessSingleTildeStrikethrough } from './markdownStrikethrough'
@@ -103,13 +104,15 @@ export function preProcessRichEditorMarkdown(
   const withBlankParagraphs = preProcessBlankParagraphs(withBlankQuotes)
   const withBareImages = normalizeBareImageUrls(withBlankParagraphs)
   const withImages = vaultPath ? resolveImageUrls(withBareImages, vaultPath, notePath) : withBareImages
-  const withWikilinks = preProcessWikilinks(withImages)
+  const withLinkedCode = preProcessLinkedCodeMarkdown(withImages)
+  const withWikilinks = preProcessWikilinks(withLinkedCode)
   const withMath = preProcessMathMarkdown({ markdown: withWikilinks })
   return preProcessSingleTildeStrikethrough({ markdown: withMath })
 }
 
 export function injectRichEditorMarkdownBlocks(blocks: EditorBlocksSnapshot): EditorBlocksSnapshot {
-  const withWikilinks = injectWikilinks(blocks)
+  const withLinkedCode = injectLinkedCodeInBlocks(blocks)
+  const withWikilinks = injectWikilinks(withLinkedCode)
   const withMath = injectMathInBlocks(withWikilinks)
   const withHighlights = injectMarkdownHighlightsInBlocks(withMath)
   const withDurableBlocks = injectDurableEditorMarkdownBlocks(withHighlights)

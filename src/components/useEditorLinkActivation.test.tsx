@@ -137,6 +137,24 @@ describe('useEditorLinkActivation', () => {
     expect(modifiedClick.defaultPrevented).toBe(true)
   })
 
+  it('opens linked inline code on Cmd+click for either DOM nesting order', () => {
+    const { container } = renderHarness()
+    const nestedCode = document.createElement('code')
+    nestedCode.textContent = 'some-symbol'
+    appendUrl(container, 'https://nested.example.com').replaceChildren(nestedCode)
+    const wrappingCode = document.createElement('code')
+    const wrappedLink = appendUrl(wrappingCode, 'https://wrapped.example.com')
+    container.appendChild(wrappingCode)
+
+    const nestedClick = dispatchMouseEvent(nestedCode, 'click', { metaKey: true })
+    const wrappedClick = dispatchMouseEvent(wrappedLink, 'click', { metaKey: true })
+
+    expect(nestedClick.defaultPrevented).toBe(true)
+    expect(wrappedClick.defaultPrevented).toBe(true)
+    expect(mockOpenExternalUrl).toHaveBeenNthCalledWith(1, 'https://nested.example.com')
+    expect(mockOpenExternalUrl).toHaveBeenNthCalledWith(2, 'https://wrapped.example.com')
+  })
+
   it('opens modified URL mousedown before editor internals see stale link nodes', () => {
     const { container } = renderHarness()
     const link = appendUrl(container, 'https://example.com')
