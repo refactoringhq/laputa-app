@@ -47,7 +47,7 @@ function useSelectionChromeObserver({
     if (!container || !workbook) return undefined
 
     const observer = new MutationObserver((mutations) => {
-      if (mutations.length > 0) scheduleSelectionChromePatch()
+      if (mutations.length > 0) patchIronCalcSelectionChrome(container)
     })
 
     patchIronCalcSelectionChrome(container)
