@@ -410,7 +410,7 @@ fn codex_sandbox(permission_mode: crate::ai_agents::AiAgentPermissionMode) -> &'
 
 fn codex_approval_policy(permission_mode: crate::ai_agents::AiAgentPermissionMode) -> &'static str {
     match permission_mode {
-        crate::ai_agents::AiAgentPermissionMode::Safe => "untrusted",
+        crate::ai_agents::AiAgentPermissionMode::Safe => "on-request",
         crate::ai_agents::AiAgentPermissionMode::PowerUser => "never",
     }
 }
@@ -739,6 +739,18 @@ mod tests {
     #[test]
     fn malformed_model_catalog_returns_an_error() {
         assert!(parse_codex_model_catalog("not-json").is_err());
+    }
+
+    #[test]
+    fn codex_approval_policy_uses_only_supported_cli_values() {
+        assert_eq!(
+            codex_approval_policy(AiAgentPermissionMode::Safe),
+            "on-request"
+        );
+        assert_eq!(
+            codex_approval_policy(AiAgentPermissionMode::PowerUser),
+            "never"
+        );
     }
 
     #[test]
