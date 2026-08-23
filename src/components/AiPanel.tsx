@@ -1,4 +1,4 @@
-import { useCallback, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { AiPanelComposer, AiPanelHeader, AiPanelMessageHistory } from './AiPanelChrome'
 import { DEFAULT_AI_AGENT, getAiAgentDefinition, type AiAgentId, type AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
@@ -8,6 +8,7 @@ import type { VaultEntry } from '../types'
 import { useAiPanelController, type AiPanelController } from './useAiPanelController'
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
+import { resumeEditorFocus, useInspectorFocusBoundary } from '../hooks/editorFocusOwnership'
 
 export type { AiAgentMessage } from '../hooks/useCliAiAgent'
 
@@ -62,6 +63,22 @@ function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
   return (ready ?? true) ? 'ready' : 'missing'
 }
 
+function resolveDefaultAgent(agent: AiAgentId | undefined): AiAgentId {
+  return agent ?? DEFAULT_AI_AGENT
+}
+
+function resolveDefaultReadiness(
+  readiness: AiAgentReadiness | undefined,
+  ready: boolean | undefined,
+): AiAgentReadiness {
+  return readiness ?? readinessFromReadyFlag(ready)
+}
+
+function resolveDefaultTarget(target: AiTarget | undefined, agent: AiAgentId) {
+  if (target) return { label: target.label, kind: target.kind }
+  return { label: getAiAgentDefinition(agent).label, kind: 'agent' as const }
+}
+
 interface AiPanelViewModel {
   agentLabel: string
   defaultAiAgent: AiAgentId
@@ -80,14 +97,15 @@ function resolveAiPanelViewModel({
   defaultAiAgentReady?: boolean
   defaultAiTarget?: AiTarget
 }): AiPanelViewModel {
-  const resolvedAgent = defaultAiAgent ?? DEFAULT_AI_AGENT
-  const resolvedReadiness = defaultAiAgentReadiness ?? readinessFromReadyFlag(defaultAiAgentReady)
+  const resolvedAgent = resolveDefaultAgent(defaultAiAgent)
+  const resolvedReadiness = resolveDefaultReadiness(defaultAiAgentReadiness, defaultAiAgentReady)
+  const resolvedTarget = resolveDefaultTarget(defaultAiTarget, resolvedAgent)
 
   return {
-    agentLabel: defaultAiTarget?.label ?? getAiAgentDefinition(resolvedAgent).label,
+    agentLabel: resolvedTarget.label,
     defaultAiAgent: resolvedAgent,
     defaultAiAgentReadiness: resolvedReadiness,
-    targetKind: defaultAiTarget?.kind ?? 'agent',
+    targetKind: resolvedTarget.kind,
   }
 }
 
@@ -98,6 +116,13 @@ function aiPanelFrameStyle(isActive: boolean, showLeftBorder: boolean): CSSPrope
     animation: showLeftBorder && isActive ? 'ai-border-pulse 2s ease-in-out infinite' : undefined,
     transition: showLeftBorder ? 'border-color 0.3s ease' : undefined,
   }
+}
+
+function useReleaseEditorFocusOnUnmount(panelRef: RefObject<HTMLElement | null>): void {
+  useLayoutEffect(() => () => {
+    const panel = panelRef.current
+    if (panel?.contains(document.activeElement)) resumeEditorFocus()
+  }, [panelRef])
 }
 
 function AiPanelFrame({
@@ -113,6 +138,9 @@ function AiPanelFrame({
   showLeftBorder: boolean
   surface: 'default' | 'sidebar'
 }) {
+  useInspectorFocusBoundary(panelRef)
+  useReleaseEditorFocusOnUnmount(panelRef)
+
   return (
     <aside
       ref={panelRef}
