@@ -188,6 +188,18 @@ describe('main entrypoint', () => {
     rootOptions().onCaughtError?.(error, { componentStack: '\n    in App' })
 
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '\n    in App' })
+    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+  }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
+
+  it('keeps the fatal overlay for an uncaught React root error', async () => {
+    await importEntrypoint()
+
+    const error = new Error('Maximum update depth exceeded')
+    window.__tolariaFrontendReady = true
+    rootOptions().onUncaughtError?.(error, { componentStack: '\n    in App' })
+
+    expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '\n    in App' })
+    expect(document.getElementById('tolaria-fatal-render-error')).toHaveTextContent('Maximum update depth exceeded')
   }, MAIN_ENTRYPOINT_IMPORT_TIMEOUT_MS)
 
   it('reloads and suppresses startup default-export chunk errors before frontend readiness', async () => {
