@@ -200,7 +200,10 @@ export function InlineWikilinkEditorField(options: {
     typeEntryMap,
   } = options
   const editorRef = useRef<HTMLDivElement | null>(null)
+  // A chip or newline at the very end leaves no text after it, so pre-wrap
+  // would render no final line; the zero-width anchor keeps that line visible.
   const needsTrailingCaretAnchor = segments[segments.length - 1]?.kind === 'chip'
+    || value.endsWith('\n')
   useImperativeHandle(inputRef, () => editorRef.current as HTMLDivElement, [])
   useInlineWikilinkPlaceholder(editorRef, placeholder)
   useInlineWikilinkEditorEvents(editorRef, {

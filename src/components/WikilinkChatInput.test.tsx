@@ -638,12 +638,23 @@ describe('WikilinkChatInput', () => {
     fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
 
     expect(onDraftChange).toHaveBeenLastCalledWith('first line\n')
-    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\u200B')
 
     fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
 
     expect(onDraftChange).toHaveBeenLastCalledWith('first line\n\n')
-    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\n\u200B')
+  })
+
+  it('renders a caret anchor after a trailing newline so the first line break is visible', () => {
+    render(<Controlled />)
+
+    updateEditorText('first line')
+    fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Enter', shiftKey: true })
+
+    // Without an anchor after the trailing "\n", pre-wrap never renders the
+    // empty last line, so the first Shift+Enter looks like a no-op.
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\u200B')
   })
 
   it('keeps a long draft anchored when Ctrl+Enter inserts a line break', () => {
@@ -685,7 +696,7 @@ describe('WikilinkChatInput', () => {
 
     expect(beforeInputEvent.defaultPrevented).toBe(true)
     expect(onDraftChange).toHaveBeenLastCalledWith('first line\n')
-    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n')
+    expect(screen.getByTestId('agent-input').textContent).toBe('first line\n\u200B')
   })
 
   it('submits a multi-line draft with normal Enter after Shift+Enter', () => {
