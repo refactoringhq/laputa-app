@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { Schema } from '@tiptap/pm/model'
+import { EditorState } from '@tiptap/pm/state'
+import { EditorView } from '@tiptap/pm/view'
 import {
+  createSafariImeDomPreserverPlugin,
   createImeCompositionKeyGuardExtension,
   shouldStopComposingParagraphInput,
   shouldStopComposingEditorShortcutKey,
@@ -316,5 +320,36 @@ describe('createImeCompositionKeyGuardExtension', () => {
 
     expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
     expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+})
+
+describe('createSafariImeDomPreserverPlugin', () => {
+  it('keeps an out-of-model sentinel beside composing text until Safari finishes the commit', () => {
+    const schema = new Schema({
+      nodes: {
+        doc: { content: 'paragraph+' },
+        paragraph: { content: 'text*', toDOM: () => ['p', 0] },
+        text: {},
+      },
+    })
+    const plugin = createSafariImeDomPreserverPlugin(true)
+    const state = EditorState.create({ schema, plugins: [plugin] })
+    const container = document.createElement('div')
+    const view = new EditorView(container, { state })
+
+    view.dom.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    view.dispatch(view.state.tr.insertText("ce'shi"))
+
+    const sentinel = container.querySelector('[data-tolaria-ime-dom-preserver]')
+    expect(sentinel).not.toBeNull()
+    expect(sentinel?.textContent).toBe('\u200B')
+    expect(view.state.doc.textContent).toBe("ce'shi")
+
+    view.dom.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '测试' }))
+    view.dispatch(view.state.tr.setMeta('ime-test-refresh', true))
+
+    expect(container.querySelector('[data-tolaria-ime-dom-preserver]')).toBeNull()
+    expect(view.state.doc.textContent).toBe("ce'shi")
+    view.destroy()
   })
 })

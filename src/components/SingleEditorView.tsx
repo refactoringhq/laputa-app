@@ -120,6 +120,7 @@ const TOOLBAR_MOUSE_DOWN_ALLOW_SELECTOR = [
   '[contenteditable="true"]',
 ].join(', ')
 const MAX_BLOCKNOTE_RENDER_RECOVERY_RETRIES = 1
+const IME_COMMIT_RECONCILIATION_FALLBACK_MS = 50
 const EMOJI_SHORTCODE_RESULT_LIMIT = 80
 const WIKILINK_AUTOCOMPLETE_RESULT_LIMIT = 20
 
@@ -825,6 +826,7 @@ function useCompositionAwareEditorChange(options: {
   const onChangeRef = useRef(onChange)
   const composingRef = useRef(false)
   const pendingChangeRef = useRef(false)
+  const pendingFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -834,24 +836,40 @@ function useCompositionAwareEditorChange(options: {
     const container = containerRef.current
     if (!container) return
 
+    const clearPendingFlushTimer = () => {
+      if (pendingFlushTimerRef.current === null) return
+      clearTimeout(pendingFlushTimerRef.current)
+      pendingFlushTimerRef.current = null
+    }
+
     const flushPendingChange = () => {
+      pendingFlushTimerRef.current = null
       if (composingRef.current || !pendingChangeRef.current) return
       pendingChangeRef.current = false
       onChangeRef.current?.()
     }
 
     const handleCompositionStart = () => {
+      clearPendingFlushTimer()
       composingRef.current = true
     }
 
     const handleCompositionEnd = () => {
       composingRef.current = false
-      queueMicrotask(flushPendingChange)
+      clearPendingFlushTimer()
+      // ProseMirror may finish Safari composition from a 20 ms fallback timer.
+      // Prefer its post-composition onChange; this timer covers IMEs that do not
+      // emit one after their final DOM reconciliation.
+      pendingFlushTimerRef.current = setTimeout(
+        flushPendingChange,
+        IME_COMMIT_RECONCILIATION_FALLBACK_MS,
+      )
     }
 
     container.addEventListener('compositionstart', handleCompositionStart, true)
     container.addEventListener('compositionend', handleCompositionEnd, true)
     return () => {
+      clearPendingFlushTimer()
       container.removeEventListener('compositionstart', handleCompositionStart, true)
       container.removeEventListener('compositionend', handleCompositionEnd, true)
     }
@@ -863,6 +881,10 @@ function useCompositionAwareEditorChange(options: {
       return
     }
 
+    if (pendingFlushTimerRef.current !== null) {
+      clearTimeout(pendingFlushTimerRef.current)
+      pendingFlushTimerRef.current = null
+    }
     pendingChangeRef.current = false
     onChangeRef.current?.()
   }, [])

@@ -1,5 +1,7 @@
 import { createExtension } from '@blocknote/core'
 import { SuggestionMenu } from '@blocknote/core/extensions'
+import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import {
   activeRichEditorView,
   isComposingKeyboardEvent,
@@ -7,6 +9,7 @@ import {
 } from './richEditorKeyboard'
 
 const COMPOSITION_SETTLE_WINDOW_MS = 500
+const SAFARI_IME_DOM_PRESERVER_ATTRIBUTE = 'data-tolaria-ime-dom-preserver'
 
 function isEnterKey(event: KeyboardEvent): boolean {
   return event.key === 'Enter'
@@ -43,6 +46,62 @@ function composedSlashCommandRange(data: string, view: ReturnType<typeof activeR
   if (from < 1 || view.state.doc.textBetween(from, to) !== command) return null
 
   return { from, query: command.slice(1), to }
+}
+
+function isSafariRuntime(): boolean {
+  return typeof navigator !== 'undefined' && /Apple Computer/.test(navigator.vendor)
+}
+
+function safariImeDomPreserverDecorations(
+  state: EditorState,
+  composing: boolean,
+): DecorationSet | undefined {
+  const { $from, $to, to } = state.selection
+  if (!composing || !$from.sameParent($to)) return undefined
+
+  const decoration = Decoration.widget(to, (view: EditorView) => {
+    const sentinel = view.dom.ownerDocument.createElement('span')
+    sentinel.className = 'ProseMirror-safari-ime-span'
+    sentinel.setAttribute(SAFARI_IME_DOM_PRESERVER_ATTRIBUTE, '')
+    sentinel.setAttribute('aria-hidden', 'true')
+    sentinel.textContent = '\u200B'
+    return sentinel
+  }, {
+    ignoreSelection: true,
+    key: 'tolaria-safari-ime-dom-preserver',
+  })
+
+  return DecorationSet.create(state.doc, [decoration])
+}
+
+/**
+ * Safari removes positioned ancestors when it commits a composition that
+ * temporarily empties their only text node. Keep an out-of-model sentinel in
+ * the active text block so nested list structure survives that native delete.
+ */
+export function createSafariImeDomPreserverPlugin(
+  enabled = isSafariRuntime(),
+): Plugin {
+  const key = new PluginKey('tolariaSafariImeDomPreserver')
+  if (!enabled) return new Plugin({ key })
+
+  let composing = false
+  return new Plugin({
+    key,
+    props: {
+      decorations: (state) => safariImeDomPreserverDecorations(state, composing),
+      handleDOMEvents: {
+        compositionstart: () => {
+          composing = true
+          return false
+        },
+        compositionend: () => {
+          composing = false
+          return false
+        },
+      },
+    },
+  })
 }
 
 export function shouldStopComposingEditorShortcutKey(
@@ -123,6 +182,7 @@ export const createImeCompositionKeyGuardExtension = createExtension(({ editor }
 
   return {
     key: 'imeCompositionKeyGuard',
+    prosemirrorPlugins: [createSafariImeDomPreserverPlugin()],
     mount: ({ dom, signal }) => {
       dom.addEventListener('keydown', handleKeyDown, {
         capture: true,

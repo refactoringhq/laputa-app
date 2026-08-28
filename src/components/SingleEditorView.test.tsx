@@ -425,9 +425,14 @@ describe('SingleEditorView', () => {
     expect(state.capturedMantineGetStyleNonce?.()).toBe(RUNTIME_STYLE_NONCE)
   })
 
-  it('defers rich-editor change propagation until IME composition ends', async () => {
+  it('defers rich-editor change propagation until ProseMirror reconciles the IME commit', async () => {
+    vi.useFakeTimers()
     const editor = createEditor()
-    const onChange = vi.fn()
+    let prosemirrorReconciled = false
+    const reconciliationStateObservedByOnChange: boolean[] = []
+    const onChange = vi.fn(() => {
+      reconciliationStateObservedByOnChange.push(prosemirrorReconciled)
+    })
 
     render(
       <SingleEditorView
@@ -439,6 +444,12 @@ describe('SingleEditorView', () => {
     )
 
     const blockNoteView = screen.getByTestId('blocknote-view')
+    blockNoteView.addEventListener('compositionend', () => {
+      setTimeout(() => {
+        prosemirrorReconciled = true
+        state.capturedBlockNoteOnChange?.()
+      }, 20)
+    }, { once: true })
 
     fireEvent.compositionStart(blockNoteView)
     act(() => {
@@ -450,8 +461,15 @@ describe('SingleEditorView', () => {
     await act(async () => {
       await Promise.resolve()
     })
+    expect(onChange).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20)
+    })
 
     expect(onChange).toHaveBeenCalledTimes(1)
+    expect(reconciliationStateObservedByOnChange).toEqual([true])
+    vi.useRealTimers()
   })
 
   it('copies selected fenced code text without markdown escape backslashes', async () => {
