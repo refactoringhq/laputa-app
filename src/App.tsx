@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { NoteList } from './components/NoteList'
 import { LazyEditor } from './components/LazyEditor'
@@ -156,6 +156,8 @@ declare global {
     __mockHandlers?: Record<string, (args?: unknown) => unknown>
   }
 }
+
+const GraphViewPanel = lazy(() => import('./components/GraphView/GraphViewPanel'))
 
 const DEFAULT_SELECTION: SidebarSelection = INBOX_SELECTION
 
@@ -750,6 +752,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     await handleReplaceActiveTab(entry)
     handleEnterNeighborhood(entry)
   }, [handleEnterNeighborhood, handleReplaceActiveTab])
+
+  const handleGraphNavigateNote = async (entry: VaultEntry) => {
+    await notes.handleSelectNote(entry)
+    handleSetSelection({ kind: 'entity', entry })
+  }
 
   const vaultBridge = useVaultBridge({
     entriesByPath,
@@ -1733,6 +1740,18 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>
           )}
+          {effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'graph' ? (
+            <div className="app__graph-view">
+              <Suspense fallback={<div className="h-full w-full bg-background" aria-busy="true" />}>
+                <GraphViewPanel
+                  entries={visibleEntries}
+                  locale={appLocale}
+                  onNavigate={handleGraphNavigateNote}
+                />
+              </Suspense>
+            </div>
+          ) : (
+            <>
           {noteListVisible && (
             <>
               <div className={`app__note-list${aiActivity.highlightElement === 'notelist' ? ' ai-highlight' : ''}`} style={{ width: layout.noteListWidth }}>
@@ -1824,6 +1843,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               locale={appLocale}
             />
           </div>
+            </>
+          )}
         </div>
         <UpdateBanner status={updateStatus} actions={updateActions} locale={appLocale} />
         <RenameDetectedBanner renames={detectedRenames} onUpdate={handleUpdateWikilinks} onDismiss={handleDismissRenames} />

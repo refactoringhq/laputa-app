@@ -635,6 +635,8 @@ Tolaria no longer implements provider-specific OAuth or remote-repository APIs. 
 
 `PulseView` is a git activity feed that replaces the NoteList when the Pulse filter is selected.
 
+`GraphViewPanel` is a renderer-native knowledge graph surface that replaces the NoteList and Editor canvas when Graph View is selected while leaving the application Sidebar and Status Bar mounted. It builds from the already-loaded mounted-workspace `VaultEntry[]`, resolves body wikilinks with Tolaria's shared resolver, adds frontmatter relationship evidence, and renders the resulting model through 2D/3D force graphs or Cytoscape analysis. Search, edge/workspace/type/tag filters, ghost/orphan visibility, and one-to-three-hop neighborhoods remain session state; opening a real node returns to the normal editor navigation path. No local graph server, graph database, or persisted coordinates are introduced.
+
 - Groups commits by day ("Today", "Yesterday", or full date)
 - Shows commit message, short hash, timestamp, and changed files
 - Files have status icons (added/modified/deleted) and are clickable to open in editor

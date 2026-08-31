@@ -34,6 +34,14 @@ describe('collectionFromSelection', () => {
     })
   })
 
+  it('maps the graph navigation item to a built-in collection', () => {
+    expect(collectionFromSelection({ kind: 'filter', filter: 'graph' })).toMatchObject({
+      id: 'builtin:graph',
+      label: 'Graph',
+      origin: 'builtin',
+    })
+  })
+
   it('maps type and folder selections without requiring saved YAML', () => {
     expect(collectionFromSelection({ kind: 'sectionGroup', type: 'Project' })).toMatchObject({
       id: 'type:Project',

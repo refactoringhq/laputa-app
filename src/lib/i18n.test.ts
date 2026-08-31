@@ -87,4 +87,15 @@ describe('i18n', () => {
       expect(translate('zh-TW', key)).not.toContain('訪達')
     }
   })
+
+  it('localizes graph presentation copy with the active app locale', () => {
+    expect(translate('zh-CN', 'sidebar.nav.graph')).toBe('图谱视图')
+    expect(translate('zh-CN', 'graph.stats', {
+      visibleNodes: 12,
+      nodes: 20,
+      visibleEdges: 18,
+      edges: 30,
+    })).toBe('显示 12 / 20 个节点 · 18 / 30 条边')
+    expect(translate('zh-TW', 'graph.detail.openNote')).toBe('開啟筆記')
+  })
 })
