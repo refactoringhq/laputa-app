@@ -3,7 +3,8 @@ use std::path::Path;
 use std::process::Output;
 
 use super::command::{
-    git_output, git_output_result, run_git, stderr_text, stdout_lines, stdout_text,
+    git_output, git_output_result, run_git, run_git_interactive, stderr_text, stdout_lines,
+    stdout_text,
 };
 use super::credentials::request_remote_credentials;
 use super::ensure_author_config;
@@ -224,7 +225,7 @@ fn unset_upstream(vault: &Path) {
 }
 
 fn fetch_remote(vault: &Path) -> Result<(), String> {
-    run_git(vault, &["fetch", DEFAULT_REMOTE_NAME, "--prune"])
+    run_git_interactive(vault, &["fetch", DEFAULT_REMOTE_NAME, "--prune"])
 }
 
 fn list_remote_branches(vault: &Path) -> Result<Vec<String>, String> {
@@ -285,7 +286,7 @@ fn push_with_tracking(
     connection: &RemoteConnection,
     success_message: String,
 ) -> GitAddRemoteResult {
-    match run_git(
+    match run_git_interactive(
         vault,
         &[
             "push",
