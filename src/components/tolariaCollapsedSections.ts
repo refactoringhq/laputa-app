@@ -38,6 +38,14 @@ type CollapsedHeadingRenderingController = {
   ownerWindow: Window | undefined
 }
 const COLLAPSIBLE_LIST_ITEM_TYPES = new Set(['bulletListItem', 'numberedListItem', 'checkListItem'])
+const HEADING_TAG_LEVELS = new Map([
+  ['h1', 1],
+  ['h2', 2],
+  ['h3', 3],
+  ['h4', 4],
+  ['h5', 5],
+  ['h6', 6],
+])
 const headingCollapseStores = new WeakMap<TolariaBlockNoteEditor, CollapsedHeadingStore>()
 const headingCollapseRenderers = createWeakKeyMap<HTMLElement, () => void>()
 const collapsedSectionStyleElements = createWeakKeyMap<HTMLElement, HTMLStyleElement>()
@@ -101,10 +109,6 @@ function headingLevelValue(rawLevel: unknown) {
   return 1
 }
 
-function isSectionBoundaryBlock(block: CollapsibleBlock) {
-  return block.type === 'divider' || block.type === 'horizontalRule'
-}
-
 function isListItemBlockType(type: unknown) {
   return typeof type === 'string' && COLLAPSIBLE_LIST_ITEM_TYPES.has(type)
 }
@@ -148,7 +152,7 @@ function collapsedSectionRenderState(
     const blockId = typeof block.id === 'string' ? block.id : undefined
     const headingLevel = blockHeadingLevel(block)
     const closesActiveSection = activeCollapsedLevel !== null
-      && (isSectionBoundaryBlock(block) || isClosingHeading(headingLevel, activeCollapsedLevel))
+      && isClosingHeading(headingLevel, activeCollapsedLevel)
 
     if (closesActiveSection) activeCollapsedLevel = null
 
@@ -329,17 +333,11 @@ function headingDataLevel(headingContent: HTMLElement): number | undefined {
 
 function headingTagLevel(headingContent: HTMLElement): number | undefined {
   const headingElement = headingContent.querySelector('h1, h2, h3, h4, h5, h6')
-  const tagName = headingElement?.tagName.toLowerCase()
-  const tagLevel = tagName?.match(/^h([1-6])$/)?.[1]
-  return tagLevel ? Number.parseInt(tagLevel, 10) : undefined
+  return HEADING_TAG_LEVELS.get(headingElement?.tagName.toLowerCase() ?? '')
 }
 
 function isValidHeadingLevel(level: number) {
   return Number.isInteger(level) && level >= 1 && level <= 6
-}
-
-function isRenderedDividerBlock(element: HTMLElement) {
-  return Boolean(element.querySelector('hr, [data-content-type="divider"]'))
 }
 
 function isRenderedListItemBlock(element: HTMLElement) {
@@ -389,7 +387,7 @@ function collapsedSectionRenderStateFromElements(
     const blockId = element.dataset.id
     const headingLevel = headingLevelFromRenderedBlock(element)
     const closesActiveSection = activeCollapsedLevel !== null
-      && (isRenderedDividerBlock(element) || isClosingHeading(headingLevel, activeCollapsedLevel))
+      && isClosingHeading(headingLevel, activeCollapsedLevel)
 
     if (closesActiveSection) activeCollapsedLevel = null
 
