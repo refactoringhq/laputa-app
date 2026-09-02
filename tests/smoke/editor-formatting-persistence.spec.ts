@@ -148,6 +148,27 @@ async function placeCursorInsideWord(page: Page, word: string) {
   expect(placed).toBe(true)
 }
 
+async function wordPosition(page: Page, blockIndex: number, word: string) {
+  const block = page.locator('.bn-block-content').nth(blockIndex)
+  return block.evaluate((element, targetWord) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode
+      const index = (node.textContent ?? '').indexOf(targetWord)
+      if (index === -1) continue
+
+      const range = document.createRange()
+      range.setStart(node, index)
+      range.setEnd(node, index + targetWord.length)
+      const rect = range.getBoundingClientRect()
+      return { left: rect.left, top: rect.top }
+    }
+
+    throw new Error(`Could not find word: ${targetWord}`)
+  }, word)
+}
+
 async function openBlockTypeMenu(page: Page) {
   const blockTypeButton = page.getByRole('button', { name: 'Paragraph' })
   await blockTypeButton.focus()
@@ -375,6 +396,19 @@ test('toolbar highlight button toggles selected text and persists removal', asyn
   const raw = await getRawEditorContent(page)
   expect(raw).toContain('This is Note B, referenced by Alpha Project.')
   expect(raw).not.toContain('==referenced==')
+})
+
+test('toolbar highlighting preserves surrounding text geometry', async ({ page }) => {
+  await openNote(page, 'Note B')
+  const positionBefore = await wordPosition(page, 1, 'Alpha')
+  await selectWord(page, 1, 'referenced')
+
+  await page.locator('.bn-formatting-toolbar [data-test="highlight"]').click()
+  await expect(page.locator('.bn-editor mark.markdown-highlight', { hasText: 'referenced' })).toBeVisible()
+
+  const positionAfter = await wordPosition(page, 1, 'Alpha')
+  expect(Math.abs(positionAfter.left - positionBefore.left)).toBeLessThan(0.1)
+  expect(Math.abs(positionAfter.top - positionBefore.top)).toBeLessThan(0.1)
 })
 
 test('toolbar dropdown and boundary control choose and change highlight colors', async ({ page }) => {
