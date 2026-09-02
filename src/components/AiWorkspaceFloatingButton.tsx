@@ -72,7 +72,7 @@ export function AiWorkspaceFloatingButton({
         variant="ghost"
         size="icon"
         className={cn(
-          'fixed right-5 z-30 size-12 rounded-full border border-border bg-background text-foreground shadow-[0_10px_28px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.12)] hover:bg-background hover:text-foreground',
+          'fixed right-80 z-30 size-12 rounded-full border border-border bg-background text-foreground shadow-[0_10px_28px_rgba(15,23,42,0.18),0_2px_8px_rgba(15,23,42,0.12)] hover:bg-background hover:text-foreground',
           updateBannerVisible ? 'bottom-[80px]' : 'bottom-11',
         )}
         aria-label={label}

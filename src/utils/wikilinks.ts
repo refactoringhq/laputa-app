@@ -560,5 +560,35 @@ export function countWords(content: MarkdownSource): WordCount {
   const withoutWikilinks = withoutTitle.replace(/\[\[[^\]]*\]\]/g, '')
   const text = withoutWikilinks.replace(/[#*_[\]`>~\-|]/g, '').trim()
   if (!text) return 0
-  return text.split(/\s+/).filter(Boolean).length
+  return countMultilingualWords(text)
+}
+
+const UNSPACED_CJK_CHARACTER_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
+const LETTER_OR_NUMBER_RE = /[\p{L}\p{N}]/u
+
+function countMultilingualWords(text: string): WordCount {
+  let count = 0
+  let insideWord = false
+
+  for (const character of text) {
+    if (UNSPACED_CJK_CHARACTER_RE.test(character)) {
+      count += insideWord ? 2 : 1
+      insideWord = false
+    } else if (continuesWord(character, insideWord)) {
+      insideWord = true
+    } else if (insideWord) {
+      count += 1
+      insideWord = false
+    }
+  }
+
+  return count + (insideWord ? 1 : 0)
+}
+
+function continuesWord(character: string, insideWord: boolean): boolean {
+  return LETTER_OR_NUMBER_RE.test(character) || (insideWord && isApostrophe(character))
+}
+
+function isApostrophe(character: string): boolean {
+  return character === "'" || character === '\u2019'
 }
