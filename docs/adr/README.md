@@ -232,3 +232,4 @@ proposed → active → superseded
 | [0176](0176-bundled-font-assets-for-offline-startup.md) | Bundled font assets for offline startup | active |
 | [0173](0173-future-calendar-version-recovery.md) | Future calendar version rejection and recovery | active |
 | [0178](0178-custom-protocol-for-scripted-html-blocks.md) | Custom protocol for scripted HTML blocks | active |
+| [0180](0180-native-knowledge-graph-renderers.md) | Native knowledge graph with force and analysis renderers | active |

@@ -14,6 +14,7 @@ const BUILTIN_LABELS: Record<SidebarFilter, string> = {
   pulse: 'Pulse',
   inbox: 'Inbox',
   favorites: 'Favorites',
+  graph: 'Graph',
 }
 
 function folderLabel(selection: Extract<SidebarSelection, { kind: 'folder' }>): string {
