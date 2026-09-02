@@ -169,7 +169,7 @@ interface VaultEntry {
   // Note: owner and cadence are now in the generic `properties` map
   createdAt: number | null  // Unix timestamp (seconds)
   fileSize: number
-  wordCount: number | null  // Body word count (excludes frontmatter)
+  wordCount: number | null  // Body word count (excludes frontmatter/H1; counts unspaced CJK characters)
   snippet: string | null    // First 200 chars of body
   workspace?: WorkspaceIdentity // Mounted-workspace provenance for cross-vault graph entries
   archived: boolean         // Archived flag

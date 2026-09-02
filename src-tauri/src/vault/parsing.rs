@@ -157,12 +157,48 @@ fn truncate_with_ellipsis(s: TextSlice<'_>, max_len: usize) -> String {
 pub(super) fn count_body_words(content: &str) -> u32 {
     let without_fm = strip_frontmatter(TextSlice(content));
     let body = without_h1_line(TextSlice(without_fm)).unwrap_or(without_fm);
-    body.split_whitespace()
-        .filter(|w| {
-            !w.chars()
-                .all(|c| matches!(c, '#' | '*' | '_' | '`' | '~' | '-' | '>' | '|'))
-        })
-        .count() as u32
+    count_multilingual_words(body)
+}
+
+fn count_multilingual_words(text: &str) -> u32 {
+    let mut count = 0;
+    let mut inside_word = false;
+
+    for character in text.chars() {
+        if is_unspaced_cjk_character(character) {
+            count += if inside_word { 2 } else { 1 };
+            inside_word = false;
+        } else if continues_word(character, inside_word) {
+            inside_word = true;
+        } else if inside_word {
+            count += 1;
+            inside_word = false;
+        }
+    }
+
+    count + u32::from(inside_word)
+}
+
+fn is_unspaced_cjk_character(character: char) -> bool {
+    matches!(
+        character,
+        '\u{3400}'..='\u{4DBF}'
+            | '\u{4E00}'..='\u{9FFF}'
+            | '\u{F900}'..='\u{FAFF}'
+            | '\u{20000}'..='\u{2FA1F}'
+            | '\u{3040}'..='\u{30FF}'
+    )
+}
+
+fn is_apostrophe(character: char) -> bool {
+    matches!(character, '\'' | '\u{2019}')
+}
+
+fn continues_word(character: char, inside_word: bool) -> bool {
+    if character.is_alphanumeric() {
+        return true;
+    }
+    inside_word && is_apostrophe(character)
 }
 
 /// Extract a snippet: first ~160 chars of content after frontmatter/title, stripped of markdown.
@@ -344,3 +380,7 @@ pub(super) fn extract_outgoing_links(content: &str) -> Vec<String> {
 #[cfg(test)]
 #[path = "parsing_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "word_count_tests.rs"]
+mod word_count_tests;
