@@ -187,7 +187,7 @@
 .editor__blocknote-container [data-content-type="heading"]:not([data-level])[data-is-only-empty-block] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
 .editor__blocknote-container [data-content-type="heading"][data-level="1"][data-is-empty-and-focused] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before,
 .editor__blocknote-container [data-content-type="heading"][data-level="1"][data-is-only-empty-block] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before {
-  content: "Title" !important;
+  content: "Title";
 }
 
 .editor__blocknote-container .bn-block-outer:has(> .bn-block > [data-content-type="heading"][data-level="2"]) {
@@ -367,7 +367,6 @@
   background-color: var(--feedback-warning-bg);
   color: var(--colors-text);
   border-radius: 2px;
-  padding: 0 0.12em;
 }
 
 .editor__blocknote-container .bn-editor mark.markdown-highlight:has([data-style-type="backgroundColor"][data-value="green"]),
