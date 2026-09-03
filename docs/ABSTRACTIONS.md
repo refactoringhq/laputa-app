@@ -370,6 +370,7 @@ Tolaria separates **display title** from the file identifier:
 - **Portable filename validation** (`vault/filename_rules.rs`): note filenames, folder names, and custom view filenames all reject Windows-reserved device names, invalid characters, and trailing dot/space suffixes so a vault created on macOS/Linux still clones and syncs cleanly on Windows.
 - **Recoverable save failures** (`useEditorSave`, `vault/file.rs`): invalid platform path syntax is reported as a clear retryable save error, while transient access-denied writes are retried briefly before surfacing failure. The editor keeps the unsaved buffer intact for another attempt.
 - **Untitled drafts** start as `untitled-*.md` and are auto-renamed on save once the note gains an H1.
+- **Property mutation boundary** flushes pending editor content before frontmatter writes without forcing the pending untitled rename. The rename remains debounced until after the property write, so a first type or property change cannot lose its target path mid-mutation; navigation still settles pending renames before switching notes.
 
 ### Title Surface (UI)
 
