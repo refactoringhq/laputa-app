@@ -7,13 +7,24 @@ import {
   serializeBlockNoteMarkdown,
   type DirectMarkdownCapableSerializer,
 } from './blockNoteDirectMarkdown'
-import { serializeRichEditorBodyToMarkdown } from './richEditorMarkdown'
+import {
+  injectRichEditorMarkdownBlocks,
+  preProcessRichEditorMarkdown,
+  serializeRichEditorBodyToMarkdown,
+} from './richEditorMarkdown'
 
 function makeEditor(document: unknown[]): DirectMarkdownCapableSerializer & { document: unknown[] } {
   return {
     document,
     blocksToMarkdownLossy: vi.fn(() => 'legacy markdown\n'),
   }
+}
+
+async function roundTripRichMarkdown(markdown: string): Promise<string> {
+  const editor = BlockNoteEditor.create({ schema })
+  const parsed = await editor.tryParseMarkdownToBlocks(preProcessRichEditorMarkdown(markdown))
+  const blocks = injectRichEditorMarkdownBlocks(parsed)
+  return blocksToMarkdownDirect(blocks).markdown
 }
 
 describe('BlockNote direct Markdown serialization', () => {
@@ -200,6 +211,24 @@ describe('BlockNote direct Markdown serialization', () => {
       '| A\\|B |',
       '| --- |',
     ].join('\n'))
+  })
+
+  it('keeps table-cell aliased wikilinks stable and repairs accumulated alias escapes', async () => {
+    const stableMarkdown = [
+      '| Link | Literal | Plain |',
+      '| --- | --- | --- |',
+      '| [[project/alpha|Project Alpha]] | A\\|B | [[project/beta]] |',
+    ].join('\n')
+    let markdown = stableMarkdown
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      markdown = await roundTripRichMarkdown(markdown)
+      expect(markdown).toBe('| Link | Literal | Plain |\n| --- | --- | --- |\n| [[project/alpha|Project Alpha]] | A\\|B | [[project/beta]] |')
+    }
+
+    await expect(roundTripRichMarkdown(
+      '| Link |\n| --- |\n| [[project/alpha\\\\\\|Project Alpha]] |',
+    )).resolves.toBe('| Link |\n| --- |\n| [[project/alpha|Project Alpha]] |')
   })
 
   it('does not escape hash references inside saved heading titles', () => {
