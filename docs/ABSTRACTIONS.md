@@ -169,7 +169,7 @@ interface VaultEntry {
   // Note: owner and cadence are now in the generic `properties` map
   createdAt: number | null  // Unix timestamp (seconds)
   fileSize: number
-  wordCount: number | null  // Body word count (excludes frontmatter/H1; counts unspaced CJK characters)
+  wordCount: number | null  // Body word count from the shared Rust/TS contract; excludes frontmatter/H1/wikilinks
   snippet: string | null    // First 200 chars of body
   workspace?: WorkspaceIdentity // Mounted-workspace provenance for cross-vault graph entries
   archived: boolean         // Archived flag
@@ -475,6 +475,7 @@ The renderer keeps app shortcuts platform-exact where they overlap with native d
    - Reads entity type from `type:` frontmatter field (`Is A:` accepted as legacy alias); type is never inferred from folder
    - Parses dates as ISO 8601 to Unix timestamps
    - Extracts relationships, outgoing links, custom properties, word count, snippet
+   - Compiles `src/shared/wordCountContract.json` for the canonical multilingual tokens and Markdown exclusions
 4. For recognized non-markdown text and binary files, emits a minimal `VaultEntry` with `fileKind`
 5. Sorts by `modified_at` descending
 6. Skips unparseable files with a warning log

@@ -25,7 +25,7 @@ const mockEntry: VaultEntry = {
   createdAt: null,
   fileSize: 1024,
   snippet: '',
-  wordCount: 0,
+  wordCount: 10,
   relationships: {},
   icon: null,
   color: null,
@@ -122,6 +122,115 @@ function makeWorkspace(path: string, label: string, alias = label.toLowerCase())
     defaultForNewNotes: false,
   }
 }
+
+const referencedByTargetEntry: VaultEntry = {
+  path: '/Users/luca/Laputa/responsibility/grow-newsletter.md',
+  filename: 'grow-newsletter.md',
+  title: 'Grow Newsletter',
+  isA: 'Responsibility',
+  aliases: [],
+  belongsTo: [],
+  relatedTo: [],
+  status: 'Active',
+  owner: null,
+  cadence: null,
+  archived: false,
+  modifiedAt: 1707900000,
+  createdAt: null,
+  fileSize: 500,
+  snippet: '',
+  wordCount: 0,
+  relationships: { 'Type': ['[[responsibility]]'] },
+  icon: null,
+  color: null,
+  order: null,
+  template: null, sort: null,
+  outgoingLinks: [],
+}
+
+const referencedByEssayEntry: VaultEntry = {
+  path: '/Users/luca/Laputa/essay/on-writing.md',
+  filename: 'on-writing.md',
+  title: 'On Writing Well',
+  isA: 'Essay',
+  aliases: [],
+  belongsTo: ['[[responsibility/grow-newsletter]]'],
+  relatedTo: [],
+  status: null,
+  owner: null,
+  cadence: null,
+  archived: false,
+  modifiedAt: 1707900000,
+  createdAt: null,
+  fileSize: 300,
+  snippet: '',
+  wordCount: 0,
+  relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[essay]]'] },
+  icon: null,
+  color: null,
+  order: null,
+  template: null, sort: null,
+  outgoingLinks: [],
+}
+
+const referencedByProcedureEntry: VaultEntry = {
+  path: '/Users/luca/Laputa/procedure/write-essays.md',
+  filename: 'write-essays.md',
+  title: 'Write Weekly Essays',
+  isA: 'Procedure',
+  aliases: [],
+  belongsTo: ['[[responsibility/grow-newsletter]]'],
+  relatedTo: [],
+  status: null,
+  owner: null,
+  cadence: null,
+  archived: false,
+  modifiedAt: 1707900000,
+  createdAt: null,
+  fileSize: 400,
+  snippet: '',
+  wordCount: 0,
+  relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[procedure]]'] },
+  icon: null,
+  color: null,
+  order: null,
+  template: null, sort: null,
+  outgoingLinks: [],
+}
+
+const referencedByExperimentEntry: VaultEntry = {
+  path: '/Users/luca/Laputa/experiment/seo.md',
+  filename: 'seo.md',
+  title: 'SEO Experiment',
+  isA: 'Experiment',
+  aliases: [],
+  belongsTo: [],
+  relatedTo: ['[[responsibility/grow-newsletter]]'],
+  status: null,
+  owner: null,
+  cadence: null,
+  archived: false,
+  modifiedAt: 1707900000,
+  createdAt: null,
+  fileSize: 200,
+  snippet: '',
+  wordCount: 0,
+  relationships: { 'Related to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[experiment]]'] },
+  icon: null,
+  color: null,
+  order: null,
+  template: null, sort: null,
+  outgoingLinks: [],
+}
+
+const referencedByTargetContent = `---
+title: Grow Newsletter
+is_a: Responsibility
+Status: Active
+---
+
+# Grow Newsletter
+`
 
 describe('Inspector', () => {
   it('renders expanded state with "no note selected"', () => {
@@ -422,122 +531,13 @@ This is a test note with some words to count.
   })
 
   describe('Referenced By (bidirectional relationships)', () => {
-    const targetEntry: VaultEntry = {
-      path: '/Users/luca/Laputa/responsibility/grow-newsletter.md',
-      filename: 'grow-newsletter.md',
-      title: 'Grow Newsletter',
-      isA: 'Responsibility',
-      aliases: [],
-      belongsTo: [],
-      relatedTo: [],
-      status: 'Active',
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
-      fileSize: 500,
-      snippet: '',
-      wordCount: 0,
-      relationships: { 'Type': ['[[responsibility]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
-
-    const essayEntry: VaultEntry = {
-      path: '/Users/luca/Laputa/essay/on-writing.md',
-      filename: 'on-writing.md',
-      title: 'On Writing Well',
-      isA: 'Essay',
-      aliases: [],
-      belongsTo: ['[[responsibility/grow-newsletter]]'],
-      relatedTo: [],
-      status: null,
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
-      fileSize: 300,
-      snippet: '',
-      wordCount: 0,
-      relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[essay]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
-
-    const procedureEntry: VaultEntry = {
-      path: '/Users/luca/Laputa/procedure/write-essays.md',
-      filename: 'write-essays.md',
-      title: 'Write Weekly Essays',
-      isA: 'Procedure',
-      aliases: [],
-      belongsTo: ['[[responsibility/grow-newsletter]]'],
-      relatedTo: [],
-      status: null,
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
-      fileSize: 400,
-      snippet: '',
-      wordCount: 0,
-      relationships: { 'Belongs to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[procedure]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
-
-    const experimentEntry: VaultEntry = {
-      path: '/Users/luca/Laputa/experiment/seo.md',
-      filename: 'seo.md',
-      title: 'SEO Experiment',
-      isA: 'Experiment',
-      aliases: [],
-      belongsTo: [],
-      relatedTo: ['[[responsibility/grow-newsletter]]'],
-      status: null,
-      owner: null,
-      cadence: null,
-      archived: false,
-      modifiedAt: 1707900000,
-      createdAt: null,
-      fileSize: 200,
-      snippet: '',
-      wordCount: 0,
-      relationships: { 'Related to': ['[[responsibility/grow-newsletter]]'], 'Type': ['[[experiment]]'] },
-      icon: null,
-      color: null,
-      order: null,
-      template: null, sort: null,
-      outgoingLinks: [],
-    }
-
-    const targetContent = `---
-title: Grow Newsletter
-is_a: Responsibility
-Status: Active
----
-
-# Grow Newsletter
-`
-
     it('shows entries that reference the current note via frontmatter relationships', async () => {
       render(
         <Inspector
           {...defaultProps}
-          entry={targetEntry}
-          content={targetContent}
-          entries={[targetEntry, essayEntry, procedureEntry, experimentEntry]}
+          entry={referencedByTargetEntry}
+          content={referencedByTargetContent}
+          entries={[referencedByTargetEntry, referencedByEssayEntry, referencedByProcedureEntry, referencedByExperimentEntry]}
 
         />
       )
@@ -550,9 +550,9 @@ Status: Active
       render(
         <Inspector
           {...defaultProps}
-          entry={targetEntry}
-          content={targetContent}
-          entries={[targetEntry, essayEntry, experimentEntry]}
+          entry={referencedByTargetEntry}
+          content={referencedByTargetContent}
+          entries={[referencedByTargetEntry, referencedByEssayEntry, referencedByExperimentEntry]}
 
         />
       )
@@ -562,9 +562,9 @@ Status: Active
 
     it('hides referenced-by section when no entries reference the current note', () => {
       renderInspector({
-        entry: targetEntry,
-        content: targetContent,
-        entries: [targetEntry],
+        entry: referencedByTargetEntry,
+        content: referencedByTargetContent,
+        entries: [referencedByTargetEntry],
       })
       expect(screen.queryByText('No references')).not.toBeInTheDocument()
       expect(screen.queryByText('Referenced by')).not.toBeInTheDocument()
@@ -573,9 +573,9 @@ Status: Active
     it('navigates when clicking a referenced-by entry', async () => {
       const onNavigate = vi.fn()
       renderInspector({
-        entry: targetEntry,
-        content: targetContent,
-        entries: [targetEntry, essayEntry],
+        entry: referencedByTargetEntry,
+        content: referencedByTargetContent,
+        entries: [referencedByTargetEntry, referencedByEssayEntry],
         onNavigate,
       })
       fireEvent.click(await screen.findByText('On Writing Well'))
@@ -584,20 +584,20 @@ Status: Active
 
     it('skips Type relationships in referenced-by computation', () => {
       const typeEntry: VaultEntry = {
-        ...targetEntry,
+        ...referencedByTargetEntry,
         path: '/Users/luca/Laputa/responsibility.md',
         filename: 'responsibility.md',
         title: 'Responsibility',
         isA: 'Type',
         relationships: {},
       }
-      // essayEntry has Type: [[responsibility]] — should NOT show as referenced-by
+      // The essay entry has Type: [[responsibility]] — should NOT show as referenced-by
       render(
         <Inspector
           {...defaultProps}
           entry={typeEntry}
           content="---\ntype: Type\n---\n# Responsibility\n"
-          entries={[typeEntry, essayEntry]}
+          entries={[typeEntry, referencedByEssayEntry]}
 
         />
       )
@@ -609,18 +609,18 @@ Status: Active
 
     it('resolves references via aliased wikilinks', async () => {
       const aliasedTarget: VaultEntry = {
-        ...targetEntry,
+        ...referencedByTargetEntry,
         aliases: ['Newsletter'],
       }
       const referrer: VaultEntry = {
-        ...essayEntry,
+        ...referencedByEssayEntry,
         relationships: { 'Topics': ['[[Newsletter]]'], 'Type': ['[[essay]]'] },
       }
       render(
         <Inspector
           {...defaultProps}
           entry={aliasedTarget}
-          content={targetContent}
+          content={referencedByTargetContent}
           entries={[aliasedTarget, referrer]}
 
         />
@@ -658,9 +658,9 @@ Status: Active
       render(
         <Inspector
           {...defaultProps}
-          entry={targetEntry}
-          content={targetContent}
-          entries={[targetEntry, noteA]}
+          entry={referencedByTargetEntry}
+          content={referencedByTargetContent}
+          entries={[referencedByTargetEntry, noteA]}
         />
       )
       // noteA shows in Referenced By (via Belongs to)
@@ -672,9 +672,9 @@ Status: Active
 
     it('does not show self-references', () => {
       const selfRef: VaultEntry = {
-        ...targetEntry,
+        ...referencedByTargetEntry,
         relationships: {
-          ...targetEntry.relationships,
+          ...referencedByTargetEntry.relationships,
           'Notes': ['[[responsibility/grow-newsletter]]'],
         },
       }
@@ -682,7 +682,7 @@ Status: Active
         <Inspector
           {...defaultProps}
           entry={selfRef}
-          content={targetContent}
+          content={referencedByTargetContent}
           entries={[selfRef]}
 
         />

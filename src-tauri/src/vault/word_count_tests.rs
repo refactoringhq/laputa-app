@@ -1,18 +1,30 @@
 use super::count_body_words;
+use serde::Deserialize;
 
-#[test]
-fn counts_the_reported_repeated_english_words() {
-    let content = "abc, efg\n\nabc, efg\n\nabc, efg\n\nabc, efg\n\nabc\n\nabc";
+#[derive(Deserialize)]
+struct WordCountFixture {
+    name: String,
+    content: String,
+    expected: u32,
+}
 
-    assert_eq!(count_body_words(content), 10);
+#[derive(Deserialize)]
+struct WordCountContract {
+    fixtures: Vec<WordCountFixture>,
 }
 
 #[test]
-fn counts_unspaced_cjk_characters() {
-    assert_eq!(count_body_words("中文没有空格"), 6);
-}
+fn matches_the_shared_word_count_contract() {
+    let contract: WordCountContract =
+        serde_json::from_str(include_str!("../../../src/shared/wordCountContract.json"))
+            .expect("shared word-count fixtures must be valid JSON");
 
-#[test]
-fn counts_cjk_characters_alongside_latin_and_numeric_words() {
-    assert_eq!(count_body_words("Hello 世界 2026"), 4);
+    for fixture in contract.fixtures {
+        assert_eq!(
+            count_body_words(&fixture.content),
+            fixture.expected,
+            "fixture: {}",
+            fixture.name
+        );
+    }
 }

@@ -60,19 +60,28 @@ function updateEntryInTransition(updateEntry: UpdateEntry, path: string, patch: 
   })
 }
 
-function syncOutgoingLinks(options: {
+function deriveContentMetadata(content: string): Pick<VaultEntry, 'outgoingLinks' | 'wordCount'> {
+  return {
+    outgoingLinks: content.includes('[[') ? extractOutgoingLinks(content) : [],
+    wordCount: countWords(content),
+  }
+}
+
+function syncLiveMetadata(options: {
   content: string
   path: string
-  prevLinksKeyRef: MutableRefObject<string>
+  prevMetadataKeyRef: MutableRefObject<string>
   updateEntry: UpdateEntry
 }): void {
-  const { content, path, prevLinksKeyRef, updateEntry } = options
-  const links = content.includes('[[') ? extractOutgoingLinks(content) : []
-  const key = links.join('\0')
-  if (key === prevLinksKeyRef.current) return
+  const { content, path, prevMetadataKeyRef, updateEntry } = options
+  if (!shouldSyncFrontmatterState(content)) return
 
-  prevLinksKeyRef.current = key
-  updateEntryInTransition(updateEntry, path, { outgoingLinks: links })
+  const metadata = deriveContentMetadata(content)
+  const key = JSON.stringify(metadata)
+  if (key === prevMetadataKeyRef.current) return
+
+  prevMetadataKeyRef.current = key
+  updateEntryInTransition(updateEntry, path, metadata)
 }
 
 function resolveFrontmatterPatch(options: {
@@ -129,16 +138,15 @@ function syncDisplayTitle(options: {
 function syncSavedMetadata(options: {
   content: string
   path: string
-  prevLinksKeyRef: MutableRefObject<string>
+  prevMetadataKeyRef: MutableRefObject<string>
   updateEntry: UpdateEntry
 }): void {
-  const { content, path, prevLinksKeyRef, updateEntry } = options
-  const outgoingLinks = content.includes('[[') ? extractOutgoingLinks(content) : []
-  prevLinksKeyRef.current = outgoingLinks.join('\0')
+  const { content, path, prevMetadataKeyRef, updateEntry } = options
+  const metadata = deriveContentMetadata(content)
+  prevMetadataKeyRef.current = JSON.stringify(metadata)
   updateEntryInTransition(updateEntry, path, {
-    outgoingLinks,
+    ...metadata,
     snippet: extractSnippet(content),
-    wordCount: countWords(content),
     modifiedAt: Math.floor(Date.now() / 1000),
   })
 }
@@ -146,7 +154,7 @@ function syncSavedMetadata(options: {
 function syncDeferredEntryMetadata(options: DeferredEntryMetadataSync & {
   prevFmKeyRef: MutableRefObject<string>
   prevFmSourceRef: MutableRefObject<string | null>
-  prevLinksKeyRef: MutableRefObject<string>
+  prevMetadataKeyRef: MutableRefObject<string>
   prevTitleKeyRef: MutableRefObject<string>
   updateEntry: UpdateEntry
 }): void {
@@ -156,14 +164,14 @@ function syncDeferredEntryMetadata(options: DeferredEntryMetadataSync & {
     path,
     prevFmKeyRef,
     prevFmSourceRef,
-    prevLinksKeyRef,
+    prevMetadataKeyRef,
     prevTitleKeyRef,
     updateEntry,
   } = options
   if (includeSavedMetadata) {
-    syncSavedMetadata({ content, path, prevLinksKeyRef, updateEntry })
+    syncSavedMetadata({ content, path, prevMetadataKeyRef, updateEntry })
   } else {
-    syncOutgoingLinks({ content, path, prevLinksKeyRef, updateEntry })
+    syncLiveMetadata({ content, path, prevMetadataKeyRef, updateEntry })
   }
   const frontmatterTitle = syncFrontmatterMetadata({
     content,
@@ -198,7 +206,7 @@ export function useEditorSaveWithLinks(config: {
   const { updateEntry } = config
   const pendingMetadataSyncRef = useRef<DeferredEntryMetadataSync | null>(null)
   const cancelMetadataSyncRef = useRef<CancelDeferredWork | null>(null)
-  const prevLinksKeyRef = useRef('')
+  const prevMetadataKeyRef = useRef('')
   const prevFmSourceRef = useRef<string | null>(null)
   const prevFmKeyRef = useRef(EMPTY_DERIVED_ENTRY_STATE_KEY)
   const prevTitleKeyRef = useRef('')
@@ -213,7 +221,7 @@ export function useEditorSaveWithLinks(config: {
       ...pending,
       prevFmKeyRef,
       prevFmSourceRef,
-      prevLinksKeyRef,
+      prevMetadataKeyRef,
       prevTitleKeyRef,
       updateEntry,
     })

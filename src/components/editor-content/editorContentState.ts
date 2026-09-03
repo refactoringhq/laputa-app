@@ -1,7 +1,6 @@
 import type { NoteStatus, VaultEntry } from '../../types'
 import { extractH1TitleFromContent } from '../../utils/noteTitle'
 import { noteDisplaysAsSheet } from '../../utils/noteFormat'
-import { countWords } from '../../utils/wikilinks'
 import { isHtmlFileEntry } from '../../utils/filePreview'
 
 export interface EditorContentTab {
@@ -102,6 +101,11 @@ function deriveVisibilityState(input: {
   }
 }
 
+function resolveWordCount(activeTab: EditorContentTab | null, freshEntry: VaultEntry | undefined): number {
+  if (freshEntry) return freshEntry.wordCount
+  return activeTab?.entry.wordCount ?? 0
+}
+
 export function deriveEditorContentState(input: EditorContentStateInput): EditorContentState {
   const { activeTab, entries, rawMode } = input
   const freshEntry = findFreshEntry(activeTab, entries)
@@ -118,6 +122,6 @@ export function deriveEditorContentState(input: EditorContentStateInput): Editor
     hasH1,
     ...visibilityState,
     path: activeTab?.entry.path ?? '',
-    wordCount: activeTab ? countWords(activeTab.content) : 0,
+    wordCount: resolveWordCount(activeTab, freshEntry),
   }
 }

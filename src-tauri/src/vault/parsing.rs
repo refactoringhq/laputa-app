@@ -1,6 +1,52 @@
 //! Pure text-processing helpers for markdown content parsing.
 //! Snippet extraction, markdown stripping, date parsing, and string utilities.
 
+use regex::Regex;
+use serde::Deserialize;
+use std::sync::OnceLock;
+
+const WORD_COUNT_CONTRACT_JSON: &str = include_str!("../../../src/shared/wordCountContract.json");
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WordCountPatternSources {
+    wikilink: String,
+    markdown_marker: String,
+    unspaced_cjk: String,
+    word: String,
+}
+
+#[derive(Deserialize)]
+struct WordCountContract {
+    patterns: WordCountPatternSources,
+}
+
+struct WordCountPatterns {
+    wikilink: Regex,
+    markdown_marker: Regex,
+    unspaced_cjk: Regex,
+    word: Regex,
+}
+
+fn compile_word_count_pattern(source: &str) -> Regex {
+    Regex::new(source).expect("shared word-count pattern must be a valid Rust regex")
+}
+
+fn word_count_patterns() -> &'static WordCountPatterns {
+    static PATTERNS: OnceLock<WordCountPatterns> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        let contract: WordCountContract = serde_json::from_str(WORD_COUNT_CONTRACT_JSON)
+            .expect("shared word-count contract must be valid JSON");
+        let sources = contract.patterns;
+        WordCountPatterns {
+            wikilink: compile_word_count_pattern(&sources.wikilink),
+            markdown_marker: compile_word_count_pattern(&sources.markdown_marker),
+            unspaced_cjk: compile_word_count_pattern(&sources.unspaced_cjk),
+            word: compile_word_count_pattern(&sources.word),
+        }
+    })
+}
+
 #[derive(Clone, Copy)]
 struct TextSlice<'a>(&'a str);
 
@@ -157,48 +203,18 @@ fn truncate_with_ellipsis(s: TextSlice<'_>, max_len: usize) -> String {
 pub(super) fn count_body_words(content: &str) -> u32 {
     let without_fm = strip_frontmatter(TextSlice(content));
     let body = without_h1_line(TextSlice(without_fm)).unwrap_or(without_fm);
-    count_multilingual_words(body)
+    let patterns = word_count_patterns();
+    let without_wikilinks = patterns.wikilink.replace_all(body, "");
+    let text = patterns.markdown_marker.replace_all(&without_wikilinks, "");
+    count_multilingual_words(&text)
 }
 
 fn count_multilingual_words(text: &str) -> u32 {
-    let mut count = 0;
-    let mut inside_word = false;
-
-    for character in text.chars() {
-        if is_unspaced_cjk_character(character) {
-            count += if inside_word { 2 } else { 1 };
-            inside_word = false;
-        } else if continues_word(character, inside_word) {
-            inside_word = true;
-        } else if inside_word {
-            count += 1;
-            inside_word = false;
-        }
-    }
-
-    count + u32::from(inside_word)
-}
-
-fn is_unspaced_cjk_character(character: char) -> bool {
-    matches!(
-        character,
-        '\u{3400}'..='\u{4DBF}'
-            | '\u{4E00}'..='\u{9FFF}'
-            | '\u{F900}'..='\u{FAFF}'
-            | '\u{20000}'..='\u{2FA1F}'
-            | '\u{3040}'..='\u{30FF}'
-    )
-}
-
-fn is_apostrophe(character: char) -> bool {
-    matches!(character, '\'' | '\u{2019}')
-}
-
-fn continues_word(character: char, inside_word: bool) -> bool {
-    if character.is_alphanumeric() {
-        return true;
-    }
-    inside_word && is_apostrophe(character)
+    let patterns = word_count_patterns();
+    let cjk_count = patterns.unspaced_cjk.find_iter(text).count();
+    let text_with_cjk_boundaries = patterns.unspaced_cjk.replace_all(text, " ");
+    let word_count = patterns.word.find_iter(&text_with_cjk_boundaries).count();
+    u32::try_from(cjk_count.saturating_add(word_count)).unwrap_or(u32::MAX)
 }
 
 /// Extract a snippet: first ~160 chars of content after frontmatter/title, stripped of markdown.

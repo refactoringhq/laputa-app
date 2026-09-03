@@ -107,7 +107,21 @@ describe('useEditorSaveWithLinks', () => {
 
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['PageA', 'PageB'],
+      wordCount: 2,
     })
+  })
+
+  it('derives live word count while edited content is dirty', () => {
+    const { result } = renderHookWithLinks()
+
+    act(() => {
+      result.current.handleContentChange('/note.md', '# Title\n\nOne two three')
+    })
+    flushDeferredMetadata()
+
+    expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
+      wordCount: 3,
+    }))
   })
 
   it('handleContentChange does NOT call updateEntry again when links have not changed', () => {
@@ -120,6 +134,7 @@ describe('useEditorSaveWithLinks', () => {
     expect(updateEntry).toHaveBeenCalledTimes(2)
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['Alpha'],
+      wordCount: 3,
     })
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       title: 'Note',
@@ -145,6 +160,7 @@ describe('useEditorSaveWithLinks', () => {
     expect(updateEntry).toHaveBeenCalledTimes(2)
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['Alpha'],
+      wordCount: 1,
     })
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       title: 'Note',
@@ -159,6 +175,7 @@ describe('useEditorSaveWithLinks', () => {
     expect(updateEntry).toHaveBeenCalledTimes(3)
     expect(updateEntry).toHaveBeenLastCalledWith('/note.md', {
       outgoingLinks: ['Alpha', 'Beta'],
+      wordCount: 2,
     })
   })
 
@@ -171,7 +188,7 @@ describe('useEditorSaveWithLinks', () => {
 
     flushDeferredMetadata()
 
-    expect(updateEntry).toHaveBeenCalledTimes(1)
+    expect(updateEntry).toHaveBeenCalledTimes(2)
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       title: 'Note',
       hasH1: false,
@@ -189,6 +206,7 @@ describe('useEditorSaveWithLinks', () => {
 
     expect(updateEntry).toHaveBeenCalledWith('/note.md', {
       outgoingLinks: ['Target'],
+      wordCount: 1,
     })
   })
 
@@ -211,18 +229,21 @@ describe('useEditorSaveWithLinks', () => {
     })
   })
 
-  it('handleContentChange does NOT call updateEntry for frontmatter when unchanged', () => {
+  it('handleContentChange updates only live metadata when frontmatter is unchanged', () => {
     const { result } = renderHookWithLinks()
     const content = '---\ntype: Essay\n---\nBody text'
 
     act(() => { result.current.handleContentChange('/note.md', content) })
     flushDeferredMetadata()
-    const callCount = updateEntry.mock.calls.length
+    updateEntry.mockClear()
 
     act(() => { result.current.handleContentChange('/note.md', `${content} more`) })
     flushDeferredMetadata()
-    // Same frontmatter, only body changed — no extra updateEntry for frontmatter
-    expect(updateEntry).toHaveBeenCalledTimes(callCount)
+    expect(updateEntry).toHaveBeenCalledTimes(1)
+    expect(updateEntry).toHaveBeenCalledWith('/note.md', {
+      outgoingLinks: [],
+      wordCount: 3,
+    })
   })
 
   it('handleContentChange updates entry when type changes in frontmatter', () => {
@@ -352,7 +373,7 @@ describe('useEditorSaveWithLinks', () => {
     expect(updateEntry).not.toHaveBeenCalled()
     flushDeferredMetadata()
 
-    expect(startTransitionMock).toHaveBeenCalledTimes(1)
+    expect(startTransitionMock).toHaveBeenCalledTimes(2)
     expect(updateEntry).toHaveBeenCalledWith('/old-title.md', {
       title: 'Renamed Note',
       hasH1: true,

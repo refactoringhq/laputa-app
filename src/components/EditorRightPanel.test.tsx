@@ -142,4 +142,28 @@ describe('EditorRightPanel', () => {
     expect(screen.getByText('keep this session')).toBeTruthy()
     expect(screen.getByText('Mock response')).toBeTruthy()
   })
+
+  it('renders inspector metadata from the refreshed vault entry', () => {
+    const refreshedEntry = { ...entry, wordCount: 3 }
+
+    rtlRender(
+      <EditorRightPanel
+        showTableOfContents={false}
+        inspectorCollapsed={false}
+        inspectorWidth={320}
+        editor={{} as never}
+        inspectorEntry={entry}
+        inspectorContent="Alpha 世界"
+        entries={[refreshedEntry]}
+        gitHistory={[]}
+        vaultPath="/tmp/vault"
+        onToggleInspector={vi.fn()}
+        onNavigateWikilink={vi.fn()}
+        onViewCommitDiff={vi.fn()}
+      />,
+      { wrapper: TooltipProvider },
+    )
+
+    expect(screen.getByText('Words').parentElement?.textContent).toContain('3')
+  })
 })

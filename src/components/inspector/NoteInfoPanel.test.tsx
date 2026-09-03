@@ -74,8 +74,8 @@ describe('NoteInfoPanel', () => {
     })
   })
 
-  it('renders word count from content', () => {
-    render(<NoteInfoPanel entry={makeEntry()} content="---\ntitle: Test\n---\nOne two three four" />)
-    expect(screen.getByText('Words')).toBeInTheDocument()
+  it('renders the derived word count stored on the entry', () => {
+    render(<NoteInfoPanel entry={makeEntry({ wordCount: 42 })} content="One word" />)
+    expect(screen.getByText('42')).toBeInTheDocument()
   })
 })

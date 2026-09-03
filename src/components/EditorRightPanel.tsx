@@ -57,6 +57,11 @@ interface EditorRightPanelProps {
   locale?: AppLocale
 }
 
+function resolveInspectorEntry(entry: VaultEntry | null, entries: VaultEntry[]): VaultEntry | null {
+  if (!entry) return null
+  return entries.find((candidate) => candidate.path === entry.path) ?? entry
+}
+
 type AiPanelSectionProps = Pick<
   EditorRightPanelProps,
   | 'defaultAiAgent'
@@ -202,18 +207,20 @@ export function EditorRightPanel(options: EditorRightPanelProps) {
 
 function renderExpandedInspector(options: EditorRightPanelProps) {
   const { inspectorCollapsed, inspectorWidth, inspectorEntry, inspectorContent, entries, gitHistory, vaultPath, onToggleInspector, onNavigateWikilink, onViewCommitDiff, onUpdateFrontmatter, onDeleteProperty, onAddProperty, onCreateMissingType, onCreateAndOpenNote, onChangeWorkspace, onInitializeProperties, onToggleRawEditor, workspaces, locale } = options
+  const currentInspectorEntry = resolveInspectorEntry(inspectorEntry, entries)
   return (
     <div className="shrink-0 flex flex-col min-h-0" style={{ width: inspectorWidth, height: '100%' }}>
-      <Inspector collapsed={inspectorCollapsed} onToggle={onToggleInspector} entry={inspectorEntry} content={inspectorContent} entries={entries} gitHistory={gitHistory} vaultPath={vaultPath} onNavigate={onNavigateWikilink} onViewCommitDiff={onViewCommitDiff} onUpdateFrontmatter={onUpdateFrontmatter} onDeleteProperty={onDeleteProperty} onAddProperty={onAddProperty} onCreateMissingType={onCreateMissingType} onCreateAndOpenNote={onCreateAndOpenNote} onChangeWorkspace={onChangeWorkspace} onInitializeProperties={onInitializeProperties} onToggleRawEditor={onToggleRawEditor} workspaces={workspaces} locale={locale} />
+      <Inspector collapsed={inspectorCollapsed} onToggle={onToggleInspector} entry={currentInspectorEntry} content={inspectorContent} entries={entries} gitHistory={gitHistory} vaultPath={vaultPath} onNavigate={onNavigateWikilink} onViewCommitDiff={onViewCommitDiff} onUpdateFrontmatter={onUpdateFrontmatter} onDeleteProperty={onDeleteProperty} onAddProperty={onAddProperty} onCreateMissingType={onCreateMissingType} onCreateAndOpenNote={onCreateAndOpenNote} onChangeWorkspace={onChangeWorkspace} onInitializeProperties={onInitializeProperties} onToggleRawEditor={onToggleRawEditor} workspaces={workspaces} locale={locale} />
     </div>
   )
 }
 
 function renderTableOfContents(options: EditorRightPanelProps) {
-  const { editor, inspectorContent, inspectorEntry, inspectorWidth, locale, onToggleTableOfContents } = options
+  const { editor, inspectorContent, inspectorEntry, inspectorWidth, entries, locale, onToggleTableOfContents } = options
+  const currentInspectorEntry = resolveInspectorEntry(inspectorEntry, entries)
   return (
     <div className="shrink-0 flex flex-col min-h-0" style={{ width: inspectorWidth, minWidth: 240, height: '100%' }}>
-      <TableOfContentsPanel editor={editor} entry={inspectorEntry} locale={locale} onClose={() => onToggleTableOfContents?.()} sourceContent={inspectorContent} />
+      <TableOfContentsPanel editor={editor} entry={currentInspectorEntry} locale={locale} onClose={() => onToggleTableOfContents?.()} sourceContent={inspectorContent} />
     </div>
   )
 }

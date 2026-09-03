@@ -9,6 +9,7 @@ const entry = {
   modifiedAt: 1700000000,
   createdAt: 1700000000,
   fileSize: 2048,
+  wordCount: 3,
 } as VaultEntry
 
 const blocks = [
@@ -217,7 +218,7 @@ describe('TableOfContentsPanel', () => {
     expect(setTextCursorPosition).toHaveBeenCalledWith('h2', 'start')
   })
 
-  it('shows note info at the bottom of the table of contents', () => {
+  it('shows indexed note info at the bottom of the table of contents', () => {
     render(
       <TableOfContentsPanel
         editor={{ document: blocks, setTextCursorPosition: vi.fn() }}

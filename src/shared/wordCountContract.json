@@ -1,0 +1,65 @@
+{
+  "patterns": {
+    "wikilink": "\\[\\[[^\\]]*\\]\\]",
+    "markdownMarker": "[#*_`>~|]|\\[|\\]|-",
+    "unspacedCjk": "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}]",
+    "word": "[\\p{L}\\p{N}]['’\\p{L}\\p{N}]*"
+  },
+  "fixtures": [
+    {
+      "name": "repeated English words",
+      "content": "abc, efg\n\nabc, efg\n\nabc, efg\n\nabc, efg\n\nabc\n\nabc",
+      "expected": 10
+    },
+    {
+      "name": "frontmatter and title exclusion",
+      "content": "---\ntype: Note\nowner: Luca Rossi\n---\n# Project update\n\nThree body words.",
+      "expected": 3
+    },
+    {
+      "name": "wikilink exclusion",
+      "content": "Check [[note-a]] and [[note-b]] here.",
+      "expected": 3
+    },
+    {
+      "name": "markdown marker exclusion",
+      "content": "## **Section**\n\n> _Three formatted words._",
+      "expected": 4
+    },
+    {
+      "name": "unspaced Han characters",
+      "content": "中文没有空格",
+      "expected": 6
+    },
+    {
+      "name": "unspaced Japanese kana",
+      "content": "こんにちは",
+      "expected": 5
+    },
+    {
+      "name": "mixed CJK Latin and numeric words",
+      "content": "Hello 世界 2026",
+      "expected": 4
+    },
+    {
+      "name": "CJK characters inside Latin text",
+      "content": "abc中文def",
+      "expected": 4
+    },
+    {
+      "name": "straight and curly apostrophes",
+      "content": "Don't split l’esprit",
+      "expected": 3
+    },
+    {
+      "name": "existing hyphen preprocessing",
+      "content": "well-known behavior",
+      "expected": 2
+    },
+    {
+      "name": "only excluded syntax",
+      "content": "[[target]] --- **__**",
+      "expected": 0
+    }
+  ]
+}

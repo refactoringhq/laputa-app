@@ -1,5 +1,6 @@
 // Wikilink placeholder tokens for markdown round-trip
 import { advanceMarkdownFence, type MarkdownFence, type MarkdownFenceScanOptions } from './markdownFences'
+import wordCountContract from '../shared/wordCountContract.json'
 
 const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
@@ -557,38 +558,36 @@ export function extractSnippet(content: MarkdownSource): MarkdownSource {
 export function countWords(content: MarkdownSource): WordCount {
   const [, body] = splitFrontmatter(content)
   const withoutTitle = body.replace(/^\s*# [^\n]+\n?/, '')
-  const withoutWikilinks = withoutTitle.replace(/\[\[[^\]]*\]\]/g, '')
-  const text = withoutWikilinks.replace(/[#*_[\]`>~\-|]/g, '').trim()
+  const withoutWikilinks = withoutTitle.replace(WORD_COUNT_WIKILINK_RE, '')
+  const text = withoutWikilinks.replace(WORD_COUNT_MARKDOWN_MARKER_RE, '').trim()
   if (!text) return 0
-  return countMultilingualWords(text)
+  const cjkCount = [...text.matchAll(WORD_COUNT_UNSPACED_CJK_RE)].length
+  const textWithCjkBoundaries = text.replace(WORD_COUNT_UNSPACED_CJK_RE, ' ')
+  return cjkCount + [...textWithCjkBoundaries.matchAll(WORD_COUNT_WORD_RE)].length
 }
 
-const UNSPACED_CJK_CHARACTER_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
-const LETTER_OR_NUMBER_RE = /[\p{L}\p{N}]/u
-
-function countMultilingualWords(text: string): WordCount {
-  let count = 0
-  let insideWord = false
-
-  for (const character of text) {
-    if (UNSPACED_CJK_CHARACTER_RE.test(character)) {
-      count += insideWord ? 2 : 1
-      insideWord = false
-    } else if (continuesWord(character, insideWord)) {
-      insideWord = true
-    } else if (insideWord) {
-      count += 1
-      insideWord = false
-    }
-  }
-
-  return count + (insideWord ? 1 : 0)
+function contractPattern(name: string, expectedSource: string, expression: RegExp): RegExp {
+  if (expression.source === expectedSource) return expression
+  throw new Error(`Word-count pattern drifted from the shared contract: ${name}`)
 }
 
-function continuesWord(character: string, insideWord: boolean): boolean {
-  return LETTER_OR_NUMBER_RE.test(character) || (insideWord && isApostrophe(character))
-}
-
-function isApostrophe(character: string): boolean {
-  return character === "'" || character === '\u2019'
-}
+const WORD_COUNT_WIKILINK_RE = contractPattern(
+  'wikilink',
+  wordCountContract.patterns.wikilink,
+  /\[\[[^\]]*\]\]/gu,
+)
+const WORD_COUNT_MARKDOWN_MARKER_RE = contractPattern(
+  'markdownMarker',
+  wordCountContract.patterns.markdownMarker,
+  /[#*_`>~|]|\[|\]|-/gu,
+)
+const WORD_COUNT_UNSPACED_CJK_RE = contractPattern(
+  'unspacedCjk',
+  wordCountContract.patterns.unspacedCjk,
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,
+)
+const WORD_COUNT_WORD_RE = contractPattern(
+  'word',
+  wordCountContract.patterns.word,
+  /[\p{L}\p{N}]['’\p{L}\p{N}]*/gu,
+)

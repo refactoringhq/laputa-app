@@ -56,6 +56,15 @@ function deriveStateForContent(entryOverrides: Partial<VaultEntry>, content: str
 }
 
 describe('deriveEditorContentState', () => {
+  it('reuses indexed word count for clean content', () => {
+    const state = deriveState({
+      entry: { ...baseEntry, wordCount: 42 },
+      content: 'one word',
+    })
+
+    expect(state.wordCount).toBe(42)
+  })
+
   it('marks loaded content with a top-level H1 as titled', () => {
     const state = deriveState({
       entry: baseEntry,

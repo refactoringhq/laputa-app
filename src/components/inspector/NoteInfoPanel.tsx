@@ -1,7 +1,5 @@
 import type { VaultEntry } from '../../types'
-import { useMemo } from 'react'
 import { Info } from '@phosphor-icons/react'
-import { countWords } from '../../utils/wikilinks'
 import { translate, type AppLocale } from '../../lib/i18n'
 import {
   formatTimestampForDateDisplay,
@@ -33,7 +31,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export function NoteInfoPanel({
   entry,
-  content,
   locale = 'en',
 }: {
   entry: VaultEntry
@@ -41,7 +38,6 @@ export function NoteInfoPanel({
   locale?: AppLocale
 }) {
   const dateDisplayFormat = useDateDisplayFormat()
-  const wordCount = useMemo(() => countWords(content ?? ''), [content])
   return (
     <div>
       <h4 className="font-mono-overline mb-2 flex items-center gap-1 text-muted-foreground">
@@ -51,7 +47,7 @@ export function NoteInfoPanel({
       <div className="flex flex-col gap-1.5">
         <InfoRow label={translate(locale, 'inspector.info.modified')} value={formatDate(entry.modifiedAt, dateDisplayFormat)} />
         <InfoRow label={translate(locale, 'inspector.info.created')} value={formatDate(entry.createdAt, dateDisplayFormat)} />
-        <InfoRow label={translate(locale, 'inspector.info.words')} value={String(wordCount)} />
+        <InfoRow label={translate(locale, 'inspector.info.words')} value={String(entry.wordCount ?? 0)} />
         <InfoRow label={translate(locale, 'inspector.info.size')} value={formatFileSize(entry.fileSize)} />
       </div>
     </div>
