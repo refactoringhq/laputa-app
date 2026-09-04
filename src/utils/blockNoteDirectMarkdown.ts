@@ -1,5 +1,6 @@
 import { restoreWikilinksInBlocks } from './wikilinks'
 import { escapeInlineMarkdownText, wrapInlineMarkdown } from './blockNoteMarkdownInline'
+import { normalizeUnsafeTableCardinalities } from './blockNoteTableCardinality'
 
 interface TextStyles {
   [style: string]: string | boolean | undefined
@@ -553,5 +554,6 @@ export function serializeBlockNoteMarkdown(
 ): string {
   const direct = editor.blocksToMarkdownDirect?.(blocks)
   if (direct?.supported) return direct.markdown
-  return editor.blocksToMarkdownLossy(restoreWikilinksInBlocks(blocks))
+  const safeBlocks = normalizeUnsafeTableCardinalities(blocks)
+  return editor.blocksToMarkdownLossy(restoreWikilinksInBlocks(safeBlocks))
 }

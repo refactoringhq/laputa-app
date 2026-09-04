@@ -186,6 +186,50 @@ describe('BlockNote direct Markdown serialization', () => {
     expect(editor.__tolariaLastDirectMarkdownMetrics?.fallbackReason).toBe('unsupported:unsupportedWidget')
   })
 
+  it('normalizes unsafe table cardinalities before BlockNote fallback serialization', () => {
+    const document = [
+      { type: 'unsupportedWidget', children: [] },
+      {
+        type: 'table',
+        content: {
+          type: 'tableContent',
+          headerRows: Number.POSITIVE_INFINITY,
+          headerCols: -1,
+          rows: [{
+            cells: [{
+              type: 'tableCell',
+              props: { colspan: 1.5, rowspan: Number.POSITIVE_INFINITY },
+              content: [{ type: 'text', text: 'Safe', styles: {} }],
+            }],
+          }],
+        },
+        children: [],
+      },
+    ]
+    const editor = makeEditor(document)
+    installBlockNoteDirectMarkdown(editor)
+
+    expect(serializeBlockNoteMarkdown(editor, document)).toBe('legacy markdown\n')
+    expect(editor.blocksToMarkdownLossy).toHaveBeenCalledWith([
+      document[0],
+      {
+        ...document[1],
+        content: {
+          ...document[1].content,
+          headerRows: 0,
+          headerCols: 0,
+          rows: [{
+            cells: [{
+              type: 'tableCell',
+              props: { colspan: 1, rowspan: 1 },
+              content: [{ type: 'text', text: 'Safe', styles: {} }],
+            }],
+          }],
+        },
+      },
+    ])
+  })
+
   it('keeps plain hash references and punctuation literal while escaping formatting syntax', () => {
     const blocks = [
       {
