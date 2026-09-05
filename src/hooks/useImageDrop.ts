@@ -37,6 +37,12 @@ type DroppedImagesRequest = {
   vaultPath: string | undefined
   onImageUrl: ImageUrlHandler | undefined
 }
+type HtmlDroppedImagesRequest = {
+  files: File[]
+  onImageImportError: ImageImportErrorHandler | undefined
+  onImageUrl: ImageUrlHandler
+  vaultPath: string | undefined
+}
 type NativeDropEventRequest = {
   event: TauriDropEvent
   onImageImportError: ImageImportErrorHandler | undefined
@@ -113,11 +119,17 @@ function hasImageFiles(dt: DataTransfer): boolean {
     const item = Reflect.get(dt.items, i) as DataTransferItem | undefined
     if (item?.kind === 'file' && IMAGE_MIME_TYPES.includes(item.type)) return true
   }
-  return false
+  return Array.from(dt.files).some(isDroppedImageFile)
 }
 
 function isImagePath(path: string): boolean {
   return IMAGE_EXTENSIONS.includes(extensionFromFilename(path))
+}
+
+function isDroppedImageFile(file: File): boolean {
+  return IMAGE_MIME_TYPES.includes(file.type.toLowerCase())
+    || isImagePath(file.name)
+    || isUnsupportedHeicFile(file)
 }
 
 function isUnsupportedHeicPath(path: string): boolean {
@@ -208,6 +220,28 @@ function logDroppedImageCopyFailure(error: unknown): void {
   console.warn('[image-drop] Failed to copy dropped image into vault:', error)
 }
 
+function imageUrlFromUploadResult(result: UploadImageFileResult): string {
+  return typeof result === 'string' ? result : result.props.url
+}
+
+function insertHtmlDroppedImages({
+  files,
+  onImageImportError,
+  onImageUrl,
+  vaultPath,
+}: HtmlDroppedImagesRequest): void {
+  for (const file of files) {
+    if (isUnsupportedHeicFile(file)) {
+      onImageImportError?.(unsupportedHeicImportError(file.name))
+      continue
+    }
+    void uploadImageFile(file, vaultPath).then((result) => {
+      const url = imageUrlFromUploadResult(result)
+      if (url) onImageUrl(url)
+    }, logDroppedImageCopyFailure)
+  }
+}
+
 function reportUnsupportedDroppedImages(
   imagePaths: string[],
   onImageImportError: ImageImportErrorHandler | undefined,
@@ -293,7 +327,7 @@ export function useImageDrop({ containerRef, onImageImportError, onImageUrl, vau
   const vaultPathRef = useRef(vaultPath)
   useEffect(() => { vaultPathRef.current = vaultPath }, [vaultPath])
 
-  // HTML5 DnD visual feedback; BlockNote handles browser-mode uploads.
+  // HTML5 DnD handles OS image files while allowing internal editor drags through.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -311,18 +345,31 @@ export function useImageDrop({ containerRef, onImageImportError, onImageUrl, vau
       }
     }
 
-    const handleDrop = () => {
+    const handleDrop = (event: DragEvent) => {
       setIsDragOver(false)
+      if (!event.dataTransfer) return
+      const files = Array.from(event.dataTransfer.files).filter(isDroppedImageFile)
+      const currentOnImageUrl = onImageUrlRef.current
+      if (files.length === 0 || !currentOnImageUrl) return
+
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      insertHtmlDroppedImages({
+        files,
+        onImageImportError: onImageImportErrorRef.current,
+        onImageUrl: currentOnImageUrl,
+        vaultPath: vaultPathRef.current,
+      })
     }
 
     container.addEventListener('dragover', handleDragOver)
     container.addEventListener('dragleave', handleDragLeave)
-    container.addEventListener('drop', handleDrop)
+    container.addEventListener('drop', handleDrop, true)
 
     return () => {
       container.removeEventListener('dragover', handleDragOver)
       container.removeEventListener('dragleave', handleDragLeave)
-      container.removeEventListener('drop', handleDrop)
+      container.removeEventListener('drop', handleDrop, true)
     }
   }, [containerRef])
 

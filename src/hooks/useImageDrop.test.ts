@@ -34,14 +34,14 @@ vi.mock('@tauri-apps/api/webview', () => ({
 // JSDOM lacks DragEvent and File.arrayBuffer — polyfill for tests
 beforeAll(() => {
   if (typeof globalThis.DragEvent === 'undefined') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).DragEvent = class DragEvent extends MouseEvent {
+    class TestDragEvent extends MouseEvent {
       dataTransfer: DataTransfer | null
       constructor(type: string, init?: DragEventInit) {
         super(type, init)
         this.dataTransfer = init?.dataTransfer ?? null
       }
     }
+    Object.defineProperty(globalThis, 'DragEvent', { value: TestDragEvent })
   }
 
   // File.prototype.arrayBuffer may be missing in older JSDOM
@@ -63,8 +63,7 @@ function createMockDataTransfer(files: File[]) {
     items: { ...items, length: items.length },
     files: Object.assign(files, { item: (i: number) => files[i] }),
     dropEffect: 'none',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any as DataTransfer
+  } as unknown as DataTransfer
 }
 
 function createDragEvent(type: string, files: File[], opts?: { relatedTarget?: EventTarget | null }) {
@@ -257,6 +256,20 @@ describe('useImageDrop', () => {
     // Should render without error; Tauri event listener is skipped in browser mode
     expect(result.current.isDragOver).toBe(false)
   })
+
+  it('leaves internal drops without image files to the editor', () => {
+    const editorSurface = document.createElement('div')
+    const blockNoteDrop = vi.fn()
+    renderImageDrop({ onImageUrl: vi.fn(), vaultPath: '/vault' })
+    editorSurface.addEventListener('drop', blockNoteDrop, true)
+    container.appendChild(editorSurface)
+
+    const drop = createDragEvent('drop', [])
+    act(() => { editorSurface.dispatchEvent(drop) })
+
+    expect(drop.defaultPrevented).toBe(false)
+    expect(blockNoteDrop).toHaveBeenCalledOnce()
+  })
 })
 
 describe('useImageDrop — Tauri native drag-drop', () => {
@@ -368,6 +381,36 @@ describe('useImageDrop — Tauri native drag-drop', () => {
     expect(invoke).toHaveBeenCalledWith('copy_image_to_vault', {
       vaultPath: '/vault',
       sourcePath: '/tmp/photo.png',
+    })
+    expect(invoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('imports an HTML5 filesystem image once without delegating it to BlockNote', async () => {
+    const onImageUrl = vi.fn()
+    const blockNoteDrop = vi.fn()
+    const editorSurface = document.createElement('div')
+    const { invoke, convertFileSrc } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockClear()
+    vi.mocked(convertFileSrc).mockClear()
+    vi.mocked(invoke).mockResolvedValue('/vault/attachments/123-photo.png')
+    vi.mocked(convertFileSrc).mockReturnValue('asset://localhost/vault/attachments/123-photo.png')
+    renderImageDropTauri({ onImageUrl, vaultPath: '/vault' })
+    editorSurface.addEventListener('drop', blockNoteDrop, true)
+    container.appendChild(editorSurface)
+
+    const file = new File(['png-data'], 'photo.png', { type: '' })
+    const drop = createDragEvent('drop', [file])
+    act(() => { editorSurface.dispatchEvent(drop) })
+
+    expect(drop.defaultPrevented).toBe(true)
+    expect(blockNoteDrop).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(onImageUrl).toHaveBeenCalledWith('asset://localhost/vault/attachments/123-photo.png')
+    })
+    expect(invoke).toHaveBeenCalledWith('save_image', {
+      vaultPath: '/vault',
+      filename: 'photo.png',
+      data: expect.any(String),
     })
     expect(invoke).toHaveBeenCalledTimes(1)
   })
