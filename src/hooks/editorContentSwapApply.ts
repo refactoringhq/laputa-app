@@ -1,5 +1,6 @@
 import type { MutableRefObject } from 'react'
 import type { useCreateBlockNote } from '@blocknote/react'
+import type { Transaction } from '@tiptap/pm/state'
 import { trackEvent } from '../lib/telemetry'
 import { classifyRichEditorRecoveryError } from '../components/richEditorRecoveryClassifier'
 import { blankParagraphBlocks } from './editorTabContent'
@@ -83,6 +84,52 @@ function setEditorEditable(editor: ReturnType<typeof useCreateBlockNote>, editab
   editor.isEditable = editable
 }
 
+function mutateEditorWithoutHistory(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  mutate: () => void,
+): void {
+  if (typeof editor.transact !== 'function') {
+    mutate()
+    return
+  }
+  editor.transact((transaction: Transaction | undefined) => {
+    transaction?.setMeta('addToHistory', false)
+    mutate()
+  })
+}
+
+function replaceBlocksWithoutHistory(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  current: EditorBlocks,
+  next: EditorBlocks,
+): void {
+  mutateEditorWithoutHistory(editor, () => editor.replaceBlocks(current, next))
+}
+
+function insertBlocksWithoutHistory(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  next: EditorBlocks,
+  reference: unknown,
+  placement: 'before' | 'after',
+): void {
+  mutateEditorWithoutHistory(editor, () => editor.insertBlocks(next, reference, placement))
+}
+
+function setContentWithoutHistory(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  markup: string,
+): void {
+  const chain = editor._tiptapEditor.chain
+  if (typeof chain !== 'function') {
+    editor._tiptapEditor.commands.setContent(markup)
+    return
+  }
+  chain.call(editor._tiptapEditor)
+    .setContent(markup)
+    .setMeta('addToHistory', false)
+    .run()
+}
+
 function lastEditorBlock(editor: ReturnType<typeof useCreateBlockNote>): unknown | undefined {
   return editor.document.at(-1)
 }
@@ -116,15 +163,15 @@ function applyPreparedBlocksToEditor(
     resetTextSelectionBeforeContentSwap(editor)
     const current = editor.document
     if (current.length > 0 && safeBlocks.length > 0) {
-      editor.replaceBlocks(current, safeBlocks)
+      replaceBlocksWithoutHistory(editor, current, safeBlocks)
     } else if (safeBlocks.length > 0) {
-      editor.insertBlocks(safeBlocks, current[0], 'before')
+      insertBlocksWithoutHistory(editor, safeBlocks, current[0], 'before')
     }
   } catch (err) {
     reportEditorContentSwapFailure(err)
     try {
       const markup = editor.blocksToHTMLLossy(safeBlocks)
-      editor._tiptapEditor.commands.setContent(markup)
+      setContentWithoutHistory(editor, markup)
     } catch (err2) {
       console.error('Fallback also failed:', err2)
       suppressChangeRef.current = false
@@ -150,9 +197,9 @@ function applyInitialProgressiveChunk(
   const chunkEnd = progressiveChunkEnd(safeBlocks, 0, PROGRESSIVE_INITIAL_BLOCK_APPLY_CHUNK_SIZE)
   const firstChunk = safeBlocks.slice(0, chunkEnd)
   if (current.length > 0 && firstChunk.length > 0) {
-    editor.replaceBlocks(current, firstChunk)
+    replaceBlocksWithoutHistory(editor, current, firstChunk)
   } else if (firstChunk.length > 0) {
-    editor.insertBlocks(firstChunk, current[0], 'before')
+    insertBlocksWithoutHistory(editor, firstChunk, current[0], 'before')
   }
   return firstChunk.length
 }
@@ -173,7 +220,7 @@ async function appendRemainingProgressiveBlocks(
     const nextChunk = safeBlocks.slice(index, chunkEnd)
     const reference = lastEditorBlock(editor)
     if (!reference) throw new Error('Missing progressive block insertion reference')
-    editor.insertBlocks(nextChunk, reference, 'after')
+    insertBlocksWithoutHistory(editor, nextChunk, reference, 'after')
     appliedChunks += 1
     index = chunkEnd
   }
@@ -189,7 +236,7 @@ function recoverProgressiveEditorContent(options: ProgressiveRecoveryOptions): b
   } = options
   try {
     const markup = editor.blocksToHTMLLossy(safeBlocks)
-    editor._tiptapEditor.commands.setContent(markup)
+    setContentWithoutHistory(editor, markup)
     return true
   } catch (err) {
     console.error('Fallback also failed:', err)
@@ -280,7 +327,7 @@ export function applyHtmlStateToEditor(options: ApplyMarkupStateToEditorOptions)
   suppressChangeRef.current = true
   try {
     resetTextSelectionBeforeContentSwap(editor)
-    editor._tiptapEditor.commands.setContent(markup)
+    setContentWithoutHistory(editor, markup)
   } catch (err) {
     console.error('applyHtmlStateToEditor failed:', err)
     suppressChangeRef.current = false

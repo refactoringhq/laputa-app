@@ -1,5 +1,8 @@
+import { BlockNoteEditor } from '@blocknote/core'
+import { undoDepth } from '@tiptap/pm/history'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { trackEvent } from '../lib/telemetry'
+import { schema } from '../components/editorSchema'
 import {
   applyBlocksToEditor,
   applyBlocksToEditorProgressively,
@@ -27,6 +30,14 @@ function makeEditor(options: MockEditorOptions = {}) {
     replaceResult = next => next,
   } = options
   let documentBlocks: unknown[] = [{ id: 'current-block', type: 'paragraph', content: [], children: [] }]
+  const transaction = {
+    setMeta: vi.fn().mockReturnThis(),
+  }
+  const contentChain = {
+    run: vi.fn(() => true),
+    setContent: vi.fn().mockReturnThis(),
+    setMeta: vi.fn().mockReturnThis(),
+  }
   return {
     isEditable: true,
     get document() {
@@ -41,10 +52,11 @@ function makeEditor(options: MockEditorOptions = {}) {
       return next
     }),
     blocksToHTMLLossy: vi.fn(() => '<p>Recovered content</p>'),
+    transact: vi.fn((callback: (nextTransaction: typeof transaction) => unknown) => callback(transaction)),
     _tiptapEditor: {
       state: { doc: { content: { size: 4 } } },
+      chain: vi.fn(() => contentChain),
       commands: {
-        setContent: vi.fn(),
         setTextSelection: vi.fn(),
       },
     },
@@ -75,6 +87,47 @@ afterEach(() => {
 })
 
 describe('applyBlocksToEditor', () => {
+  it('keeps repeated programmatic note replacements out of the user undo history', () => {
+    const mount = document.createElement('div')
+    document.body.appendChild(mount)
+    const editor = BlockNoteEditor.create({
+      initialContent: [{ id: 'previous', type: 'paragraph', content: 'Previous note' }],
+      schema,
+    })
+    editor.mount(mount)
+
+    try {
+      for (let index = 0; index < 120; index += 1) {
+        expect(applyBlocksToEditor({
+          blocks: [{ id: `next-${index}`, type: 'paragraph', content: `Next note ${index}` }],
+          editor,
+          editorContentPathRef: makeFrameRef<string | null>(null),
+          scrollTop: 0,
+          suppressChangeRef: makeFrameRef(false),
+          targetPath: `next-${index}.md`,
+        })).toBe(true)
+      }
+
+      expect(editor.document[0]?.content).toEqual([
+        expect.objectContaining({ text: 'Next note 119' }),
+      ])
+      expect(undoDepth(editor._tiptapEditor.state)).toBe(0)
+      expect(editor.undo()).toBe(false)
+
+      const activeBlock = editor.document[0]
+      if (!activeBlock) throw new Error('Expected the replacement note block')
+      editor.updateBlock(activeBlock, { content: 'User edit' })
+      expect(undoDepth(editor._tiptapEditor.state)).toBe(1)
+      expect(editor.undo()).toBe(true)
+      expect(editor.document[0]?.content).toEqual([
+        expect.objectContaining({ text: 'Next note 119' }),
+      ])
+    } finally {
+      editor.unmount()
+      mount.remove()
+    }
+  })
+
   it('recovers stale BlockNote block references without reporting a note-open swap error', () => {
     const staleBlockError = new Error('Block with ID 49c0b2e9-3c7e-47a6-954a-da98714f7ed0 not found')
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -101,7 +154,10 @@ describe('applyBlocksToEditor', () => {
       reason: 'stale_block_reference',
     })
     expect(editor.blocksToHTMLLossy).toHaveBeenCalledWith(nextBlocks)
-    expect(editor._tiptapEditor.commands.setContent).toHaveBeenCalledWith('<p>Recovered content</p>')
+    expect(editor._tiptapEditor.chain).toHaveBeenCalledOnce()
+    expect(editor._tiptapEditor.chain().setContent).toHaveBeenCalledOnce()
+    expect(editor._tiptapEditor.chain().setMeta).toHaveBeenCalledWith('addToHistory', false)
+    expect(editor._tiptapEditor.chain().run).toHaveBeenCalledOnce()
   })
 
   it('mounts large documents progressively while keeping the editor locked until commit', async () => {
@@ -188,7 +244,8 @@ describe('applyBlocksToEditor', () => {
     expect(applied).toBe(true)
     expect(editor.insertBlocks).not.toHaveBeenCalled()
     expect(editor.blocksToHTMLLossy).toHaveBeenCalledWith(blocks)
-    expect(editor._tiptapEditor.commands.setContent).toHaveBeenCalledWith('<p>Recovered content</p>')
+    expect(editor._tiptapEditor.chain().setContent).toHaveBeenCalledOnce()
+    expect(editor._tiptapEditor.chain().setMeta).toHaveBeenCalledWith('addToHistory', false)
     expect(editor.isEditable).toBe(true)
     expect(suppressChangeRef.current).toBe(false)
     expect(editorContentPathRef.current).toBe('large.md')

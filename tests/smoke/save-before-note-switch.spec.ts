@@ -1,5 +1,5 @@
-import fs from 'fs'
-import path from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 import { test, expect, type Page } from '@playwright/test'
 import {
   createFixtureVaultCopy,
@@ -17,6 +17,15 @@ type SaveBeforeSwitchProbeWindow = Window & typeof globalThis & {
     release: () => void
   }
   __saveBeforeSwitchProbeGate?: Promise<void>
+}
+
+interface CodeMirrorContentElement extends Element {
+  cmTile?: {
+    view?: {
+      dispatch: (transaction: { changes: { from: number; insert: string; to: number } }) => void
+      state: { doc: { length: number; toString: () => string } }
+    }
+  }
 }
 
 function isReactUpdateLoop(message: string): boolean {
@@ -62,10 +71,9 @@ async function openPropertiesPanel(page: Page) {
 
 async function getRawEditorContent(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const el = document.querySelector('.cm-content')
+    const el = document.querySelector('.cm-content') as CodeMirrorContentElement | null
     if (!el) return ''
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const view = (el as any).cmTile?.view
+    const view = el.cmTile?.view
     if (view) return view.state.doc.toString() as string
     return el.textContent ?? ''
   })
@@ -73,12 +81,11 @@ async function getRawEditorContent(page: Page): Promise<string> {
 
 async function setRawEditorContent(page: Page, content: string) {
   await page.evaluate((nextContent) => {
-    const el = document.querySelector('.cm-content')
+    const el = document.querySelector('.cm-content') as CodeMirrorContentElement | null
     if (!el) {
       throw new Error('CodeMirror content element is missing')
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const view = (el as any).cmTile?.view
+    const view = el.cmTile?.view
     if (!view) {
       throw new Error('CodeMirror view is missing')
     }
@@ -248,6 +255,20 @@ test('@smoke switching notes during a slow rich-editor save writes once and open
     { timeout: 10_000 },
   ).toContain(appendedText)
   expect(errors).toEqual([])
+})
+
+test('@smoke note navigation stays out of rich-editor undo history', async ({ page }) => {
+  await openNote(page, 'Note B')
+  await expect(page.locator('.bn-editor h1').first()).toHaveText('Note B', { timeout: 5_000 })
+
+  await openNote(page, 'Alpha Project')
+  await expect(page.locator('.bn-editor h1').first()).toHaveText('Alpha Project', { timeout: 5_000 })
+  await placeCaretAtEndOfBlock(page, 1)
+
+  await page.keyboard.press('Meta+z')
+
+  await expect(page.locator('.bn-editor h1').first()).toHaveText('Alpha Project')
+  await expect(page.locator('.bn-editor')).toContainText('This is a test project')
 })
 
 test('@smoke deleting a property after switching notes keeps the current note editable', async ({ page }) => {
