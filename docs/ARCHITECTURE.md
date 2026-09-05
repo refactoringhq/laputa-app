@@ -992,7 +992,6 @@ Data flows unidirectionally: `App` passes data and callbacks as props to child c
 | Cmd+[ / Cmd+] | Navigate back / forward (replaces tabs) |
 | Cmd+Z / Cmd+Shift+Z | Undo / Redo |
 | Cmd+1–9 | Switch to tab N |
-| Cmd+[ / Cmd+] | Navigate back / forward |
 | `[[` in editor | Open wikilink suggestion menu |
 
 `QuickOpenPalette` mounts its stateful content only while the palette is open. Closing it therefore removes keyboard and backdrop listeners, while reopening creates a fresh query, selection, and focus lifecycle without effect-driven state resets.
