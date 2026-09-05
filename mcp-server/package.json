@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test.js tool-service.test.js vault-lifecycle.test.js vault-lifecycle-stdio.test.js vault-path.test.js"
+    "test": "node --test test.js tool-service.test.js vault-lifecycle.test.js vault-lifecycle-stdio.test.js vault-path.test.js bundle.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

@@ -176,6 +176,9 @@ jobs:
                 raise SystemExit("CodeScene project health gate failed")
             PY
       - run:
+          name: MCP server tests
+          command: pnpm --filter tolaria-mcp-server test
+      - run:
           name: Frontend lint, build, and sharded coverage
           command: |
             FRONTEND_COVERAGE_SHARDS=2 \

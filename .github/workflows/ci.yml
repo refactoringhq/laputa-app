@@ -162,6 +162,9 @@ jobs:
       - name: Bundle MCP server resources (required by Tauri build)
         run: node scripts/bundle-mcp-server.mjs
 
+      - name: MCP server tests
+        run: pnpm --filter tolaria-mcp-server test
+
       - name: Frontend tests + coverage (≥70% lines/functions/branches/statements)
         run: pnpm test:coverage
         # Thresholds configured in vite.config.ts — exits non-zero if coverage drops
