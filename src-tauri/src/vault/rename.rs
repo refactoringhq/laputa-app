@@ -189,10 +189,12 @@ fn rewrite_wikilinks_in_file(path: &Path, re: &Regex, replacement: &str) -> Resu
 
 /// Extract the value of the `title:` frontmatter field from raw content.
 fn extract_fm_title_value(content: &str) -> Option<String> {
-    if !content.starts_with("---\n") {
-        return None;
-    }
-    let fm = content[4..].split("\n---").next()?;
+    let (after_open, line_ending) = content
+        .strip_prefix("---\n")
+        .map(|after| (after, "\n"))
+        .or_else(|| content.strip_prefix("---\r\n").map(|after| (after, "\r\n")))?;
+    let close_marker = format!("{line_ending}---");
+    let fm = after_open.split(&close_marker).next()?;
     fm.lines()
         .map(str::trim_start)
         .find_map(extract_title_value_from_frontmatter_line)

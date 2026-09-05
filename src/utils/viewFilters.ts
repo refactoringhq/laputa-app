@@ -23,7 +23,7 @@ const BUILT_IN_FIELD_READERS = new Map<string, BuiltInFieldReader>([
 
 /** Evaluate a view's filters against a list of entries, returning only matches. */
 export function evaluateView(definition: ViewDefinition, entries: VaultEntry[]): VaultEntry[] {
-  return entries.filter((e) => !e.archived && evaluateGroup(definition.filters, e))
+  return entries.filter((e) => evaluateGroup(definition.filters, e))
 }
 
 function evaluateGroup(group: FilterGroup, entry: VaultEntry): boolean {
