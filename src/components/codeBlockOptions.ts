@@ -144,6 +144,7 @@ const EXTRA_LANGUAGE_LOADERS = new Map<string, TolariaLanguageLoader>([
   ['diff', async () => optionalLanguageInputs(() => import('@shikijs/langs/diff'))],
   ['ini', async () => optionalLanguageInputs(() => import('@shikijs/langs/ini'))],
   ['toml', async () => optionalLanguageInputs(() => import('@shikijs/langs/toml'))],
+  ['pascal', async () => optionalLanguageInputs(() => import('@shikijs/langs/pascal'))],
 ])
 
 function expandGoLanguage(language: string): TolariaLanguageInput[] | null {

@@ -33,6 +33,7 @@ export const EXTRA_CODE_BLOCK_LANGUAGES = [
   { id: 'diff', name: 'Diff', aliases: ['diff', 'patch'] },
   { id: 'ini', name: 'INI', aliases: ['ini', 'properties'] },
   { id: 'toml', name: 'TOML', aliases: ['toml'] },
+  { id: 'pascal', name: 'Pascal', aliases: ['pascal', 'pas', 'objectpascal', 'delphi'] },
 ] as const satisfies readonly CodeBlockLanguageCatalogEntry[]
 
 const KNOWN_CODE_BLOCK_LANGUAGES = [
