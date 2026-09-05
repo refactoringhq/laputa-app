@@ -1,7 +1,10 @@
 import type { createTranslator } from '../lib/i18n'
+import { formatShortcutDisplay } from '../hooks/appCommandCatalog'
 import { Button } from './ui/button'
 
 type Translate = ReturnType<typeof createTranslator>
+
+const SETTINGS_SHORTCUT = formatShortcutDisplay({ display: '⌘,' })
 
 export function SettingsFooter({
   onClose,
@@ -17,7 +20,7 @@ export function SettingsFooter({
       className="flex items-center justify-between shrink-0"
       style={{ height: 56, padding: '0 24px', borderTop: '1px solid var(--border)' }}
     >
-      <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{t('settings.footerShortcut')}</span>
+      <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{t('settings.footerShortcut', { shortcut: SETTINGS_SHORTCUT })}</span>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={onClose}>
           {t('settings.cancel')}

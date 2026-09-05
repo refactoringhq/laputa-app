@@ -395,7 +395,7 @@
   "settings.privacy.crashReportingDescription": "Надсилати анонімні звіти про помилки",
   "settings.privacy.analytics": "Аналітика використання",
   "settings.privacy.analyticsDescription": "Ділитися анонімними шаблонами використання",
-  "settings.footerShortcut": "⌘, щоб відкрити налаштування",
+  "settings.footerShortcut": "{shortcut} щоб відкрити налаштування",
   "settings.cancel": "Скасувати",
   "settings.save": "Зберегти",
   "common.cancel": "Скасувати",
