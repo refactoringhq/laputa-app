@@ -55,14 +55,31 @@ function SheetUnavailableStatus({ error, locale }: { error: string; locale: AppL
 class SheetWorkbookBoundary extends Component<SheetWorkbookBoundaryProps, SheetWorkbookBoundaryState> {
   state: SheetWorkbookBoundaryState = { error: null }
 
+  private handleWindowError = (event: ErrorEvent): void => {
+    const error = event.error ?? new Error(event.message)
+    if (!isIronCalcWasmBridgeError(error)) return
+
+    event.preventDefault()
+    console.warn('[sheet-editor] Recovered IronCalc WASM bridge event failure:', error)
+    this.setState({ error })
+  }
+
   static getDerivedStateFromError(error: unknown): SheetWorkbookBoundaryState {
     return { error }
+  }
+
+  componentDidMount(): void {
+    window.addEventListener('error', this.handleWindowError, true)
   }
 
   componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {
     if (!isIronCalcWasmBridgeError(error)) return
 
     console.warn('[sheet-editor] Recovered IronCalc WASM bridge render failure:', error, errorInfo.componentStack)
+  }
+
+  componentWillUnmount(): void {
+    window.removeEventListener('error', this.handleWindowError, true)
   }
 
   render(): ReactNode {
