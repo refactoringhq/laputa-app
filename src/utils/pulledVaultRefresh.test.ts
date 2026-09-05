@@ -39,7 +39,7 @@ describe('refreshPulledVaultState', () => {
     expect(options.reloadVault).toHaveBeenCalledOnce()
     expect(options.reloadFolders).toHaveBeenCalledOnce()
     expect(options.reloadViews).toHaveBeenCalledOnce()
-    expect(options.closeAllTabs).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
     expect(options.replaceActiveTab).toHaveBeenCalledWith(entries[0])
   })
 
@@ -73,7 +73,7 @@ describe('refreshPulledVaultState', () => {
 
     await refreshPulledVaultState(options)
 
-    expect(options.closeAllTabs).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
     expect(options.replaceActiveTab).toHaveBeenCalledWith(activeEntry)
   })
 
@@ -96,7 +96,7 @@ describe('refreshPulledVaultState', () => {
     expect(options.reloadVault).toHaveBeenCalledOnce()
     expect(options.reloadFolders).toHaveBeenCalledOnce()
     expect(options.reloadViews).toHaveBeenCalledOnce()
-    expect(options.closeAllTabs).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
     expect(options.replaceActiveTab).toHaveBeenCalledWith(makeEntry('/vault/active.md', 'Active'))
   })
 
@@ -122,7 +122,7 @@ describe('refreshPulledVaultState', () => {
     await refreshPulledVaultState(options)
 
     expect(shouldRefocusActiveEditor).toHaveBeenCalledOnce()
-    expect(options.closeAllTabs).toHaveBeenCalledOnce()
+    expect(options.closeAllTabs).not.toHaveBeenCalled()
     expect(options.replaceActiveTab).toHaveBeenCalledWith(makeEntry('/vault/active.md', 'Active'))
     expect(refocusActiveEditor).toHaveBeenCalledWith('/vault/active.md')
   })

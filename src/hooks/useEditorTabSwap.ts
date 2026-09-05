@@ -545,8 +545,8 @@ function handleStableActivePath(options: StableActivePathOptions) {
 function resolveStableActivePathContent(options: StableActivePathOptions): boolean | null {
   return resolveCachedStableContent(options)
     ?? resolveEmptyHeadingStableContent(options)
-    ?? resolveStaleStableContent(options)
     ?? resolveCurrentStableContent(options)
+    ?? resolveStaleStableContent(options)
 }
 
 function resolveCachedStableContent(options: StableActivePathOptions): boolean | null {
@@ -965,68 +965,54 @@ function shouldSkipScheduledTabSwap(options: {
 }
 
 function runTabSwapEffect(options: RunTabSwapEffectOptions) {
-  const {
-    tabs,
-    activeTabPath,
-    editor,
-    rawMode,
-    tabCacheRef,
-    tabsRef,
-    prevActivePathRef,
-    editorMountedRef,
-    pendingSwapRef,
-    swapSeqRef,
-    prevRawModeRef,
-    rawSwapPendingRef,
-    suppressChangeRef,
-    editorContentPathRef,
-    pendingLocalContentRef,
-    flushPendingEditorChange,
-    vaultPath,
-  } = options
-
-  const rawModeJustEnded = consumeRawModeTransition(prevRawModeRef, rawMode)
-  if (flushBeforeRawMode({ rawMode, flushPendingEditorChange })) return
+  const rawModeJustEnded = consumeRawModeTransition(options.prevRawModeRef, options.rawMode)
+  if (flushBeforeRawMode(options)) return
   const state = resolveTabSwapState({
-    tabs,
-    activeTabPath,
-    tabCacheRef,
-    prevActivePathRef,
+    tabs: options.tabs,
+    activeTabPath: options.activeTabPath,
+    tabCacheRef: options.tabCacheRef,
+    prevActivePathRef: options.prevActivePathRef,
     rawModeJustEnded,
   })
-  if (state.pathChanged) invalidatePendingSwap({ pendingSwapRef, swapSeqRef })
-  flushBeforePathChange({ pathChanged: state.pathChanged, flushPendingEditorChange })
-  if (!state.pathChanged && flushPendingEditorChange()) return
+  if (state.pathChanged) invalidatePendingSwap(options)
+  flushBeforePathChange({
+    pathChanged: state.pathChanged,
+    flushPendingEditorChange: options.flushPendingEditorChange,
+  })
+  if (!state.pathChanged && options.flushPendingEditorChange()) return
 
   if (shouldSkipScheduledTabSwap({
     state,
-    activeTabPath,
-    editor,
-    editorMountedRef,
-    prevActivePathRef,
-    editorContentPathRef,
-    rawSwapPendingRef,
-    pendingLocalContentRef,
+    activeTabPath: options.activeTabPath,
+    editor: options.editor,
+    editorMountedRef: options.editorMountedRef,
+    prevActivePathRef: options.prevActivePathRef,
+    editorContentPathRef: options.editorContentPathRef,
+    rawSwapPendingRef: options.rawSwapPendingRef,
+    pendingLocalContentRef: options.pendingLocalContentRef,
   })) {
     return
   }
 
-  if (!activeTabPath || !state.activeTab) return
+  if (!options.activeTabPath || !state.activeTab) return
 
   scheduleTabSwap({
-    editor,
+    editor: options.editor,
     cache: state.cache,
-    targetPath: activeTabPath,
+    targetPath: options.activeTabPath,
     activeTab: state.activeTab,
-    clearDomSelection: shouldClearDomSelectionForScheduledSwap({ activeTabPath, state }),
-    pendingSwapRef,
-    swapSeqRef,
-    tabsRef,
-    prevActivePathRef,
-    rawSwapPendingRef,
-    suppressChangeRef,
-    editorContentPathRef,
-    vaultPath,
+    clearDomSelection: shouldClearDomSelectionForScheduledSwap({
+      activeTabPath: options.activeTabPath,
+      state,
+    }),
+    pendingSwapRef: options.pendingSwapRef,
+    swapSeqRef: options.swapSeqRef,
+    tabsRef: options.tabsRef,
+    prevActivePathRef: options.prevActivePathRef,
+    rawSwapPendingRef: options.rawSwapPendingRef,
+    suppressChangeRef: options.suppressChangeRef,
+    editorContentPathRef: options.editorContentPathRef,
+    vaultPath: options.vaultPath,
   })
 }
 

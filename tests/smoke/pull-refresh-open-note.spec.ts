@@ -92,12 +92,23 @@ async function expectEditorFocused(page: Page): Promise<void> {
 }
 
 async function activeSelectionBlockType(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const selection = window.getSelection()
-    const anchorNode = selection?.anchorNode ?? null
-    const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode?.parentElement ?? null
-    return anchorElement?.closest('.bn-block-content')?.getAttribute('data-content-type') ?? null
-  })
+  return page.evaluate(() => window.getSelection()?.anchorNode?.parentElement
+    ?.closest('.bn-block-content')?.getAttribute('data-content-type') ?? null)
+}
+
+async function activeSelectionText(page: Page): Promise<string | null> {
+  return page.evaluate(() => window.getSelection()?.anchorNode?.textContent ?? null)
+}
+
+async function readEditorScrollTop(page: Page): Promise<number> {
+  return page.locator('.editor-scroll-area').evaluate((element) => element.scrollTop)
+}
+
+function makeLongNoteBody(paragraphCount: number): string {
+  return Array.from(
+    { length: paragraphCount },
+    (_, index) => `Pull refresh paragraph ${index + 1}.`,
+  ).join('\n\n')
 }
 
 test.describe('Pull refreshes the open note immediately', () => {
@@ -170,6 +181,44 @@ ${pulledBody}
     await page.waitForTimeout(500)
     expect(await readEditorSwapCount(page)).toBe(0)
     await expect.poll(() => activeSelectionBlockType(page), { timeout: 5_000 }).toBe('paragraph')
+    await expectEditorFocused(page)
+  })
+
+  test('@smoke frontmatter-only pull preserves the active caret and scroll position', async ({ page }) => {
+    const paragraphCount = 80
+    const finalParagraph = `Pull refresh paragraph ${paragraphCount}.`
+    const notePath = path.join(tempVaultDir, 'note', 'note-b.md')
+    const body = makeLongNoteBody(paragraphCount)
+    const noteContent = `---
+Is A: Note
+Status: Active
+---
+
+# Note B
+
+${body}
+`
+
+    fs.writeFileSync(notePath, noteContent, 'utf8')
+    await openNote(page, 'Note B')
+    const finalBlock = page.locator('.bn-block-content').filter({ hasText: finalParagraph }).last()
+    await finalBlock.scrollIntoViewIfNeeded()
+    await placeCaretAtEndOfBlock(page, paragraphCount)
+    await expectEditorFocused(page)
+    const scrollTopBeforePull = await readEditorScrollTop(page)
+    expect(scrollTopBeforePull).toBeGreaterThan(0)
+    await expect.poll(() => activeSelectionText(page)).toContain(finalParagraph)
+    await installEditorSwapProbe(page)
+
+    fs.writeFileSync(notePath, noteContent.replace('Status: Active', 'Status: Reviewed'), 'utf8')
+    await stubUpdatedPull(page, notePath)
+    await triggerPullCommand(page)
+
+    await expect(page.getByText('Pulled 1 update(s) from remote')).toBeVisible({ timeout: 5_000 })
+    await page.waitForTimeout(500)
+    expect(await readEditorSwapCount(page)).toBe(0)
+    await expect.poll(() => readEditorScrollTop(page)).toBe(scrollTopBeforePull)
+    await expect.poll(() => activeSelectionText(page)).toContain(finalParagraph)
     await expectEditorFocused(page)
   })
 })

@@ -131,7 +131,7 @@ describe('useVaultBridge', () => {
     await act(async () => { result.current.handleAgentFileModified('active.md') })
 
     expectVaultDerivedStateReloaded({ reloadVault, reloadFolders, reloadViews })
-    expect(closeAllTabs).toHaveBeenCalledOnce()
+    expect(closeAllTabs).not.toHaveBeenCalled()
     expect(replaceActiveTab).toHaveBeenCalledWith(fresh)
   })
 

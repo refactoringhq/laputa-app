@@ -118,6 +118,7 @@ async function shouldKeepCurrentActiveEntryMounted(options: {
 }
 
 async function applyActiveEntryReplacement(options: {
+  activePath: string
   closeAllTabs: PulledVaultRefreshOptions['closeAllTabs']
   replaceActiveTab: PulledVaultRefreshOptions['replaceActiveTab']
   refocusActiveEditor?: PulledVaultRefreshOptions['refocusActiveEditor']
@@ -126,6 +127,7 @@ async function applyActiveEntryReplacement(options: {
   shouldReplace: boolean | null
 }): Promise<boolean> {
   const {
+    activePath,
     closeAllTabs,
     replaceActiveTab,
     refocusActiveEditor,
@@ -136,7 +138,7 @@ async function applyActiveEntryReplacement(options: {
   if (!replacementEntry || !shouldReplace) return false
 
   const shouldRefocus = shouldRefocusActiveEditor?.() === true
-  closeAllTabs()
+  if (!notePathsMatch(activePath, replacementEntry.path)) closeAllTabs()
   await replaceActiveTab(replacementEntry)
   if (shouldRefocus) refocusActiveEditor?.(replacementEntry.path)
   return true
@@ -194,6 +196,7 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   })) return entries
 
   const handledReplacement = await applyActiveEntryReplacement({
+    activePath,
     closeAllTabs,
     replaceActiveTab,
     refocusActiveEditor,

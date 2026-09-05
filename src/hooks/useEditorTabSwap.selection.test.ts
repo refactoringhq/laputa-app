@@ -113,4 +113,34 @@ describe('useEditorTabSwap selection refresh', () => {
     expect(document.activeElement).not.toBe(editable)
     document.removeEventListener('selectionchange', selectionChanges)
   })
+
+  it('preserves the editor selection when only the current note frontmatter changes', async () => {
+    installFrameAndScrollSpies()
+    const docRef = { current: initialBlocks as unknown[] }
+    const editor = makeEditor(docRef)
+    const tabA = makeTab('a.md', '---\ntitle: Note A\n---\n\nOld body')
+    const refreshedTabA = makeTab(
+      'a.md',
+      '---\ntitle: Note A\nstatus: Reviewed\n---\n\nOld body',
+    )
+
+    const rendered = renderHook(
+      ({ tabs }) => useEditorTabSwap({
+        tabs,
+        activeTabPath: 'a.md',
+        editor: editor as never,
+      }),
+      { initialProps: { tabs: [tabA] } },
+    )
+    await flushEditorTick()
+    editor.replaceBlocks.mockClear()
+
+    const { editable, selection } = appendFocusedEditorSelection()
+    rendered.rerender({ tabs: [refreshedTabA] })
+    await flushEditorTick()
+
+    expect(selection.rangeCount).toBe(1)
+    expect(editable.contains(selection.anchorNode)).toBe(true)
+    expect(editor.replaceBlocks).not.toHaveBeenCalled()
+  })
 })
